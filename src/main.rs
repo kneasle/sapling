@@ -1,3 +1,7 @@
+use sapling::ast::json::{JSONFormat, JSON};
+use sapling::editor::Editor;
+
 fn main() {
-    println!("Hello, world!");
+    let editor = Editor::new(JSON::True, JSONFormat::Pretty);
+    editor.mainloop();
 }
