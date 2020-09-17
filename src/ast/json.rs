@@ -165,6 +165,8 @@ impl Default for JSON {
 impl AST for JSON {
     type FormatStyle = JSONFormat;
 
+    /* FORMATTING FUNCTIONS */
+
     fn write_text(&self, string: &mut String, format_style: JSONFormat) {
         match format_style {
             JSONFormat::Compact => {
@@ -176,6 +178,27 @@ impl AST for JSON {
             }
         }
     }
+
+    /* DEBUG VIEW FUNCTIONS */
+
+    fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
+        match self {
+            JSON::True | JSON::False => Box::new(std::iter::empty()),
+            JSON::Array(children) => Box::new(children.iter()),
+            JSON::Object(fields) => Box::new(fields.iter().map(|x| &x.1)),
+        }
+    }
+
+    fn get_display_name(&self) -> String {
+        match self {
+            JSON::True => "true".to_string(),
+            JSON::False => "false".to_string(),
+            JSON::Array(_) => "array".to_string(),
+            JSON::Object(_) => "object".to_string(),
+        }
+    }
+
+    /* AST EDITING FUNCTIONS */
 
     fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
         Box::new(
@@ -282,6 +305,26 @@ mod tests {
             ),
         ] {
             assert_eq!(tree.to_text(JSONFormat::Pretty), *expected_string);
+        }
+    }
+
+    // This function actually tests `write_tree_view` from 'ast/mod.rs', but since that is a trait
+    // method, it can only be tested on a concrete implementation of AST
+    #[test]
+    fn tree_view() {
+        for (tree, expected_string) in &[
+            (JSON::True, "true"),
+            (JSON::False, "false"),
+            (JSON::Object(vec![]), "object"),
+            (JSON::Array(vec![]), "array"),
+            (
+                JSON::Array(vec![JSON::True, JSON::False]),
+                "array
+├── true
+└── false",
+            ),
+        ] {
+            assert_eq!(tree.tree_view(), *expected_string);
         }
     }
 }

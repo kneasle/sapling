@@ -19,6 +19,32 @@ pub trait AST: Eq + Default {
         s
     }
 
+    /* DEBUG VIEW FUNCTIONS */
+
+    /// Get an iterator over the direct children of this node
+    fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a>;
+    /// Get the display name of this node
+    fn get_display_name(&self) -> String;
+
+    fn write_tree_view_recursive(&self, string: &mut String, indentation_string: &mut String) {
+        unimplemented!();
+    }
+
+    /// Render a tree view of this node, similar to the output of the Unix command 'tree'
+    fn write_tree_view(&self, string: &mut String) {
+        let mut indentation_string = String::new();
+        self.write_tree_view_recursive(string, &mut indentation_string);
+    }
+    
+    /// Build a string of the a tree view of this node, similar to the output of the Unix command
+    /// 'tree'.  This is the same as [write_tree_view](AST::write_tree_view), except that it
+    /// returns a [String] rather than appending to an existing [String].
+    fn tree_view(&self) -> String {
+        let mut s = String::new();
+        self.write_tree_view(&mut s);
+        s
+    }
+
     /* AST EDITING FUNCTIONS */
 
     /// Generate an iterator over the possible shorthand [char]s that a user could type to replace
