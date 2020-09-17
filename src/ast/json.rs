@@ -76,3 +76,39 @@ impl AST for JSON {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{AST, JSON};
+
+    #[test]
+    fn text_conversion() {
+        for (tree, expected_string) in &[
+            (JSON::True, "true"),
+            (JSON::False, "false"),
+            (JSON::Array(vec![JSON::True, JSON::False]), "[true, false]"),
+            (
+                JSON::Object(vec![
+                    ("foo".to_string(), JSON::True),
+                    ("bar".to_string(), JSON::False),
+                ]),
+                r#"{"foo": true, "bar": false}"#,
+            ),
+            (
+                JSON::Array(vec![
+                    JSON::Object(vec![
+                        (
+                            "foos".to_string(),
+                            JSON::Array(vec![JSON::False, JSON::True, JSON::False]),
+                        ),
+                        ("bar".to_string(), JSON::False),
+                    ]),
+                    JSON::True,
+                ]),
+                r#"[{"foos": [false, true, false], "bar": false}, true]"#,
+            ),
+        ] {
+            assert_eq!(tree.to_text(), *expected_string);
+        }
+    }
+}
