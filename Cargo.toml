@@ -3,3 +3,6 @@ name = "sapling"
 version = "0.1.0"
 authors = ["Ben White-Horne <kneasle@gmail.com>"]
 edition = "2018"
+
+[dependencies]
+tuikit = "*"
