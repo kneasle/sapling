@@ -167,7 +167,7 @@ impl AST for JSON {
 
     /* FORMATTING FUNCTIONS */
 
-    fn write_text(&self, string: &mut String, format_style: JSONFormat) {
+    fn write_text(&self, string: &mut String, format_style: &JSONFormat) {
         match format_style {
             JSONFormat::Compact => {
                 self.write_text_compact(string);
@@ -252,7 +252,7 @@ mod tests {
                 r#"[{"foos": [false, true, false], "bar": false}, true]"#,
             ),
         ] {
-            assert_eq!(tree.to_text(JSONFormat::Compact), *expected_string);
+            assert_eq!(tree.to_text(&JSONFormat::Compact), *expected_string);
         }
     }
 
@@ -304,7 +304,7 @@ mod tests {
 ]"#,
             ),
         ] {
-            assert_eq!(tree.to_text(JSONFormat::Pretty), *expected_string);
+            assert_eq!(tree.to_text(&JSONFormat::Pretty), *expected_string);
         }
     }
 
