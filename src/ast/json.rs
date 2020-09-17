@@ -35,7 +35,9 @@ impl AST for JSON {
             JSON::Array(children) => {
                 // All arrays start with a '['
                 string.push('[');
-                // Push the first child (if it exists) without starting with a ','
+                // Push the first child (if it exists) without starting with a ','.
+                // We don't need to fuse 'child_iter' because std::slice::Iter is already a
+                // FusedIterator
                 let mut child_iter = children.iter();
                 if let Some(first_child) = child_iter.next() {
                     first_child.write_text(string);
@@ -52,7 +54,9 @@ impl AST for JSON {
             JSON::Object(fields) => {
                 // All objects start with a '{'
                 string.push('{');
-                // Push the first child (if it exists) without starting with a ','
+                // Push the first child (if it exists) without starting with a ','.
+                // We don't need to fuse 'child_iter' because std::slice::Iter is already a
+                // FusedIterator
                 let mut child_iter = fields.iter();
                 if let Some((name, child)) = child_iter.next() {
                     // Push the field's name, and a colon
