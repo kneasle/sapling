@@ -27,6 +27,11 @@ pub enum JSON {
     Object(Vec<(String, JSON)>),
 }
 
+const CHAR_TRUE: char = 't';
+const CHAR_FALSE: char = 'f';
+const CHAR_ARRAY: char = 'a';
+const CHAR_OBJECT: char = 'o';
+
 impl JSON {
     fn write_text_compact(&self, string: &mut String) {
         match self {
@@ -169,6 +174,24 @@ impl AST for JSON {
                 let mut indentation_buffer = String::new();
                 self.write_text_pretty(string, &mut indentation_buffer);
             }
+        }
+    }
+
+    fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
+        Box::new(
+            [CHAR_TRUE, CHAR_FALSE, CHAR_ARRAY, CHAR_OBJECT]
+                .iter()
+                .copied(),
+        )
+    }
+
+    fn from_replace_char(&self, c: char) -> Option<Self> {
+        match c {
+            CHAR_TRUE => Some(JSON::True),
+            CHAR_FALSE => Some(JSON::False),
+            CHAR_ARRAY => Some(JSON::Array(vec![])),
+            CHAR_OBJECT => Some(JSON::Object(vec![])),
+            _ => None,
         }
     }
 }
