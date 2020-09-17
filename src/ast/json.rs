@@ -1,5 +1,4 @@
 use crate::ast::AST;
-use std::collections::HashMap;
 
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
@@ -15,12 +14,12 @@ pub enum JSON {
     /// A JSON object, represented as a map of [String]s to more JSON values.
     /// Corresponds to a string `{"<key1>": <v1>, "<key2>": <v2>, ...}` where `<key1>`, `<key2>`,
     /// ... are the keys, and `<v1>`, `<v2>`, ... are the corresponding JSON values.
-    Object(HashMap<String, JSON>),
+    Object(Vec<(String, JSON)>),
 }
 
 impl Default for JSON {
     fn default() -> JSON {
-        JSON::Object(HashMap::default())
+        JSON::Object(vec![])
     }
 }
 
