@@ -36,10 +36,14 @@ impl<T: AST> Editor<T> {
                         break;
                     }
                     Key::Char(c) => {
-                        self.command.push(c);
-                    }
-                    Key::Backspace => {
-                        self.command.pop();
+                        if self.command == "r" {
+                            if let Some(node) = self.ast.from_replace_char(c) {
+                                self.ast = node;
+                            }
+                            self.command.clear();
+                        } else {
+                            self.command.push(c);
+                        }
                     }
                     Key::ESC => {
                         self.command.clear();
