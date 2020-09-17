@@ -87,58 +87,64 @@ impl JSON {
             }
             JSON::Array(children) => {
                 // Push the '[' on its own line
-                string.push_str("[\n");
-                // Indent by one extra level
-                indentation_buffer.push_str("    ");
-                // Append all the children, separated by commas
-                let mut is_first_child = true;
-                for child in children.iter() {
-                    // Add the comma if this isn't the first element
-                    if !is_first_child {
-                        string.push_str(",\n");
+                string.push('[');
+                if !children.is_empty() {
+                    string.push('\n');
+                    // Indent by one extra level
+                    indentation_buffer.push_str("    ");
+                    // Append all the children, separated by commas
+                    let mut is_first_child = true;
+                    for child in children.iter() {
+                        // Add the comma if this isn't the first element
+                        if !is_first_child {
+                            string.push_str(",\n");
+                        }
+                        is_first_child = false;
+                        // Indent and then render the child
+                        string.push_str(indentation_buffer);
+                        child.write_text_pretty(string, indentation_buffer);
                     }
-                    is_first_child = false;
-                    // Indent and then render the child
+                    // Return to the current indentation level
+                    for _ in 0..4 {
+                        indentation_buffer.pop();
+                    }
+                    // Put the finishing ']' on its own line
+                    string.push('\n');
                     string.push_str(indentation_buffer);
-                    child.write_text_pretty(string, indentation_buffer);
                 }
-                // Return to the current indentation level
-                for _ in 0..4 {
-                    indentation_buffer.pop();
-                }
-                // Put the finishing ']' on its own line
-                string.push('\n');
-                string.push_str(indentation_buffer);
                 string.push(']');
             }
             JSON::Object(fields) => {
                 // Push the '{' on its own line
-                string.push_str("{\n");
-                // Indent by one extra level
-                indentation_buffer.push_str("    ");
-                // Append all the children, separated by commas
-                let mut is_first_child = true;
-                for (name, child) in fields.iter() {
-                    // Add the comma if this isn't the first element
-                    if !is_first_child {
-                        string.push_str(",\n");
+                string.push('{');
+                if !fields.is_empty() {
+                    string.push('\n');
+                    // Indent by one extra level
+                    indentation_buffer.push_str("    ");
+                    // Append all the children, separated by commas
+                    let mut is_first_child = true;
+                    for (name, child) in fields.iter() {
+                        // Add the comma if this isn't the first element
+                        if !is_first_child {
+                            string.push_str(",\n");
+                        }
+                        is_first_child = false;
+                        // Indent the right number of times
+                        string.push_str(indentation_buffer);
+                        // Push the field's name then a colon then the child value
+                        string.push('"');
+                        string.push_str(name);
+                        string.push_str("\": ");
+                        child.write_text_pretty(string, indentation_buffer);
                     }
-                    is_first_child = false;
-                    // Indent the right number of times
+                    // Return to the current indentation level
+                    for _ in 0..4 {
+                        indentation_buffer.pop();
+                    }
+                    // Put the finishing '}' on its own line
+                    string.push('\n');
                     string.push_str(indentation_buffer);
-                    // Push the field's name then a colon then the child value
-                    string.push('"');
-                    string.push_str(name);
-                    string.push_str("\": ");
-                    child.write_text_pretty(string, indentation_buffer);
                 }
-                // Return to the current indentation level
-                for _ in 0..4 {
-                    indentation_buffer.pop();
-                }
-                // Put the finishing '}' on its own line
-                string.push('\n');
-                string.push_str(indentation_buffer);
                 string.push('}');
             }
         }
@@ -176,6 +182,8 @@ mod tests {
         for (tree, expected_string) in &[
             (JSON::True, "true"),
             (JSON::False, "false"),
+            (JSON::Array(vec![]), "[]"),
+            (JSON::Object(vec![]), "{}"),
             (JSON::Array(vec![JSON::True, JSON::False]), "[true, false]"),
             (
                 JSON::Object(vec![
@@ -207,6 +215,8 @@ mod tests {
         for (tree, expected_string) in &[
             (JSON::True, "true"),
             (JSON::False, "false"),
+            (JSON::Array(vec![]), "[]"),
+            (JSON::Object(vec![]), "{}"),
             (
                 JSON::Array(vec![JSON::True, JSON::False]),
                 "[
