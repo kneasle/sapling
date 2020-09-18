@@ -21,6 +21,17 @@ impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for VecNodeMap<Node> {
         self.root
     }
 
+    /// Set the root of the tree to be the node at a given reference, returning [true] if the
+    /// reference was valid.  If the reference was invalid, the root will not be replaced and
+    /// [false] will be returned.
+    fn set_root(&mut self, new_root: Ref) -> bool {
+        let is_ref_valid = self.get_node(new_root).is_some();
+        if is_ref_valid {
+            self.root = new_root;
+        }
+        is_ref_valid
+    }
+
     /// Gets node from a reference, returning [None] if the reference is invalid.
     #[inline]
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node> {
@@ -168,7 +179,10 @@ mod tests {
             .unwrap()
             .clone_from(&ExampleNode::WithPayload(0));
 
-        assert_eq!(node_map.get_node(node_map.root()), Some(&ExampleNode::WithPayload(0)));
+        assert_eq!(
+            node_map.get_node(node_map.root()),
+            Some(&ExampleNode::WithPayload(0))
+        );
     }
 
     #[test]
@@ -180,5 +194,45 @@ mod tests {
 
         assert_eq!(node_map.get_node(r1), Some(&ExampleNode::Value1));
         assert_eq!(node_map.get_node(r2), Some(&ExampleNode::Value2));
+    }
+
+    #[test]
+    fn manual_set_root() {
+        let mut node_map: TestNodeMap = VecNodeMap::with_root(ExampleNode::WithPayload(42));
+
+        let r = node_map.add_node(ExampleNode::Recursive(node_map.root()));
+        assert!(node_map.set_root(r));
+
+        if let Some(node) = node_map.get_node(node_map.root()) {
+            match node {
+                ExampleNode::Recursive(child_ref) => {
+                    assert_eq!(node_map.get_node(*child_ref), Some(&ExampleNode::WithPayload(42)));
+                }
+                _ => {
+                    panic!("New root node has the wrong value.");
+                }
+            }
+        } else {
+            panic!("New root node not valid.");
+        }
+    }
+
+    #[test]
+    fn set_root() {
+        let mut node_map: TestNodeMap = VecNodeMap::with_root(ExampleNode::WithPayload(42));
+        node_map.add_as_root(ExampleNode::Recursive(node_map.root()));
+
+        if let Some(node) = node_map.get_node(node_map.root()) {
+            match node {
+                ExampleNode::Recursive(child_ref) => {
+                    assert_eq!(node_map.get_node(*child_ref), Some(&ExampleNode::WithPayload(42)));
+                }
+                _ => {
+                    panic!("New root node has the wrong value.");
+                }
+            }
+        } else {
+            panic!("New root node not valid.");
+        }
     }
 }

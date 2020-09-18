@@ -22,6 +22,19 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
     /// Get the reference of the root node of the tree
     fn root(&self) -> Ref;
 
+    /// Set the root of the tree to be the node at a given reference, returning [true] if the
+    /// reference was valid.  If the reference was invalid, the root will not be replaced and
+    /// [false] will be returned.
+    fn set_root(&mut self, new_root: Ref) -> bool;
+
+    /// Adds a new node and set it to the tree's root
+    fn add_as_root(&mut self, new_root_node: Node) -> Ref {
+        let r = self.add_node(new_root_node);
+        let is_valid = self.set_root(r);
+        debug_assert!(is_valid);
+        r
+    }
+
     /// Gets node from a reference, returning [None] if the reference is invalid.
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node>;
 

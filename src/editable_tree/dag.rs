@@ -31,6 +31,15 @@ impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for DAG<Node> {
         *self.roots.last().unwrap()
     }
 
+    /// Get the reference of the root node of the tree
+    fn set_root(&mut self, new_root: Ref) -> bool {
+        let is_ref_valid = self.get_node(new_root).is_some();
+        if is_ref_valid {
+            self.roots.push(new_root);
+        }
+        is_ref_valid
+    }
+
     /// Gets node from a reference, returning [None] if the reference is invalid.
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node> {
         self.nodes.get(id.as_usize())
