@@ -23,4 +23,3 @@ impl Ref {
         self.0
     }
 }
-
