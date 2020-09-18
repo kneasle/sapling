@@ -16,6 +16,14 @@ pub struct DAG<Node: ASTSpec<Ref>> {
 impl<Node: ASTSpec<Ref>> DAG<Node> {}
 
 impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for DAG<Node> {
+    /// Create a new `NodeMap` with a given `Node` as root
+    fn with_root(root: Node) -> Self {
+        DAG {
+            nodes: vec![root],
+            roots: vec![Ref::from(0)],
+        }
+    }
+    
     /// Get the reference of the root node of the tree
     fn root(&self) -> Ref {
         // We can unwrap here because we uphold the invariant that there must always be at least

@@ -7,6 +7,14 @@ pub struct VecNodeMap<Node> {
 }
 
 impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for VecNodeMap<Node> {
+    /// Create a new `NodeMap` with a given `Node` as root
+    fn with_root(node: Node) -> Self {
+        VecNodeMap {
+            nodes: vec![node],
+            root: Ref::from(0),
+        }
+    }
+
     /// Get the reference of the root node of the tree
     #[inline]
     fn root(&self) -> Ref {

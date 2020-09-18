@@ -8,6 +8,17 @@ pub trait Reference: Copy + Eq + std::fmt::Debug + std::hash::Hash {}
 
 /// A trait bound for a type that can store `Node`s, accessible by references.
 pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
+    /// Create a new `NodeMap` with a given `Node` as root
+    fn with_root(root: Node) -> Self;
+
+    /// Create a new `NodeMap` containing only the default node as root
+    fn with_default_root() -> Self
+    where
+        Self: Sized,
+    {
+        Self::with_root(Node::default())
+    }
+
     /// Get the reference of the root node of the tree
     fn root(&self) -> Ref;
 
