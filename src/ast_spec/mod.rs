@@ -63,6 +63,7 @@ pub trait ASTSpec<Ref: Reference>: Eq + Default {
 
     /// Get an iterator over the direct children of this node
     fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a>;
+
     /// Get the display name of this node
     fn get_display_name(&self) -> String;
 
@@ -95,6 +96,7 @@ pub trait ASTSpec<Ref: Reference>: Eq + Default {
     /// Generate an iterator over the possible shorthand [char]s that a user could type to replace
     /// this node with something else.
     fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>>;
+
     /// Generate a new node from a [char] that a user typed as part of the `r` command.  If `c` is
     /// an element of [get_replace_chars](AST::get_replace_chars), this must return `Some` value,
     /// if it isn't, then this can return `None`.
