@@ -1,20 +1,6 @@
+use super::reference::Ref;
 use super::EditableTree;
-use crate::ast_spec::{ASTSpec, NodeMap, Reference};
-
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct Ref(usize);
-
-impl Reference for Ref {}
-
-impl Ref {
-    pub fn new(val: usize) -> Ref {
-        Ref(val)
-    }
-
-    pub fn as_usize(self) -> usize {
-        self.0
-    }
-}
+use crate::ast_spec::{ASTSpec, NodeMap};
 
 #[derive(Debug, Clone)]
 pub struct DAG<Node: ASTSpec<Ref>> {
