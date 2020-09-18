@@ -20,6 +20,17 @@ impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for DAG<Node> {
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node> {
         self.nodes.get(id.as_usize())
     }
+
+    /// Gets mutable node from a reference, returning [None] if the reference is invalid.
+    fn get_node_mut<'a>(&'a mut self, id: Ref) -> Option<&'a mut Node> {
+        self.nodes.get_mut(id.as_usize())
+    }
+
+    /// Add a new `Node` to the tree, and return its reference
+    fn add_node(&mut self, node: Node) -> Ref {
+        self.nodes.push(node);
+        Ref::new(self.nodes.len() - 1)
+    }
 }
 
 impl<Node: ASTSpec<Ref>> EditableTree<Ref, Node> for DAG<Node> {

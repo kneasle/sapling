@@ -9,6 +9,12 @@ pub trait Reference: Copy + Eq + std::fmt::Debug + std::hash::Hash {}
 pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
     /// Gets node from a reference, returning [None] if the reference is invalid.
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node>;
+
+    /// Gets mutable node from a reference, returning [None] if the reference is invalid.
+    fn get_node_mut<'a>(&'a mut self, id: Ref) -> Option<&'a mut Node>;
+
+    /// Add a new `Node` to the tree, and return its reference
+    fn add_node(&mut self, node: Node) -> Ref;
 }
 
 /// The specification of an AST that sapling can edit
