@@ -37,6 +37,6 @@ impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for VecNodeMap<Node> {
     #[inline]
     fn add_node(&mut self, node: Node) -> Ref {
         self.nodes.push(node);
-        Ref::new(self.nodes.len() - 1)
+        Ref::from(self.nodes.len() - 1)
     }
 }

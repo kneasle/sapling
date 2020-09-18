@@ -12,12 +12,13 @@ pub struct Ref(usize);
 
 impl Reference for Ref {}
 
-impl Ref {
-    #[inline]
-    pub(crate) fn new(val: usize) -> Ref {
+impl From<usize> for Ref {
+    fn from(val: usize) -> Ref {
         Ref(val)
     }
+}
 
+impl Ref {
     #[inline]
     pub(crate) fn as_usize(self) -> usize {
         self.0

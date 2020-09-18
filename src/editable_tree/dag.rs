@@ -44,7 +44,7 @@ impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for DAG<Node> {
     /// Add a new `Node` to the tree, and return its reference
     fn add_node(&mut self, node: Node) -> Ref {
         self.nodes.push(node);
-        Ref::new(self.nodes.len() - 1)
+        Ref::from(self.nodes.len() - 1)
     }
 }
 
@@ -52,7 +52,7 @@ impl<Node: ASTSpec<Ref>> EditableTree<Ref, Node> for DAG<Node> {
     fn new() -> Self {
         DAG {
             nodes: vec![Node::default()],
-            roots: vec![Ref::new(0)],
+            roots: vec![Ref::from(0)],
         }
     }
 }
