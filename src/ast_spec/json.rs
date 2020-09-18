@@ -1,4 +1,4 @@
-use crate::ast::AST;
+use super::{ASTSpec, NodeMap, Reference};
 
 /// An enum to hold the different ways that a JSON AST can be formatted
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -13,18 +13,18 @@ pub enum JSONFormat {
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
 #[derive(Eq, PartialEq, Clone)]
-pub enum JSON {
+pub enum JSON<Ref: Reference> {
     /// The JSON value for 'true'.  Corresponds to the string `true`.
     True,
     /// The JSON value 'false'.  Corresponds to the string `false`.
     False,
     /// A JSON array of multiple values.
     /// Corresponds to a string `[<v1>, <v2>, ...]` where `v1`, `v2`, ... are JSON values.
-    Array(Vec<JSON>),
+    Array(Vec<Ref>),
     /// A JSON object, represented as a map of [String]s to more JSON values.
     /// Corresponds to a string `{"<key1>": <v1>, "<key2>": <v2>, ...}` where `<key1>`, `<key2>`,
     /// ... are the keys, and `<v1>`, `<v2>`, ... are the corresponding JSON values.
-    Object(Vec<(String, JSON)>),
+    Object(Vec<(String, Ref)>),
 }
 
 const CHAR_TRUE: char = 't';
@@ -32,8 +32,8 @@ const CHAR_FALSE: char = 'f';
 const CHAR_ARRAY: char = 'a';
 const CHAR_OBJECT: char = 'o';
 
-impl JSON {
-    fn write_text_compact(&self, string: &mut String) {
+impl<Ref: Reference> JSON<Ref> {
+    fn write_text_compact(&self, node_map: &impl NodeMap<Ref, Self>, string: &mut String) {
         match self {
             JSON::True => {
                 string.push_str("true");
@@ -46,14 +46,21 @@ impl JSON {
                 string.push('[');
                 // Append all the children, separated by commas
                 let mut is_first_child = true;
-                for child in children.iter() {
+                for child in children.iter().copied() {
                     // Add the comma if this isn't the first element
                     if !is_first_child {
                         string.push_str(", ");
                     }
                     is_first_child = false;
                     // Push the field's name then a colon then the child value
-                    child.write_text_compact(string);
+                    match node_map.get_node(child) {
+                        Some(node) => {
+                            node.write_text_compact(node_map, string);
+                        }
+                        None => {
+                            string.push_str(&format!("<INVALID REF {:?}>", child));
+                        }
+                    }
                 }
                 // Finish the array with a ']'
                 string.push(']');
@@ -73,7 +80,14 @@ impl JSON {
                     string.push('"');
                     string.push_str(name);
                     string.push_str("\": ");
-                    child.write_text_compact(string);
+                    match node_map.get_node(*child) {
+                        Some(node) => {
+                            node.write_text_compact(node_map, string);
+                        }
+                        None => {
+                            string.push_str(&format!("<INVALID REF {:?}>", child));
+                        }
+                    }
                 }
                 // Finish the array with a '}'
                 string.push('}');
@@ -81,7 +95,12 @@ impl JSON {
         }
     }
 
-    fn write_text_pretty(&self, string: &mut String, indentation_buffer: &mut String) {
+    fn write_text_pretty(
+        &self,
+        node_map: &impl NodeMap<Ref, Self>,
+        string: &mut String,
+        indentation_buffer: &mut String,
+    ) {
         // Insert the text for this JSON tree
         match self {
             JSON::True => {
@@ -99,7 +118,7 @@ impl JSON {
                     indentation_buffer.push_str("    ");
                     // Append all the children, separated by commas
                     let mut is_first_child = true;
-                    for child in children.iter() {
+                    for child in children.iter().copied() {
                         // Add the comma if this isn't the first element
                         if !is_first_child {
                             string.push_str(",\n");
@@ -107,7 +126,14 @@ impl JSON {
                         is_first_child = false;
                         // Indent and then render the child
                         string.push_str(indentation_buffer);
-                        child.write_text_pretty(string, indentation_buffer);
+                        match node_map.get_node(child) {
+                            Some(node) => {
+                                node.write_text_pretty(node_map, string, indentation_buffer);
+                            }
+                            None => {
+                                string.push_str(&format!("<INVALID REF {:?}>", child));
+                            }
+                        }
                     }
                     // Return to the current indentation level
                     for _ in 0..4 {
@@ -140,7 +166,14 @@ impl JSON {
                         string.push('"');
                         string.push_str(name);
                         string.push_str("\": ");
-                        child.write_text_pretty(string, indentation_buffer);
+                        match node_map.get_node(*child) {
+                            Some(node) => {
+                                node.write_text_pretty(node_map, string, indentation_buffer);
+                            }
+                            None => {
+                                string.push_str(&format!("<INVALID REF {:?}>", child));
+                            }
+                        }
                     }
                     // Return to the current indentation level
                     for _ in 0..4 {
@@ -156,36 +189,41 @@ impl JSON {
     }
 }
 
-impl Default for JSON {
-    fn default() -> JSON {
+impl<Ref: Reference> Default for JSON<Ref> {
+    fn default() -> JSON<Ref> {
         JSON::Object(vec![])
     }
 }
 
-impl AST for JSON {
+impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
     type FormatStyle = JSONFormat;
 
     /* FORMATTING FUNCTIONS */
 
-    fn write_text(&self, string: &mut String, format_style: &JSONFormat) {
+    fn write_text(
+        &self,
+        node_map: &impl NodeMap<Ref, Self>,
+        string: &mut String,
+        format_style: &JSONFormat,
+    ) {
         match format_style {
             JSONFormat::Compact => {
-                self.write_text_compact(string);
+                self.write_text_compact(node_map, string);
             }
             JSONFormat::Pretty => {
                 let mut indentation_buffer = String::new();
-                self.write_text_pretty(string, &mut indentation_buffer);
+                self.write_text_pretty(node_map, string, &mut indentation_buffer);
             }
         }
     }
 
     /* DEBUG VIEW FUNCTIONS */
 
-    fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
+    fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a> {
         match self {
             JSON::True | JSON::False => Box::new(std::iter::empty()),
-            JSON::Array(children) => Box::new(children.iter()),
-            JSON::Object(fields) => Box::new(fields.iter().map(|x| &x.1)),
+            JSON::Array(children) => Box::new(children.iter().copied()),
+            JSON::Object(fields) => Box::new(fields.iter().map(|x| x.1)),
         }
     }
 

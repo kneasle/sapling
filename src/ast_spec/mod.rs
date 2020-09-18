@@ -2,46 +2,69 @@
 
 pub mod json;
 
+/// A trait bound that specifies what types can be used as a reference to Node in an AST
+pub trait Reference: Copy + Eq + std::fmt::Debug + std::hash::Hash {}
+
+/// A trait bound for a type that can generate nodes from references
+pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
+    fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node>;
+}
+
 /// The specification of an AST that sapling can edit
-pub trait AST: Eq + Default {
+pub trait ASTSpec<Ref: Reference>: Eq + Default {
+    /// A type parameter that will represent the different ways this AST can be rendered
     type FormatStyle;
 
     /* FORMATTING FUNCTIONS */
 
     /// Write the textual representation of this AST to a string
-    fn write_text(&self, string: &mut String, format_style: &Self::FormatStyle);
+    fn write_text(
+        &self,
+        node_map: &impl NodeMap<Ref, Self>,
+        string: &mut String,
+        format_style: &Self::FormatStyle,
+    );
 
     /// Make a [String] representing this AST.
     /// Same as [write_text](AST::write_text) but creates a new [String].
-    fn to_text(&self, format_style: &Self::FormatStyle) -> String {
+    fn to_text(
+        &self,
+        node_map: &impl NodeMap<Ref, Self>,
+        format_style: &Self::FormatStyle,
+    ) -> String {
         let mut s = String::new();
-        self.write_text(&mut s, format_style);
+        self.write_text(node_map, &mut s, format_style);
         s
     }
 
     /* DEBUG VIEW FUNCTIONS */
 
     /// Get an iterator over the direct children of this node
-    fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a>;
+    fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a>;
     /// Get the display name of this node
     fn get_display_name(&self) -> String;
 
-    fn write_tree_view_recursive(&self, string: &mut String, indentation_string: &mut String) {
+    fn write_tree_view_recursive(
+        &self,
+        node_map: &impl NodeMap<Ref, Self>,
+        string: &mut String,
+        indentation_string: &mut String,
+    ) {
         unimplemented!();
     }
 
     /// Render a tree view of this node, similar to the output of the Unix command 'tree'
-    fn write_tree_view(&self, string: &mut String) {
+    fn write_tree_view(&self, node_map: &impl NodeMap<Ref, Self>, string: &mut String) {
         let mut indentation_string = String::new();
-        self.write_tree_view_recursive(string, &mut indentation_string);
+        self.write_tree_view_recursive(node_map, string, &mut indentation_string);
     }
-    
+
     /// Build a string of the a tree view of this node, similar to the output of the Unix command
     /// 'tree'.  This is the same as [write_tree_view](AST::write_tree_view), except that it
     /// returns a [String] rather than appending to an existing [String].
-    fn tree_view(&self) -> String {
+    fn tree_view(&self, node_map: &impl NodeMap<Ref, Self>) -> String {
         let mut s = String::new();
-        self.write_tree_view(&mut s);
+        self.write_tree_view(node_map, &mut s);
         s
     }
 
