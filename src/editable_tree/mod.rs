@@ -7,9 +7,6 @@ pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> +
     /// Build a new EditableTree with a default AST
     fn new() -> Self;
 
-    /// Return the current root of the tree
-    fn root(&self) -> Ref;
-
     /// Render the text representing the current AST
     fn to_text(&self, format: &Node::FormatStyle) -> String {
         match self.get_node(self.root()) {

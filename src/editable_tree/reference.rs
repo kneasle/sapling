@@ -14,12 +14,12 @@ impl Reference for Ref {}
 
 impl Ref {
     #[inline]
-    pub(super) fn new(val: usize) -> Ref {
+    pub(crate) fn new(val: usize) -> Ref {
         Ref(val)
     }
 
     #[inline]
-    pub(super) fn as_usize(self) -> usize {
+    pub(crate) fn as_usize(self) -> usize {
         self.0
     }
 }

@@ -1,12 +1,16 @@
 //! A module to contain Rust representations of ASTs in a format that sapling can work with.
 
 pub mod json;
+mod vec_node_map;
 
 /// A trait bound that specifies what types can be used as a reference to Node in an AST
 pub trait Reference: Copy + Eq + std::fmt::Debug + std::hash::Hash {}
 
 /// A trait bound for a type that can store `Node`s, accessible by references.
 pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
+    /// Get the reference of the root node of the tree
+    fn root(&self) -> Ref;
+
     /// Gets node from a reference, returning [None] if the reference is invalid.
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node>;
 
