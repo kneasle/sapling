@@ -5,8 +5,9 @@ pub mod json;
 /// A trait bound that specifies what types can be used as a reference to Node in an AST
 pub trait Reference: Copy + Eq + std::fmt::Debug + std::hash::Hash {}
 
-/// A trait bound for a type that can generate nodes from references
+/// A trait bound for a type that can store `Node`s, accessible by references.
 pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
+    /// Gets node from a reference, returning [None] if the reference is invalid.
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node>;
 }
 

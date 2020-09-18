@@ -16,6 +16,7 @@ pub struct DAG<Node: ASTSpec<Ref>> {
 impl<Node: ASTSpec<Ref>> DAG<Node> {}
 
 impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for DAG<Node> {
+    /// Gets node from a reference, returning [None] if the reference is invalid.
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node> {
         self.nodes.get(id.as_usize())
     }

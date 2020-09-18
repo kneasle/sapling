@@ -14,7 +14,7 @@ pub struct Editor<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> {
 }
 
 impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
-    /// Create a new [Editor] to edit a given `ast`.
+    /// Create a new [Editor] with the default AST.
     pub fn new(tree: E, format_style: T::FormatStyle) -> Editor<R, T, E> {
         let term = Term::new().unwrap();
         Editor {
