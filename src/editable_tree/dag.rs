@@ -17,22 +17,22 @@ impl Ref {
 }
 
 #[derive(Debug, Clone)]
-pub struct Persistent<Node: ASTSpec<Ref>> {
+pub struct DAG<Node: ASTSpec<Ref>> {
     nodes: Vec<Node>,
     roots: Vec<Ref>,
 }
 
-impl<Node: ASTSpec<Ref>> Persistent<Node> {}
+impl<Node: ASTSpec<Ref>> DAG<Node> {}
 
-impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for Persistent<Node> {
+impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for DAG<Node> {
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node> {
         self.nodes.get(id.as_usize())
     }
 }
 
-impl<Node: ASTSpec<Ref>> EditableTree<Ref, Node> for Persistent<Node> {
+impl<Node: ASTSpec<Ref>> EditableTree<Ref, Node> for DAG<Node> {
     fn new() -> Self {
-        Persistent {
+        DAG {
             nodes: vec![Node::default()],
             roots: vec![Ref::new(0)],
         }

@@ -1,4 +1,4 @@
-pub mod persistent;
+pub mod dag;
 
 use crate::ast_spec::{NodeMap, ASTSpec, Reference};
 
