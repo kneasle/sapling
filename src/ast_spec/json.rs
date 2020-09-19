@@ -411,8 +411,8 @@ mod tests {
                 (
                     TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
                     "array
-├── true
-└── false",
+    ├── true
+    └── false",
                 ),
             ] {
                 let node_map = tree.build_node_map();
