@@ -19,8 +19,20 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
         Self::with_root(Node::default())
     }
 
-    /// Get the reference of the root node of the tree
+    /// Get the reference of the root node of the tree.  This is required to be a valid reference
     fn root(&self) -> Ref;
+
+    /// Get the node that is the root of the current tree
+    fn root_node<'a>(&'a self) -> &'a Node {
+        // We can unwrap here, because self.root() is required to be a valid reference.
+        self.get_node(self.root()).unwrap()
+    }
+
+    /// Get the node that is the root of the current tree
+    fn root_node_mut<'a>(&'a mut self) -> &'a mut Node {
+        // We can unwrap here, because self.root() is required to be a valid reference.
+        self.get_node_mut(self.root()).unwrap()
+    }
 
     /// Set the root of the tree to be the node at a given reference, returning [true] if the
     /// reference was valid.  If the reference was invalid, the root will not be replaced and
@@ -33,6 +45,34 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
         let is_valid = self.set_root(r);
         debug_assert!(is_valid);
         r
+    }
+
+    /// Writes the text rendering of the root node to a string (same as calling
+    /// [to_text](ASTSpec::to_text) on the [root](NodeMap::root)).
+    fn write_text(&self, string: &mut String, format_style: &Node::FormatStyle)
+    where
+        Self: Sized,
+    {
+        match self.get_node(self.root()) {
+            Some(root) => {
+                root.write_text(self, string, format_style);
+            }
+            None => {
+                string.push_str("<INVALID ROOT NODE>");
+            }
+        }
+    }
+
+    /// Generates the text rendering of the root node (same as calling [to_text](ASTSpec::to_text)
+    /// on the [root](NodeMap::root)).
+    fn to_text(&self, format_style: &Node::FormatStyle) -> String
+    where
+        Self: Sized,
+    {
+        match self.get_node(self.root()) {
+            Some(root) => root.to_text(self, format_style),
+            None => "<INVALID ROOT NODE>".to_string(),
+        }
     }
 
     /// Gets node from a reference, returning [None] if the reference is invalid.
