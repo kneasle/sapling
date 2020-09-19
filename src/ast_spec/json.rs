@@ -265,26 +265,26 @@ mod tests {
     use crate::editable_tree::reference::Ref;
 
     /// A copy of [JSON] that does not rely on a [NodeMap] for recursive types
-    enum J {
+    enum TestJSON {
         True,
         False,
-        Array(Vec<J>),
-        Object(Vec<(String, J)>),
+        Array(Vec<TestJSON>),
+        Object(Vec<(String, TestJSON)>),
     }
 
-    impl J {
+    impl TestJSON {
         fn recursive_add_node_to_map(&self, map: &mut VecNodeMap<JSON<Ref>>) -> Ref {
             match self {
-                J::True => map.add_node(JSON::True),
-                J::False => map.add_node(JSON::False),
-                J::Array(child_nodes) => {
+                TestJSON::True => map.add_node(JSON::True),
+                TestJSON::False => map.add_node(JSON::False),
+                TestJSON::Array(child_nodes) => {
                     let child_refs = child_nodes
                         .iter()
                         .map(|x| x.recursive_add_node_to_map(map))
                         .collect::<Vec<Ref>>();
                     map.add_node(JSON::Array(child_refs))
                 }
-                J::Object(child_nodes) => {
+                TestJSON::Object(child_nodes) => {
                     let child_refs = child_nodes
                         .iter()
                         .map(|x| (x.0.clone(), x.1.recursive_add_node_to_map(map)))
@@ -307,28 +307,31 @@ mod tests {
     #[test]
     fn to_text_compact() {
         for (tree, expected_string) in &[
-            (J::True, "true"),
-            (J::False, "false"),
-            (J::Array(vec![]), "[]"),
-            (J::Object(vec![]), "{}"),
-            (J::Array(vec![J::True, J::False]), "[true, false]"),
+            (TestJSON::True, "true"),
+            (TestJSON::False, "false"),
+            (TestJSON::Array(vec![]), "[]"),
+            (TestJSON::Object(vec![]), "{}"),
             (
-                J::Object(vec![
-                    ("foo".to_string(), J::True),
-                    ("bar".to_string(), J::False),
+                TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
+                "[true, false]",
+            ),
+            (
+                TestJSON::Object(vec![
+                    ("foo".to_string(), TestJSON::True),
+                    ("bar".to_string(), TestJSON::False),
                 ]),
                 r#"{"foo": true, "bar": false}"#,
             ),
             (
-                J::Array(vec![
-                    J::Object(vec![
+                TestJSON::Array(vec![
+                    TestJSON::Object(vec![
                         (
                             "foos".to_string(),
-                            J::Array(vec![J::False, J::True, J::False]),
+                            TestJSON::Array(vec![TestJSON::False, TestJSON::True, TestJSON::False]),
                         ),
-                        ("bar".to_string(), J::False),
+                        ("bar".to_string(), TestJSON::False),
                     ]),
-                    J::True,
+                    TestJSON::True,
                 ]),
                 r#"[{"foos": [false, true, false], "bar": false}, true]"#,
             ),
@@ -343,21 +346,21 @@ mod tests {
     #[test]
     fn to_text_pretty() {
         for (tree, expected_string) in &[
-            (J::True, "true"),
-            (J::False, "false"),
-            (J::Array(vec![]), "[]"),
-            (J::Object(vec![]), "{}"),
+            (TestJSON::True, "true"),
+            (TestJSON::False, "false"),
+            (TestJSON::Array(vec![]), "[]"),
+            (TestJSON::Object(vec![]), "{}"),
             (
-                J::Array(vec![J::True, J::False]),
+                TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
                 "[
     true,
     false
 ]",
             ),
             (
-                J::Object(vec![
-                    ("foo".to_string(), J::True),
-                    ("bar".to_string(), J::False),
+                TestJSON::Object(vec![
+                    ("foo".to_string(), TestJSON::True),
+                    ("bar".to_string(), TestJSON::False),
                 ]),
                 r#"{
     "foo": true,
@@ -365,15 +368,15 @@ mod tests {
 }"#,
             ),
             (
-                J::Array(vec![
-                    J::Object(vec![
+                TestJSON::Array(vec![
+                    TestJSON::Object(vec![
                         (
                             "foos".to_string(),
-                            J::Array(vec![J::False, J::True, J::False]),
+                            TestJSON::Array(vec![TestJSON::False, TestJSON::True, TestJSON::False]),
                         ),
-                        ("bar".to_string(), J::False),
+                        ("bar".to_string(), TestJSON::False),
                     ]),
-                    J::True,
+                    TestJSON::True,
                 ]),
                 r#"[
     {
@@ -395,24 +398,26 @@ mod tests {
         }
     }
 
-    // This function actually tests `write_tree_view` from 'ast/mod.rs', but since that is a trait
-    // method, it can only be tested on a concrete implementation of AST
-    #[test]
-    fn tree_view() {
-        for (tree, expected_string) in &[
-            (J::True, "true"),
-            (J::False, "false"),
-            (J::Object(vec![]), "object"),
-            (J::Array(vec![]), "array"),
-            (
-                J::Array(vec![J::True, J::False]),
-                "array
+    /*
+        // This function actually tests `write_tree_view` from 'ast/mod.rs', but since that is a trait
+        // method, it can only be tested on a concrete implementation of AST
+        #[test]
+        fn tree_view() {
+            for (tree, expected_string) in &[
+                (TestJSON::True, "true"),
+                (TestJSON::False, "false"),
+                (TestJSON::Object(vec![]), "object"),
+                (TestJSON::Array(vec![]), "array"),
+                (
+                    TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
+                    "array
 ├── true
 └── false",
-            ),
-        ] {
-            let node_map = tree.build_node_map();
-            assert_eq!(node_map.root_node().tree_view(&node_map), *expected_string);
+                ),
+            ] {
+                let node_map = tree.build_node_map();
+                assert_eq!(node_map.root_node().tree_view(&node_map), *expected_string);
+            }
         }
-    }
+    */
 }
