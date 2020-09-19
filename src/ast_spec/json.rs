@@ -261,7 +261,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 mod tests {
     use super::{JSONFormat, JSON};
     use crate::ast_spec::vec_node_map::VecNodeMap;
-    use crate::ast_spec::{ASTSpec, NodeMap};
+    use crate::ast_spec::NodeMap;
     use crate::editable_tree::reference::Ref;
 
     /// A copy of [JSON] that does not rely on a [NodeMap] for recursive types
