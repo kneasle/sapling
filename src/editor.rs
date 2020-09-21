@@ -108,11 +108,11 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
 
         // Clear the terminal
         self.term.clear().unwrap();
-        // Print the AST to the terminal
+
+        /* RENDER MAIN TEXT VIEW */
         self.term
             .print(0, 0, &self.tree.to_text(&self.format_style))
             .unwrap();
-        // Render the bottom bar of the editor
 
         /* RENDER LOG SECTION */
         for (i, (level, message)) in self.log.iter().enumerate() {
@@ -120,6 +120,8 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                 .print_with_attr(i, width / 2, message, Attr::default().fg(level.to_color()))
                 .unwrap();
         }
+
+        /* RENDER BOTTOM BAR */
         self.term
             .print(height - 1, 0, "Press 'q' to exit.")
             .unwrap();
@@ -130,11 +132,22 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                 &self.command,
             )
             .unwrap();
+
         // Update the terminal screen
         self.term.present().unwrap();
     }
 
-    pub fn mainloop(mut self) {
+    pub fn run(mut self) {
+        // Log the startup of the code
+        self.log(LogLevel::Info, "Starting Up...".to_string());
+        // Start the mainloop
+        self.mainloop();
+        // Log that the editor is closing
+        self.log(LogLevel::Info, format!("Closing..."));
+    }
+
+    fn mainloop(&mut self) {
+        // Sit in the infinte mainloop
         while let Ok(event) = self.term.poll_event() {
             /* RESPOND TO THE USER'S INPUT */
             if let Event::Key(key) = event {

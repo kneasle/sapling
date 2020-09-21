@@ -7,5 +7,5 @@ use sapling::vec_node_map::Index;
 fn main() {
     let tree: DAG<JSON<Index>> = DAG::new();
     let editor = Editor::new(tree, JSONFormat::Pretty);
-    editor.mainloop();
+    editor.run();
 }
