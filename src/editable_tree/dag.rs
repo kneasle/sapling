@@ -18,10 +18,6 @@ impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for DAG<Node> {
         self.node_map.get_node(id)
     }
 
-    fn get_node_mut<'a>(&'a mut self, id: Index) -> Option<&'a mut Node> {
-        self.node_map.get_node_mut(id)
-    }
-
     fn root(&self) -> Index {
         self.node_map.root()
     }

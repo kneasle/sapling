@@ -14,9 +14,6 @@ pub trait ReadableNodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
     /// Gets node from a reference, returning [`None`] if the reference is invalid.
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node>;
 
-    /// Gets mutable node from a reference, returning [`None`] if the reference is invalid.
-    fn get_node_mut<'a>(&'a mut self, id: Ref) -> Option<&'a mut Node>;
-
     /// Get the reference of the root node of the tree.  This is required to be a valid reference,
     /// i.e. `self.get_node(self.root())` should never return [`None`].
     fn root(&self) -> Ref;
@@ -25,12 +22,6 @@ pub trait ReadableNodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
     fn root_node<'a>(&'a self) -> &'a Node {
         // We can unwrap here, because self.root() is required to be a valid reference.
         self.get_node(self.root()).unwrap()
-    }
-
-    /// Get the node that is the root of the current tree
-    fn root_node_mut<'a>(&'a mut self) -> &'a mut Node {
-        // We can unwrap here, because self.root() is required to be a valid reference.
-        self.get_node_mut(self.root()).unwrap()
     }
 }
 
@@ -45,6 +36,15 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
         Self: Sized,
     {
         Self::with_root(Node::default())
+    }
+
+    /// Gets mutable node from a reference, returning [`None`] if the reference is invalid.
+    fn get_node_mut<'a>(&'a mut self, id: Ref) -> Option<&'a mut Node>;
+
+    /// Get the node that is the root of the current tree
+    fn root_node_mut<'a>(&'a mut self) -> &'a mut Node {
+        // We can unwrap here, because self.root() is required to be a valid reference.
+        self.get_node_mut(self.root()).unwrap()
     }
 
     /// Set the root of the tree to be the node at a given reference, returning `true` if the
