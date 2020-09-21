@@ -21,7 +21,8 @@ pub struct DAG<Node: ASTSpec<Index>> {
 }
 
 impl<Node: ASTSpec<Index>> DAG<Node> {
-    fn from_tree(node_map: VecNodeMap<Node>) -> Self {
+    /// Makes a `DAG` that contains the tree stored inside `node_map`
+    pub fn from_tree(node_map: VecNodeMap<Node>) -> Self {
         DAG {
             undo_history: vec![],
             node_map,

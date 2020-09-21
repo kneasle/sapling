@@ -150,9 +150,10 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
         self.term.clear().unwrap();
 
         /* RENDER MAIN TEXT VIEW */
-        self.term
-            .print(0, 0, &self.tree.to_text(&self.format_style))
-            .unwrap();
+        let text = self.tree.to_text(&self.format_style);
+        for (i, line) in text.lines().enumerate() {
+            self.term.print(i, 0, line).unwrap();
+        }
 
         /* RENDER LOG SECTION */
         for (i, (level, message)) in self.log.iter().enumerate() {
