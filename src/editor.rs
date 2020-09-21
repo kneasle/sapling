@@ -33,7 +33,6 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
 
             /* RESPOND TO THE USER'S INPUT */
 
-            // Close the editor if the user presses 'q'
             if let Event::Key(key) = event {
                 match key {
                     // If the user types 'q' then quit the program
@@ -62,7 +61,11 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                 .print(height - 1, 0, "Press 'q' to exit.")
                 .unwrap();
             self.term
-                .print(height - 1, width - 5 - self.command.len(), &self.command)
+                .print(
+                    height - 1,
+                    width - 5 - self.command.chars().count(),
+                    &self.command,
+                )
                 .unwrap();
             // Update the terminal screen
             self.term.present().unwrap();
