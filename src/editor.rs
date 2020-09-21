@@ -2,7 +2,36 @@ use crate::ast_spec::{ASTSpec, Reference};
 use crate::editable_tree::EditableTree;
 use tuikit::prelude::*;
 
-/// The possible outcomes of a user-typed command
+/// The possible log levels
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum LogLevel {
+    /// Logs that give lots of minute details.  Intended to be used only when debugging Sapling.
+    VerboseDebug = 0,
+    /// Less verbose debugging, intended to be used only when debugging Sapling.
+    Debug = 1,
+    /// Logs that just give information to the user
+    Info = 2,
+    /// Logs that represent warnings about an Error that is either going to happen or might have
+    /// already happened.
+    Warning = 3,
+    /// Logs that will always be logged.
+    Error = 4,
+}
+
+impl LogLevel {
+    /// Returns a [`Color`] with which to display this log entry
+    pub fn to_color(&self) -> Color {
+        match self {
+            LogLevel::VerboseDebug => Color::BLUE,
+            LogLevel::Debug => Color::LIGHT_BLUE,
+            LogLevel::Info => Color::GREEN,
+            LogLevel::Warning => Color::YELLOW,
+            LogLevel::Error => Color::RED,
+        }
+    }
+}
+
+/// The possible meanings of a user-typed command
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum Action {
     /// The user typed a command that isn't defined, but the command box should still be cleared
@@ -48,6 +77,7 @@ fn interpret_command(command: &str) -> Option<Action> {
 /// A struct to hold the top-level components of the editor.
 pub struct Editor<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> {
     tree: E,
+    log: Vec<(LogLevel, String)>,
     format_style: T::FormatStyle,
     term: Term,
     command: String,
@@ -59,10 +89,16 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
         let term = Term::new().unwrap();
         Editor {
             tree,
+            log: Vec::new(),
             term,
             format_style,
             command: String::new(),
         }
+    }
+
+    /// Log a message to whatever console is appropriate
+    fn log(&mut self, level: LogLevel, message: String) {
+        self.log.push((level, message));
     }
 
     /// Update the terminal UI display
@@ -77,6 +113,13 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
             .print(0, 0, &self.tree.to_text(&self.format_style))
             .unwrap();
         // Render the bottom bar of the editor
+
+        /* RENDER LOG SECTION */
+        for (i, (level, message)) in self.log.iter().enumerate() {
+            self.term
+                .print_with_attr(i, width / 2, message, Attr::default().fg(level.to_color()))
+                .unwrap();
+        }
         self.term
             .print(height - 1, 0, "Press 'q' to exit.")
             .unwrap();
@@ -102,16 +145,23 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                         // Attempt to interpret the command, and take action if the command is
                         // complete
                         if let Some(action) = interpret_command(&self.command) {
-                            // Clear the command box
-                            self.command.clear();
                             // Respond to the action
                             match action {
-                                Action::Undefined => {}
+                                Action::Undefined => {
+                                    self.log(
+                                        LogLevel::Warning,
+                                        format!("'{}' not a command.", self.command),
+                                    );
+                                }
                                 Action::Quit => {
                                     break;
                                 }
-                                Action::Replace(_c) => {}
+                                Action::Replace(c) => {
+                                    self.log(LogLevel::Debug, format!("Replacing with '{}'", c));
+                                }
                             }
+                            // Clear the command box
+                            self.command.clear();
                         }
                     }
                     Key::ESC => {
