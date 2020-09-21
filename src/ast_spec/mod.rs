@@ -2,23 +2,23 @@
 
 pub mod json;
 
+#[allow(unused_imports)]
+use crate::editable_tree::EditableTree;
+
 /// A trait bound that specifies what types can be used as a reference to Node in an AST
 pub trait Reference: Copy + Eq + std::fmt::Debug + std::hash::Hash {}
 
-/// A trait bound for a type that can store `Node`s, accessible by references.
-pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
-    /// Create a new `NodeMap` with a given `Node` as root
-    fn with_root(root: Node) -> Self;
+/// A trait bound for a type that can be used to access nodes (used to give [NodeMap]-like
+/// attributes to [EditableTree]s).
+pub trait ReadableNodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
+    /// Gets node from a reference, returning [None] if the reference is invalid.
+    fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node>;
 
-    /// Create a new `NodeMap` containing only the default node as root
-    fn with_default_root() -> Self
-    where
-        Self: Sized,
-    {
-        Self::with_root(Node::default())
-    }
+    /// Gets mutable node from a reference, returning [None] if the reference is invalid.
+    fn get_node_mut<'a>(&'a mut self, id: Ref) -> Option<&'a mut Node>;
 
-    /// Get the reference of the root node of the tree.  This is required to be a valid reference
+    /// Get the reference of the root node of the tree.  This is required to be a valid reference,
+    /// i.e. `self.get_node(self.root())` should never return [None].
     fn root(&self) -> Ref;
 
     /// Get the node that is the root of the current tree
@@ -31,6 +31,20 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
     fn root_node_mut<'a>(&'a mut self) -> &'a mut Node {
         // We can unwrap here, because self.root() is required to be a valid reference.
         self.get_node_mut(self.root()).unwrap()
+    }
+}
+
+/// A trait bound for a type that can store `Node`s, accessible by references.
+pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node> {
+    /// Create a new `NodeMap` with a given `Node` as root
+    fn with_root(root: Node) -> Self;
+
+    /// Create a new `NodeMap` containing only the default node as root
+    fn with_default_root() -> Self
+    where
+        Self: Sized,
+    {
+        Self::with_root(Node::default())
     }
 
     /// Set the root of the tree to be the node at a given reference, returning `true` if the
@@ -73,12 +87,6 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
             None => "<INVALID ROOT NODE>".to_string(),
         }
     }
-
-    /// Gets node from a reference, returning [None] if the reference is invalid.
-    fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node>;
-
-    /// Gets mutable node from a reference, returning [None] if the reference is invalid.
-    fn get_node_mut<'a>(&'a mut self, id: Ref) -> Option<&'a mut Node>;
 
     /// Add a new `Node` to the tree, and return its reference
     fn add_node(&mut self, node: Node) -> Ref;

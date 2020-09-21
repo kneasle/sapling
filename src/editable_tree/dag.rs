@@ -1,5 +1,5 @@
 use super::EditableTree;
-use crate::ast_spec::{ASTSpec, NodeMap};
+use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap};
 use crate::vec_node_map::{Index, VecNodeMap};
 
 /// An [EditableTree] that stores the history as a DAG (Directed Acyclic Graph).  This means that
