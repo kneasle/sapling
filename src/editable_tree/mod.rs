@@ -1,8 +1,10 @@
 pub mod dag;
 
-use crate::ast_spec::{ASTSpec, Reference};
+use crate::ast_spec::{ASTSpec, ReadableNodeMap, Reference};
 
-pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>: Sized {
+pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>:
+    ReadableNodeMap<Ref, Node> + Sized
+{
     /* CONSTRUCTOR METHODS */
 
     /// Build a new `EditableTree` with the default AST of the given type

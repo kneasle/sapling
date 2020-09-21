@@ -13,6 +13,21 @@ pub struct DAG<Node: ASTSpec<Index>> {
     roots: Vec<Index>,
 }
 
+impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for DAG<Node> {
+    fn get_node<'a>(&'a self, id: Index) -> Option<&'a Node> {
+        self.node_map.get_node(id)
+    }
+
+    fn get_node_mut<'a>(&'a mut self, id: Index) -> Option<&'a mut Node> {
+        self.node_map.get_node_mut(id)
+    }
+
+    fn root(&self) -> Index {
+        self.node_map.root()
+    }
+}
+
+
 impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
     fn new() -> Self {
         let node_map = VecNodeMap::with_default_root();
