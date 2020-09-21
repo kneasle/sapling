@@ -54,7 +54,9 @@ impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
         self.node_map.add_as_root(new_node);
     }
 
-    fn insert_child(&mut self, new_node: Node) {}
+    fn insert_child(&mut self, _new_node: Node) {
+        unimplemented!();
+    }
 
     fn write_text(&self, string: &mut String, format: &Node::FormatStyle) {
         self.node_map.write_text(string, format);
