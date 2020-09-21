@@ -70,6 +70,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
         // Put the terminal size into some convenient variables
         let (width, height) = self.term.term_size().unwrap();
 
+        // Clear the terminal
         self.term.clear().unwrap();
         // Print the AST to the terminal
         self.term
@@ -93,7 +94,6 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
     pub fn mainloop(mut self) {
         while let Ok(event) = self.term.poll_event() {
             /* RESPOND TO THE USER'S INPUT */
-
             if let Event::Key(key) = event {
                 match key {
                     Key::Char(c) => {
@@ -121,7 +121,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                 }
             }
 
-            // Update the screen after every update (if this becomes a bottleneck then we can
+            // Update the screen after every input (if this becomes a bottleneck then we can
             // optimise the number of calls to `update_display` but for now it's not worth the
             // added complexity)
             self.update_display();
