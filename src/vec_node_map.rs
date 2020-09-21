@@ -27,6 +27,7 @@ impl Index {
 
 /// A [NodeMap] that stores all the AST nodes in a [Vec] and uses indices into this [Vec] as IDs
 /// for the nodes.
+#[derive(Debug, Clone)]
 pub struct VecNodeMap<Node> {
     nodes: Vec<Node>,
     root: Index,
