@@ -4,23 +4,23 @@ use crate::ast_spec::{ASTSpec, NodeMap, Reference};
 #[allow(unused_imports)]
 use crate::editable_tree::EditableTree;
 
-/// A small type used as a reference into Vec-powered [EditableTree]s.  `Ref` acts as a type-safe
-/// alternative to just using [usize], and can only be created and used by code in the
-/// editable_tree module - to the rest of the code `Ref`s are essentially black boxes.
+/// A small type used as a reference into Vec-powered [EditableTree]s.  `Index` acts as a type-safe
+/// alternative to just using [usize], and can only be created and used by [VecNodeMap]s - to the
+/// rest of the code `Indices` are essentially black boxes.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Index(usize);
 
 impl Reference for Index {}
 
-impl From<usize> for Index {
-    fn from(val: usize) -> Index {
+impl Index {
+    fn new(val: usize) -> Index {
         Index(val)
     }
 }
 
 impl Index {
     #[inline]
-    pub(crate) fn as_usize(self) -> usize {
+    fn as_usize(self) -> usize {
         self.0
     }
 }
@@ -38,7 +38,7 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
     fn with_root(node: Node) -> Self {
         VecNodeMap {
             nodes: vec![node],
-            root: Index::from(0),
+            root: Index::new(0),
         }
     }
 
@@ -75,7 +75,7 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
     #[inline]
     fn add_node(&mut self, node: Node) -> Index {
         self.nodes.push(node);
-        Index::from(self.nodes.len() - 1)
+        Index::new(self.nodes.len() - 1)
     }
 }
 
