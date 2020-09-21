@@ -75,11 +75,14 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
             if let Event::Key(key) = event {
                 match key {
                     Key::Char(c) => {
+                        // Add the new keypress to the command
                         self.command.push(c);
+                        // Attempt to interpret the command, and take action if the command is
+                        // complete
                         if let Some(action) = interpret_command(&self.command) {
                             // Clear the command box
                             self.command.clear();
-                            // Respond to the command
+                            // Respond to the action
                             match action {
                                 Action::Undefined => {}
                                 Action::Quit => {
