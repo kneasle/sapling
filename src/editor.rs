@@ -2,7 +2,6 @@ use crate::ast_spec::{ASTSpec, Reference};
 use crate::editable_tree::EditableTree;
 use tuikit::prelude::*;
 
-use std::marker::PhantomData;
 
 /// A struct to hold the top-level components of the editor.
 pub struct Editor<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> {
@@ -10,7 +9,6 @@ pub struct Editor<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> {
     format_style: T::FormatStyle,
     term: Term,
     command: String,
-    phantom_ref: PhantomData<R>,
 }
 
 impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
@@ -22,7 +20,6 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
             term,
             format_style,
             command: String::new(),
-            phantom_ref: PhantomData::default(),
         }
     }
 
