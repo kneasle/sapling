@@ -233,7 +233,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
         // Start the mainloop
         self.mainloop();
         // Log that the editor is closing
-        self.log(LogLevel::Info, format!("Closing..."));
+        self.log(LogLevel::Info, "Closing...".to_string());
     }
 }
 

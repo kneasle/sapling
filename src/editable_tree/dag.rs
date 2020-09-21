@@ -14,7 +14,7 @@ pub struct DAG<Node: ASTSpec<Index>> {
 }
 
 impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for DAG<Node> {
-    fn get_node<'a>(&'a self, id: Index) -> Option<&'a Node> {
+    fn get_node(&self, id: Index) -> Option<&Node> {
         self.node_map.get_node(id)
     }
 

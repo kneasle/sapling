@@ -19,7 +19,7 @@ pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>:
 
     /// Returns the node referenced by the cursor.
     #[inline]
-    fn cursor_node<'a>(&'a self) -> &'a Node {
+    fn cursor_node(&self) -> &Node {
         self.get_node(self.cursor()).unwrap()
     }
 

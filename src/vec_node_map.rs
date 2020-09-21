@@ -43,7 +43,7 @@ impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for VecNodeMap<Node> {
 
     /// Gets node from a reference, returning [`None`] if the reference is invalid.
     #[inline]
-    fn get_node<'a>(&'a self, id: Index) -> Option<&'a Node> {
+    fn get_node(&self, id: Index) -> Option<&Node> {
         self.nodes.get(id.as_usize())
     }
 }
@@ -59,7 +59,7 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
 
     /// Gets mutable node from a reference, returning [`None`] if the reference is invalid.
     #[inline]
-    fn get_node_mut<'a>(&'a mut self, id: Index) -> Option<&'a mut Node> {
+    fn get_node_mut(&mut self, id: Index) -> Option<&mut Node> {
         self.nodes.get_mut(id.as_usize())
     }
 
