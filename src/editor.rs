@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn interpret_command_incomplete() {
-        for command in &["r"] {
+        for command in &["", "r"] {
             assert_eq!(interpret_command(*command), None);
         }
     }
