@@ -1,30 +1,30 @@
-use super::{ASTSpec, NodeMap};
-use crate::editable_tree::reference::Ref;
+use crate::ast_spec::{ASTSpec, NodeMap};
+use crate::editable_tree::reference::Index;
 
 pub struct VecNodeMap<Node> {
     nodes: Vec<Node>,
-    root: Ref,
+    root: Index,
 }
 
-impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for VecNodeMap<Node> {
+impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
     /// Create a new `NodeMap` with a given `Node` as root
     fn with_root(node: Node) -> Self {
         VecNodeMap {
             nodes: vec![node],
-            root: Ref::from(0),
+            root: Index::from(0),
         }
     }
 
     /// Get the reference of the root node of the tree
     #[inline]
-    fn root(&self) -> Ref {
+    fn root(&self) -> Index {
         self.root
     }
 
     /// Set the root of the tree to be the node at a given reference, returning [true] if the
     /// reference was valid.  If the reference was invalid, the root will not be replaced and
     /// [false] will be returned.
-    fn set_root(&mut self, new_root: Ref) -> bool {
+    fn set_root(&mut self, new_root: Index) -> bool {
         let is_ref_valid = self.get_node(new_root).is_some();
         if is_ref_valid {
             self.root = new_root;
@@ -34,21 +34,21 @@ impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for VecNodeMap<Node> {
 
     /// Gets node from a reference, returning [None] if the reference is invalid.
     #[inline]
-    fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node> {
+    fn get_node<'a>(&'a self, id: Index) -> Option<&'a Node> {
         self.nodes.get(id.as_usize())
     }
 
     /// Gets mutable node from a reference, returning [None] if the reference is invalid.
     #[inline]
-    fn get_node_mut<'a>(&'a mut self, id: Ref) -> Option<&'a mut Node> {
+    fn get_node_mut<'a>(&'a mut self, id: Index) -> Option<&'a mut Node> {
         self.nodes.get_mut(id.as_usize())
     }
 
     /// Add a new `Node` to the tree, and return its reference
     #[inline]
-    fn add_node(&mut self, node: Node) -> Ref {
+    fn add_node(&mut self, node: Node) -> Index {
         self.nodes.push(node);
-        Ref::from(self.nodes.len() - 1)
+        Index::from(self.nodes.len() - 1)
     }
 }
 
@@ -56,7 +56,7 @@ impl<Node: ASTSpec<Ref>> NodeMap<Ref, Node> for VecNodeMap<Node> {
 mod tests {
     use super::VecNodeMap;
     use crate::ast_spec::{ASTSpec, NodeMap, Reference};
-    use crate::editable_tree::reference::Ref;
+    use crate::editable_tree::reference::Index;
 
     /// An extremely basic node type, used for testing [VecNodeMap].
     #[derive(Debug, Eq, PartialEq, Hash, Clone)]
@@ -148,7 +148,7 @@ mod tests {
     }
 
     /// A useful type alias to make the unit tests terser
-    type TestNodeMap = VecNodeMap<ExampleNode<Ref>>;
+    type TestNodeMap = VecNodeMap<ExampleNode<Index>>;
 
     #[test]
     fn with_root() {
@@ -206,7 +206,10 @@ mod tests {
         if let Some(node) = node_map.get_node(node_map.root()) {
             match node {
                 ExampleNode::Recursive(child_ref) => {
-                    assert_eq!(node_map.get_node(*child_ref), Some(&ExampleNode::WithPayload(42)));
+                    assert_eq!(
+                        node_map.get_node(*child_ref),
+                        Some(&ExampleNode::WithPayload(42))
+                    );
                 }
                 _ => {
                     panic!("New root node has the wrong value.");
@@ -225,7 +228,10 @@ mod tests {
         if let Some(node) = node_map.get_node(node_map.root()) {
             match node {
                 ExampleNode::Recursive(child_ref) => {
-                    assert_eq!(node_map.get_node(*child_ref), Some(&ExampleNode::WithPayload(42)));
+                    assert_eq!(
+                        node_map.get_node(*child_ref),
+                        Some(&ExampleNode::WithPayload(42))
+                    );
                 }
                 _ => {
                     panic!("New root node has the wrong value.");

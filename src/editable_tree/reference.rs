@@ -8,17 +8,17 @@ use super::EditableTree;
 /// alternative to just using [usize], and can only be created and used by code in the
 /// editable_tree module - to the rest of the code `Ref`s are essentially black boxes.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct Ref(usize);
+pub struct Index(usize);
 
-impl Reference for Ref {}
+impl Reference for Index {}
 
-impl From<usize> for Ref {
-    fn from(val: usize) -> Ref {
-        Ref(val)
+impl From<usize> for Index {
+    fn from(val: usize) -> Index {
+        Index(val)
     }
 }
 
-impl Ref {
+impl Index {
     #[inline]
     pub(crate) fn as_usize(self) -> usize {
         self.0
