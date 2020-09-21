@@ -61,7 +61,7 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
     }
 
     /// Writes the text rendering of the root node to a string (same as calling
-    /// [to_text](ASTSpec::to_text) on the [root](NodeMap::root)).
+    /// [to_text](ASTSpec::to_text) on the [root](ReadableNodeMap::root)).
     fn write_text(&self, string: &mut String, format_style: &Node::FormatStyle)
     where
         Self: Sized,
@@ -77,7 +77,7 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
     }
 
     /// Generates the text rendering of the root node (same as calling [to_text](ASTSpec::to_text)
-    /// on the [root](NodeMap::root)).
+    /// on the [root](ReadableNodeMap::root)).
     fn to_text(&self, format_style: &Node::FormatStyle) -> String
     where
         Self: Sized,
