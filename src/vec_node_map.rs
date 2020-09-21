@@ -13,6 +13,7 @@ pub struct Index(usize);
 impl Reference for Index {}
 
 impl Index {
+    #[inline]
     fn new(val: usize) -> Index {
         Index(val)
     }
