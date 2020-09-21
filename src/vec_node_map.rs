@@ -166,6 +166,10 @@ mod tests {
         fn from_replace_char(&self, _c: char) -> Option<Self> {
             None
         }
+
+        fn get_insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
+            Box::new(std::iter::empty())
+        }
     }
 
     /// A useful type alias to make the unit tests terser
