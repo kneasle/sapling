@@ -101,6 +101,26 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
         self.log.push((level, message));
     }
 
+    /* ===== COMMAND FUNCTIONS ===== */
+
+    /// Replace the node under the cursor with the node represented by a given [`char`]
+    fn replace_cursor(&mut self, c: char) {
+        if let Some(new_node) = self.tree.cursor_node().from_replace_char(c) {
+            self.log(
+                LogLevel::Debug,
+                format!("Replacing with '{}'/{:?}", c, new_node),
+            );
+            self.tree.replace_cursor(new_node);
+        } else {
+            self.log(
+                LogLevel::Warning,
+                format!("Cannot replace node with '{}'", c),
+            );
+        }
+    }
+
+    /* ===== MAIN FUNCTIONS ===== */
+
     /// Update the terminal UI display
     fn update_display(&self) {
         // Put the terminal size into some convenient variables
@@ -135,22 +155,6 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
 
         // Update the terminal screen
         self.term.present().unwrap();
-    }
-
-    /* COMMAND FUNCTIONS */
-    fn replace_cursor(&mut self, c: char) {
-        if let Some(new_node) = self.tree.cursor_node().from_replace_char(c) {
-            self.log(
-                LogLevel::Debug,
-                format!("Replacing with '{}'/{:?}", c, new_node),
-            );
-            self.tree.replace_cursor(new_node);
-        } else {
-            self.log(
-                LogLevel::Warning,
-                format!("Cannot replace node with '{}'", c),
-            );
-        }
     }
 
     fn mainloop(&mut self) {
