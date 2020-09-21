@@ -8,17 +8,17 @@ use crate::editable_tree::EditableTree;
 /// A trait bound that specifies what types can be used as a reference to Node in an AST
 pub trait Reference: Copy + Eq + std::fmt::Debug + std::hash::Hash {}
 
-/// A trait bound for a type that can be used to access nodes (used to give [NodeMap]-like
-/// attributes to [EditableTree]s).
+/// A trait bound for a type that can be used to access nodes (used to give [`NodeMap`]-like
+/// attributes to [`EditableTree`]s).
 pub trait ReadableNodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
-    /// Gets node from a reference, returning [None] if the reference is invalid.
+    /// Gets node from a reference, returning [`None`] if the reference is invalid.
     fn get_node<'a>(&'a self, id: Ref) -> Option<&'a Node>;
 
-    /// Gets mutable node from a reference, returning [None] if the reference is invalid.
+    /// Gets mutable node from a reference, returning [`None`] if the reference is invalid.
     fn get_node_mut<'a>(&'a mut self, id: Ref) -> Option<&'a mut Node>;
 
     /// Get the reference of the root node of the tree.  This is required to be a valid reference,
-    /// i.e. `self.get_node(self.root())` should never return [None].
+    /// i.e. `self.get_node(self.root())` should never return [`None`].
     fn root(&self) -> Ref;
 
     /// Get the node that is the root of the current tree
@@ -61,7 +61,7 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
     }
 
     /// Writes the text rendering of the root node to a string (same as calling
-    /// [to_text](ASTSpec::to_text) on the [root](ReadableNodeMap::root)).
+    /// [`to_text`](ASTSpec::to_text) on the [`root`](ReadableNodeMap::root)).
     fn write_text(&self, string: &mut String, format_style: &Node::FormatStyle)
     where
         Self: Sized,
@@ -76,8 +76,8 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
         }
     }
 
-    /// Generates the text rendering of the root node (same as calling [to_text](ASTSpec::to_text)
-    /// on the [root](ReadableNodeMap::root)).
+    /// Generates the text rendering of the root node (same as calling [`to_text`](ASTSpec::to_text)
+    /// on the [`root`](ReadableNodeMap::root)).
     fn to_text(&self, format_style: &Node::FormatStyle) -> String
     where
         Self: Sized,
@@ -107,8 +107,8 @@ pub trait ASTSpec<Ref: Reference>: Eq + Default {
         format_style: &Self::FormatStyle,
     );
 
-    /// Make a [String] representing this AST.
-    /// Same as [write_text](ASTSpec::write_text) but creates a new [String].
+    /// Make a [`String`] representing this AST.
+    /// Same as [`write_text`](ASTSpec::write_text) but creates a new [`String`].
     fn to_text(
         &self,
         node_map: &impl NodeMap<Ref, Self>,
@@ -143,8 +143,8 @@ pub trait ASTSpec<Ref: Reference>: Eq + Default {
     }
 
     /// Build a string of the a tree view of this node, similar to the output of the Unix command
-    /// 'tree'.  This is the same as [write_tree_view](ASTSpec::write_tree_view), except that it
-    /// returns a [String] rather than appending to an existing [String].
+    /// 'tree'.  This is the same as [`write_tree_view`](ASTSpec::write_tree_view), except that it
+    /// returns a [`String`] rather than appending to an existing [`String`].
     fn tree_view(&self, node_map: &impl NodeMap<Ref, Self>) -> String {
         let mut s = String::new();
         self.write_tree_view(node_map, &mut s);
@@ -153,12 +153,12 @@ pub trait ASTSpec<Ref: Reference>: Eq + Default {
 
     /* AST EDITING FUNCTIONS */
 
-    /// Generate an iterator over the possible shorthand [char]s that a user could type to replace
+    /// Generate an iterator over the possible shorthand [`char`]s that a user could type to replace
     /// this node with something else.
     fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>>;
 
-    /// Generate a new node from a [char] that a user typed as part of the `r` command.  If `c` is
-    /// an element of [get_replace_chars](ASTSpec::get_replace_chars), this must return `Some` value,
-    /// if it isn't, then this should return `None`.
+    /// Generate a new node from a [`char`] that a user typed as part of the `r` command.  If `c` is
+    /// an element of [`get_replace_chars`](ASTSpec::get_replace_chars), this must return [`Some`] node,
+    /// if it isn't, then this should return [`None`].
     fn from_replace_char(&self, c: char) -> Option<Self>;
 }

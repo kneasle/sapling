@@ -4,8 +4,8 @@ use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap, Reference};
 #[allow(unused_imports)]
 use crate::editable_tree::EditableTree;
 
-/// A small type used as a reference into Vec-powered [EditableTree]s.  `Index` acts as a type-safe
-/// alternative to just using [usize], and can only be created and used by [VecNodeMap]s - to the
+/// A small type used as a reference into Vec-powered [`EditableTree`]s.  `Index` acts as a type-safe
+/// alternative to just using [`usize`], and can only be created and used by [`VecNodeMap`]s - to the
 /// rest of the code `Indices` are essentially black boxes.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Index(usize);
@@ -26,7 +26,7 @@ impl Index {
     }
 }
 
-/// A [NodeMap] that stores all the AST nodes in a [Vec] and uses indices into this [Vec] as IDs
+/// A [`NodeMap`] that stores all the AST nodes in a [`Vec`] and uses indices into this [`Vec`] as IDs
 /// for the nodes.
 #[derive(Debug, Clone)]
 pub struct VecNodeMap<Node> {
@@ -41,13 +41,13 @@ impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for VecNodeMap<Node> {
         self.root
     }
 
-    /// Gets node from a reference, returning [None] if the reference is invalid.
+    /// Gets node from a reference, returning [`None`] if the reference is invalid.
     #[inline]
     fn get_node<'a>(&'a self, id: Index) -> Option<&'a Node> {
         self.nodes.get(id.as_usize())
     }
 
-    /// Gets mutable node from a reference, returning [None] if the reference is invalid.
+    /// Gets mutable node from a reference, returning [`None`] if the reference is invalid.
     #[inline]
     fn get_node_mut<'a>(&'a mut self, id: Index) -> Option<&'a mut Node> {
         self.nodes.get_mut(id.as_usize())
@@ -107,7 +107,6 @@ mod tests {
     impl<Ref: Reference> ASTSpec<Ref> for ExampleNode<Ref> {
         type FormatStyle = ();
 
-        /// Write the textual representation of this AST to a string
         fn write_text(
             &self,
             node_map: &impl NodeMap<Ref, Self>,
@@ -139,7 +138,6 @@ mod tests {
             }
         }
 
-        /// Get an iterator over the direct children of this node
         fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a> {
             match self {
                 ExampleNode::DefaultValue
@@ -150,7 +148,6 @@ mod tests {
             }
         }
 
-        /// Get the display name of this node
         fn get_display_name(&self) -> String {
             match self {
                 ExampleNode::DefaultValue => "default",
@@ -162,15 +159,10 @@ mod tests {
             .to_string()
         }
 
-        /// Generate an iterator over the possible shorthand [char]s that a user could type to replace
-        /// this node with something else.
         fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
             Box::new(std::iter::empty())
         }
 
-        /// Generate a new node from a [char] that a user typed as part of the `r` command.  If `c` is
-        /// an element of [get_replace_chars](AST::get_replace_chars), this must return `Some` value,
-        /// if it isn't, then this can return `None`.
         fn from_replace_char(&self, _c: char) -> Option<Self> {
             None
         }

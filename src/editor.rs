@@ -9,17 +9,17 @@ enum Action {
     Undefined,
     /// Quit Sapling
     Quit,
-    /// Replace the currently selected node with a node represented by some [char]
+    /// Replace the currently selected node with a node represented by some [`char`]
     Replace(char),
 }
 
-/// Attempt to convert a command as a [str] into an [Action].
+/// Attempt to convert a command as a `&`[`str`] into an [`Action`].
 /// This parses the string from the start, and returns when it finds a valid command.
 /// Therefore, `"q489flshb"` will be treated like `"q"`, and will return `Some(Action::Quit)`.
 /// This returns:
-/// - [None] if the command is incomplete.
-/// - [Action::Undefined] if the command is not defined (like the command "X").
-/// - The corresponding [Action], otherwise.
+/// - [`None`] if the command is incomplete.
+/// - [`Action::Undefined`] if the command is not defined (like the command "X").
+/// - The corresponding [`Action`], otherwise.
 fn interpret_command(command: &str) -> Option<Action> {
     let mut command_char_iter = command.chars();
 
@@ -54,7 +54,7 @@ pub struct Editor<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> {
 }
 
 impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
-    /// Create a new [Editor] with the default AST.
+    /// Create a new [`Editor`] with the default AST.
     pub fn new(tree: E, format_style: T::FormatStyle) -> Editor<R, T, E> {
         let term = Term::new().unwrap();
         Editor {

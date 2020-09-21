@@ -21,7 +21,7 @@ pub enum JSON<Ref: Reference> {
     /// A JSON array of multiple values.
     /// Corresponds to a string `[<v1>, <v2>, ...]` where `v1`, `v2`, ... are JSON values.
     Array(Vec<Ref>),
-    /// A JSON object, represented as a map of [String]s to more JSON values.
+    /// A JSON object, represented as a map of [`String`]s to more JSON values.
     /// Corresponds to a string `{"<key1>": <v1>, "<key2>": <v2>, ...}` where `<key1>`, `<key2>`,
     /// ... are the keys, and `<v1>`, `<v2>`, ... are the corresponding JSON values.
     Object(Vec<(String, Ref)>),
@@ -263,7 +263,7 @@ mod tests {
     use crate::ast_spec::NodeMap;
     use crate::vec_node_map::{Index, VecNodeMap};
 
-    /// A copy of [JSON] that does not rely on a [NodeMap] for recursive types
+    /// A copy of [`JSON`] that does not rely on a [`NodeMap`] for recursive types
     enum TestJSON {
         True,
         False,
@@ -293,7 +293,7 @@ mod tests {
             }
         }
 
-        /// Turn this node into a [VecNodeMap] which contains the corresponding [JSON] node as
+        /// Turn this node into a [`VecNodeMap`] which contains the corresponding [`JSON`] node as
         /// root. This also adds all the children to that VecNodeMap.
         pub fn build_node_map(&self) -> VecNodeMap<JSON<Index>> {
             let mut node_map: VecNodeMap<JSON<Index>> = VecNodeMap::with_default_root();
