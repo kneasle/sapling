@@ -51,7 +51,7 @@ enum Action {
 /// - [`None`] if the command is incomplete.
 /// - [`Action::Undefined`] if the command is not defined (like the command "X").
 /// - The corresponding [`Action`], otherwise.
-fn interpret_command(command: &str) -> Option<Action> {
+fn parse_command(command: &str) -> Option<Action> {
     let mut command_char_iter = command.chars();
 
     // Consume the first char of the command
@@ -185,9 +185,9 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                     Key::Char(c) => {
                         // Add the new keypress to the command
                         self.command.push(c);
-                        // Attempt to interpret the command, and take action if the command is
+                        // Attempt to parse the command, and take action if the command is
                         // complete
-                        if let Some(action) = interpret_command(&self.command) {
+                        if let Some(action) = parse_command(&self.command) {
                             // Respond to the action
                             match action {
                                 Action::Undefined => {
@@ -238,10 +238,10 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
 
 #[cfg(test)]
 mod tests {
-    use super::{interpret_command, Action};
+    use super::{parse_command, Action};
 
     #[test]
-    fn interpret_command_complete() {
+    fn parse_command_complete() {
         for (command, expected_effect) in &[
             ("q", Action::Quit),
             ("x", Action::Undefined),
@@ -253,14 +253,14 @@ mod tests {
             ("iX", Action::Insert('X')),
             ("iP", Action::Insert('P')),
         ] {
-            assert_eq!(interpret_command(*command), Some(expected_effect.clone()));
+            assert_eq!(parse_command(*command), Some(expected_effect.clone()));
         }
     }
 
     #[test]
-    fn interpret_command_incomplete() {
+    fn parse_command_incomplete() {
         for command in &["", "r", "i"] {
-            assert_eq!(interpret_command(*command), None);
+            assert_eq!(parse_command(*command), None);
         }
     }
 }
