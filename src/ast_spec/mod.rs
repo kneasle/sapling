@@ -151,6 +151,6 @@ pub trait ASTSpec<Ref: Reference>: Eq + Default {
 
     /// Generate a new node from a [char] that a user typed as part of the `r` command.  If `c` is
     /// an element of [get_replace_chars](AST::get_replace_chars), this must return `Some` value,
-    /// if it isn't, then this can return `None`.
+    /// if it isn't, then this should return `None`.
     fn from_replace_char(&self, c: char) -> Option<Self>;
 }
