@@ -129,7 +129,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
 
     /// Insert new child as the first child of the selected node
     fn insert_child(&mut self, c: char) {
-        if self.tree.cursor_node().get_insert_chars().any(|x| x == c) {
+        if self.tree.cursor_node().insert_chars().any(|x| x == c) {
             self.log(LogLevel::Debug, format!("Inserting with '{}'", c));
         } else {
             self.log(

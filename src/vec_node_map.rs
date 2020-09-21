@@ -138,7 +138,7 @@ mod tests {
             }
         }
 
-        fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a> {
+        fn children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a> {
             match self {
                 ExampleNode::DefaultValue
                 | ExampleNode::Value1
@@ -148,7 +148,7 @@ mod tests {
             }
         }
 
-        fn get_display_name(&self) -> String {
+        fn display_name(&self) -> String {
             match self {
                 ExampleNode::DefaultValue => "default",
                 ExampleNode::Value1 => "value1",
@@ -159,7 +159,7 @@ mod tests {
             .to_string()
         }
 
-        fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
+        fn replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
             Box::new(std::iter::empty())
         }
 
@@ -167,7 +167,7 @@ mod tests {
             None
         }
 
-        fn get_insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
+        fn insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
             Box::new(std::iter::empty())
         }
     }

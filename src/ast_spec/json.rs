@@ -228,7 +228,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
     /* DEBUG VIEW FUNCTIONS */
 
-    fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a> {
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a> {
         match self {
             JSON::True | JSON::False => Box::new(std::iter::empty()),
             JSON::Array(children) => Box::new(children.iter().copied()),
@@ -236,7 +236,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
         }
     }
 
-    fn get_display_name(&self) -> String {
+    fn display_name(&self) -> String {
         match self {
             JSON::True => "true".to_string(),
             JSON::False => "false".to_string(),
@@ -247,7 +247,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
     /* AST EDITING FUNCTIONS */
 
-    fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
+    fn replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
         Self::all_chars()
     }
 
@@ -261,7 +261,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
         }
     }
 
-    fn get_insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
+    fn insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
         match self {
             JSON::True | JSON::False => Box::new(std::iter::empty()),
             JSON::Object(_) | JSON::Array(_) => Self::all_chars(),

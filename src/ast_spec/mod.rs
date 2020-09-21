@@ -122,10 +122,10 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /* DEBUG VIEW FUNCTIONS */
 
     /// Get an iterator over the direct children of this node
-    fn get_children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a>;
+    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a>;
 
     /// Get the display name of this node
-    fn get_display_name(&self) -> String;
+    fn display_name(&self) -> String;
 
     fn write_tree_view_recursive(
         &self,
@@ -155,7 +155,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
 
     /// Generate an iterator over the possible shorthand [`char`]s that a user could type to replace
     /// this node with something else.
-    fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>>;
+    fn replace_chars(&self) -> Box<dyn Iterator<Item = char>>;
 
     /// Generate a new node from a [`char`] that a user typed as part of the `r` command.  If `c` is
     /// an element of [`get_replace_chars`](ASTSpec::get_replace_chars), this must return [`Some`] node,
@@ -164,5 +164,5 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
 
     /// Generate an iterator over the possible shorthand [`char`]s that a user could type to insert
     /// other nodes into this one
-    fn get_insert_chars(&self) -> Box<dyn Iterator<Item = char>>;
+    fn insert_chars(&self) -> Box<dyn Iterator<Item = char>>;
 }
