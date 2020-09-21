@@ -27,6 +27,10 @@ pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>:
     /// `cursor`.
     fn replace_cursor(&mut self, new_node: Node);
 
+    /// Updates the internal state so that the tree now contains `new_node` inserted as the first
+    /// child of the selected node.  Also moves the cursor so that the new node is selected.
+    fn insert_child(&mut self, new_node: Node);
+
     /* DISPLAY METHODS */
 
     /// Build the text representation of the current tree into the given [`String`]

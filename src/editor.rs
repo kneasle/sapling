@@ -38,10 +38,10 @@ enum Action {
     Undefined,
     /// Quit Sapling
     Quit,
-    /// Replace the currently selected node with a node represented by some [`char`]
+    /// Replace the selected node with a node represented by some [`char`]
     Replace(char),
-    /// Insert a new node into the currently selected node from a given [`char`]
-    Insert(char),
+    /// Insert a new node (given by some [`char`]) as the first child of the selected node
+    InsertChild(char),
 }
 
 /// Attempt to convert a command as a `&`[`str`] into an [`Action`].
@@ -64,7 +64,7 @@ fn parse_command(command: &str) -> Option<Action> {
             'i' => {
                 // Consume the second char of the iterator
                 if let Some(insert_char) = command_char_iter.next() {
-                    return Some(Action::Insert(insert_char));
+                    return Some(Action::InsertChild(insert_char));
                 }
             }
             'r' => {
@@ -127,6 +127,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
         }
     }
 
+    /// Insert new child as the first child of the selected node
     fn insert_child(&mut self, c: char) {
         if self.tree.cursor_node().get_insert_chars().any(|x| x == c) {
             self.log(LogLevel::Debug, format!("Inserting with '{}'", c));
@@ -203,7 +204,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                                 Action::Replace(c) => {
                                     self.replace_cursor(c);
                                 }
-                                Action::Insert(c) => {
+                                Action::InsertChild(c) => {
                                     self.insert_child(c);
                                 }
                             }
@@ -250,8 +251,8 @@ mod tests {
             ("Qsx", Action::Undefined),
             ("ra", Action::Replace('a')),
             ("rg", Action::Replace('g')),
-            ("iX", Action::Insert('X')),
-            ("iP", Action::Insert('P')),
+            ("iX", Action::InsertChild('X')),
+            ("iP", Action::InsertChild('P')),
         ] {
             assert_eq!(parse_command(*command), Some(expected_effect.clone()));
         }
