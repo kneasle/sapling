@@ -77,6 +77,7 @@ fn interpret_command(command: &str) -> Option<Action> {
 /// A struct to hold the top-level components of the editor.
 pub struct Editor<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> {
     tree: E,
+    cursor: R,
     log: Vec<(LogLevel, String)>,
     format_style: T::FormatStyle,
     term: Term,
@@ -88,6 +89,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
     pub fn new(tree: E, format_style: T::FormatStyle) -> Editor<R, T, E> {
         let term = Term::new().unwrap();
         Editor {
+            cursor: tree.root(),
             tree,
             log: Vec::new(),
             term,
@@ -170,7 +172,24 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                                     break;
                                 }
                                 Action::Replace(c) => {
-                                    self.log(LogLevel::Debug, format!("Replacing with '{}'", c));
+                                    if let Some(selected_node) = self.tree.get_node(self.cursor) {
+                                        if let Some(new_node) = selected_node.from_replace_char(c) {
+                                            self.log(
+                                                LogLevel::Debug,
+                                                format!("Replacing with '{}'/{:?}", c, new_node),
+                                            );
+                                        } else {
+                                            self.log(
+                                                LogLevel::Warning,
+                                                format!("Cannot replace node with '{}'", c),
+                                            );
+                                        }
+                                    } else {
+                                        self.log(
+                                            LogLevel::Error,
+                                            "Current cursor node is invalid.".to_string(),
+                                        );
+                                    }
                                 }
                             }
                             // Clear the command box

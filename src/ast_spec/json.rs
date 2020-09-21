@@ -12,7 +12,7 @@ pub enum JSONFormat {
 
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
-#[derive(Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum JSON<Ref: Reference> {
     /// The JSON value for 'true'.  Corresponds to the string `true`.
     True,

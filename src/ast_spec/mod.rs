@@ -93,7 +93,7 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
 }
 
 /// The specification of an AST that sapling can edit
-pub trait ASTSpec<Ref: Reference>: Eq + Default {
+pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// A type parameter that will represent the different ways this AST can be rendered
     type FormatStyle;
 
