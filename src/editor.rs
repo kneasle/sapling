@@ -133,6 +133,8 @@ mod tests {
             ("q", Action::Quit),
             ("x", Action::Undefined),
             ("pajlbsi", Action::Undefined),
+            ("Pxx", Action::Undefined),
+            ("Qsx", Action::Undefined),
             ("ra", Action::Replace('a')),
             ("rg", Action::Replace('g')),
         ] {
