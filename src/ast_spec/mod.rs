@@ -33,9 +33,9 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
         self.get_node_mut(self.root()).unwrap()
     }
 
-    /// Set the root of the tree to be the node at a given reference, returning [true] if the
+    /// Set the root of the tree to be the node at a given reference, returning `true` if the
     /// reference was valid.  If the reference was invalid, the root will not be replaced and
-    /// [false] will be returned.
+    /// `false` will be returned.
     fn set_root(&mut self, new_root: Ref) -> bool;
 
     /// Adds a new node and set it to the tree's root
@@ -100,7 +100,7 @@ pub trait ASTSpec<Ref: Reference>: Eq + Default {
     );
 
     /// Make a [String] representing this AST.
-    /// Same as [write_text](AST::write_text) but creates a new [String].
+    /// Same as [write_text](ASTSpec::write_text) but creates a new [String].
     fn to_text(
         &self,
         node_map: &impl NodeMap<Ref, Self>,
@@ -135,7 +135,7 @@ pub trait ASTSpec<Ref: Reference>: Eq + Default {
     }
 
     /// Build a string of the a tree view of this node, similar to the output of the Unix command
-    /// 'tree'.  This is the same as [write_tree_view](AST::write_tree_view), except that it
+    /// 'tree'.  This is the same as [write_tree_view](ASTSpec::write_tree_view), except that it
     /// returns a [String] rather than appending to an existing [String].
     fn tree_view(&self, node_map: &impl NodeMap<Ref, Self>) -> String {
         let mut s = String::new();
@@ -150,7 +150,7 @@ pub trait ASTSpec<Ref: Reference>: Eq + Default {
     fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>>;
 
     /// Generate a new node from a [char] that a user typed as part of the `r` command.  If `c` is
-    /// an element of [get_replace_chars](AST::get_replace_chars), this must return `Some` value,
+    /// an element of [get_replace_chars](ASTSpec::get_replace_chars), this must return `Some` value,
     /// if it isn't, then this should return `None`.
     fn from_replace_char(&self, c: char) -> Option<Self>;
 }

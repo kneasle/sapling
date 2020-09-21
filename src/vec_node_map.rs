@@ -48,9 +48,9 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
         self.root
     }
 
-    /// Set the root of the tree to be the node at a given reference, returning [true] if the
+    /// Set the root of the tree to be the node at a given reference, returning `true` if the
     /// reference was valid.  If the reference was invalid, the root will not be replaced and
-    /// [false] will be returned.
+    /// `false` will be returned.
     fn set_root(&mut self, new_root: Index) -> bool {
         let is_ref_valid = self.get_node(new_root).is_some();
         if is_ref_valid {
