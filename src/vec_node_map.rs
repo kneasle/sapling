@@ -1,6 +1,32 @@
-use crate::ast_spec::{ASTSpec, NodeMap};
-use crate::editable_tree::reference::Index;
+use crate::ast_spec::{ASTSpec, NodeMap, Reference};
 
+// An import solely used by doc-comments
+#[allow(unused_imports)]
+use crate::editable_tree::EditableTree;
+
+/// A small type used as a reference into Vec-powered [EditableTree]s.  `Ref` acts as a type-safe
+/// alternative to just using [usize], and can only be created and used by code in the
+/// editable_tree module - to the rest of the code `Ref`s are essentially black boxes.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub struct Index(usize);
+
+impl Reference for Index {}
+
+impl From<usize> for Index {
+    fn from(val: usize) -> Index {
+        Index(val)
+    }
+}
+
+impl Index {
+    #[inline]
+    pub(crate) fn as_usize(self) -> usize {
+        self.0
+    }
+}
+
+/// A [NodeMap] that stores all the AST nodes in a [Vec] and uses indices into this [Vec] as IDs
+/// for the nodes.
 pub struct VecNodeMap<Node> {
     nodes: Vec<Node>,
     root: Index,
@@ -54,9 +80,8 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
 
 #[cfg(test)]
 mod tests {
-    use super::VecNodeMap;
+    use super::{Index, VecNodeMap};
     use crate::ast_spec::{ASTSpec, NodeMap, Reference};
-    use crate::editable_tree::reference::Index;
 
     /// An extremely basic node type, used for testing [VecNodeMap].
     #[derive(Debug, Eq, PartialEq, Hash, Clone)]

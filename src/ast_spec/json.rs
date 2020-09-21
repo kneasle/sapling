@@ -260,9 +260,8 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 #[cfg(test)]
 mod tests {
     use super::{JSONFormat, JSON};
-    use crate::vec_node_map::VecNodeMap;
     use crate::ast_spec::NodeMap;
-    use crate::editable_tree::reference::Index;
+    use crate::vec_node_map::{Index, VecNodeMap};
 
     /// A copy of [JSON] that does not rely on a [NodeMap] for recursive types
     enum TestJSON {

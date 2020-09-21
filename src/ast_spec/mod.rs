@@ -1,7 +1,6 @@
 //! A module to contain Rust representations of ASTs in a format that sapling can work with.
 
 pub mod json;
-mod vec_node_map;
 
 /// A trait bound that specifies what types can be used as a reference to Node in an AST
 pub trait Reference: Copy + Eq + std::fmt::Debug + std::hash::Hash {}

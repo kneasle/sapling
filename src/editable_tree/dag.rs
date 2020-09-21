@@ -1,6 +1,6 @@
-use super::reference::Index;
 use super::EditableTree;
 use crate::ast_spec::{ASTSpec, NodeMap};
+use crate::vec_node_map::Index;
 
 /// An [EditableTree] that stores the history as a DAG (Directed Acyclic Graph).  This means that
 /// every node that has ever been created exists somewhere in the DAG, and when changes are made,
@@ -23,7 +23,7 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for DAG<Node> {
             roots: vec![Index::from(0)],
         }
     }
-    
+
     /// Get the reference of the root node of the tree
     fn root(&self) -> Index {
         // We can unwrap here because we uphold the invariant that there must always be at least
