@@ -158,7 +158,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     fn replace_chars(&self) -> Box<dyn Iterator<Item = char>>;
 
     /// Generate a new node from a [`char`] that a user typed as part of the `r` command.  If `c` is
-    /// an element of [`get_replace_chars`](ASTSpec::get_replace_chars), this must return [`Some`] node,
+    /// an element of [`get_replace_chars`](ASTSpec::replace_chars), this must return [`Some`] node,
     /// if it isn't, then this should return [`None`].
     fn from_replace_char(&self, c: char) -> Option<Self>;
 
