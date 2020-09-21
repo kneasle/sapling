@@ -10,6 +10,11 @@ pub enum JSONFormat {
     Pretty,
 }
 
+const CHAR_TRUE: char = 't';
+const CHAR_FALSE: char = 'f';
+const CHAR_ARRAY: char = 'a';
+const CHAR_OBJECT: char = 'o';
+
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -27,12 +32,16 @@ pub enum JSON<Ref: Reference> {
     Object(Vec<(String, Ref)>),
 }
 
-const CHAR_TRUE: char = 't';
-const CHAR_FALSE: char = 'f';
-const CHAR_ARRAY: char = 'a';
-const CHAR_OBJECT: char = 'o';
-
 impl<Ref: Reference> JSON<Ref> {
+    /// Return an iterator over all the possible chars that could represent JSON nodes
+    fn all_chars() -> Box<dyn Iterator<Item = char>> {
+        Box::new(
+            [CHAR_TRUE, CHAR_FALSE, CHAR_ARRAY, CHAR_OBJECT]
+                .iter()
+                .copied(),
+        )
+    }
+
     fn write_text_compact(&self, node_map: &impl NodeMap<Ref, Self>, string: &mut String) {
         match self {
             JSON::True => {
@@ -239,11 +248,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
     /* AST EDITING FUNCTIONS */
 
     fn get_replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
-        Box::new(
-            [CHAR_TRUE, CHAR_FALSE, CHAR_ARRAY, CHAR_OBJECT]
-                .iter()
-                .copied(),
-        )
+        Self::all_chars()
     }
 
     fn from_replace_char(&self, c: char) -> Option<Self> {
@@ -253,6 +258,13 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
             CHAR_ARRAY => Some(JSON::Array(vec![])),
             CHAR_OBJECT => Some(JSON::Object(vec![])),
             _ => None,
+        }
+    }
+
+    fn get_insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
+        match self {
+            JSON::True | JSON::False => Box::new(std::iter::empty()),
+            JSON::Object(_) | JSON::Array(_) => Self::all_chars(),
         }
     }
 }

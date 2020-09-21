@@ -161,4 +161,8 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// an element of [`get_replace_chars`](ASTSpec::get_replace_chars), this must return [`Some`] node,
     /// if it isn't, then this should return [`None`].
     fn from_replace_char(&self, c: char) -> Option<Self>;
+
+    /// Generate an iterator over the possible shorthand [`char`]s that a user could type to insert
+    /// other nodes into this one
+    fn get_insert_chars(&self) -> Box<dyn Iterator<Item = char>>;
 }

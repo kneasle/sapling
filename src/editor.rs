@@ -40,6 +40,8 @@ enum Action {
     Quit,
     /// Replace the currently selected node with a node represented by some [`char`]
     Replace(char),
+    /// Insert a new node into the currently selected node from a given [`char`]
+    Insert(char),
 }
 
 /// Attempt to convert a command as a `&`[`str`] into an [`Action`].
@@ -58,6 +60,12 @@ fn interpret_command(command: &str) -> Option<Action> {
             // "q" quits Sapling
             'q' => {
                 return Some(Action::Quit);
+            }
+            'i' => {
+                // Consume the second char of the iterator
+                if let Some(insert_char) = command_char_iter.next() {
+                    return Some(Action::Insert(insert_char));
+                }
             }
             'r' => {
                 // Consume the second char of the iterator
@@ -111,6 +119,17 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                 format!("Replacing with '{}'/{:?}", c, new_node),
             );
             self.tree.replace_cursor(new_node);
+        } else {
+            self.log(
+                LogLevel::Warning,
+                format!("Cannot replace node with '{}'", c),
+            );
+        }
+    }
+
+    fn insert_child(&mut self, c: char) {
+        if self.tree.cursor_node().get_insert_chars().any(|x| x == c) {
+            self.log(LogLevel::Debug, format!("Inserting with '{}'", c));
         } else {
             self.log(
                 LogLevel::Warning,
@@ -178,10 +197,14 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                                     );
                                 }
                                 Action::Quit => {
+                                    // Break the mainloop to quit
                                     break;
                                 }
                                 Action::Replace(c) => {
                                     self.replace_cursor(c);
+                                }
+                                Action::Insert(c) => {
+                                    self.insert_child(c);
                                 }
                             }
                             // Clear the command box
@@ -227,6 +250,8 @@ mod tests {
             ("Qsx", Action::Undefined),
             ("ra", Action::Replace('a')),
             ("rg", Action::Replace('g')),
+            ("iX", Action::Insert('X')),
+            ("iP", Action::Insert('P')),
         ] {
             assert_eq!(interpret_command(*command), Some(expected_effect.clone()));
         }
@@ -234,7 +259,7 @@ mod tests {
 
     #[test]
     fn interpret_command_incomplete() {
-        for command in &["", "r"] {
+        for command in &["", "r", "i"] {
             assert_eq!(interpret_command(*command), None);
         }
     }
