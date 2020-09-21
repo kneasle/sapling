@@ -271,9 +271,15 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
 #[cfg(test)]
 mod tests {
-    use super::JSONFormat;
-    use crate::ast_spec::NodeMap;
+    use super::{JSONFormat, JSON};
     use crate::ast_spec::test_json::TestJSON;
+    use crate::ast_spec::NodeMap;
+    use crate::vec_node_map::{Index, VecNodeMap};
+
+    /// None-generic version of [`TestJSON::build_node_map`] that always returns a [`VecNodeMap`].
+    fn build_vec_node_map(tree: &TestJSON) -> VecNodeMap<JSON<Index>> {
+        tree.build_node_map::<Index, VecNodeMap<JSON<Index>>>()
+    }
 
     #[test]
     fn to_text_compact() {
@@ -308,7 +314,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                tree.build_node_map().to_text(&JSONFormat::Compact),
+                build_vec_node_map(tree).to_text(&JSONFormat::Compact),
                 *expected_string
             );
         }
@@ -363,7 +369,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                tree.build_node_map().to_text(&JSONFormat::Pretty),
+                build_vec_node_map(tree).to_text(&JSONFormat::Pretty),
                 *expected_string
             );
         }
