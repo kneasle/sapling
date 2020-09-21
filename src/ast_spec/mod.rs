@@ -1,6 +1,7 @@
 //! A module to contain Rust representations of ASTs in a format that sapling can work with.
 
 pub mod json;
+pub mod test_json;
 
 #[allow(unused_imports)]
 use crate::editable_tree::EditableTree;
