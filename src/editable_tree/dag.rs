@@ -27,7 +27,6 @@ impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for DAG<Node> {
     }
 }
 
-
 impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
     fn new() -> Self {
         let node_map = VecNodeMap::with_default_root();
@@ -35,6 +34,15 @@ impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
             roots: vec![node_map.root()],
             node_map,
         }
+    }
+
+    fn cursor(&self) -> Index {
+        // TODO: Allow the user to move the cursor
+        self.root()
+    }
+
+    fn replace_cursor(&mut self, new_node: Node) {
+        self.node_map.add_as_root(new_node);
     }
 
     fn write_text(&self, string: &mut String, format: &Node::FormatStyle) {
