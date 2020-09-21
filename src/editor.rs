@@ -137,13 +137,20 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
         self.term.present().unwrap();
     }
 
-    pub fn run(mut self) {
-        // Log the startup of the code
-        self.log(LogLevel::Info, "Starting Up...".to_string());
-        // Start the mainloop
-        self.mainloop();
-        // Log that the editor is closing
-        self.log(LogLevel::Info, format!("Closing..."));
+    /* COMMAND FUNCTIONS */
+    fn replace_cursor(&mut self, c: char) {
+        if let Some(new_node) = self.tree.cursor_node().from_replace_char(c) {
+            self.log(
+                LogLevel::Debug,
+                format!("Replacing with '{}'/{:?}", c, new_node),
+            );
+            self.tree.replace_cursor(new_node);
+        } else {
+            self.log(
+                LogLevel::Warning,
+                format!("Cannot replace node with '{}'", c),
+            );
+        }
     }
 
     fn mainloop(&mut self) {
@@ -170,20 +177,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
                                     break;
                                 }
                                 Action::Replace(c) => {
-                                    if let Some(new_node) =
-                                        self.tree.cursor_node().from_replace_char(c)
-                                    {
-                                        self.log(
-                                            LogLevel::Debug,
-                                            format!("Replacing with '{}'/{:?}", c, new_node),
-                                        );
-                                        self.tree.replace_cursor(new_node);
-                                    } else {
-                                        self.log(
-                                            LogLevel::Warning,
-                                            format!("Cannot replace node with '{}'", c),
-                                        );
-                                    }
+                                    self.replace_cursor(c);
                                 }
                             }
                             // Clear the command box
@@ -202,6 +196,16 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
             // added complexity)
             self.update_display();
         }
+    }
+
+    /// Start the editor and enter the mainloop
+    pub fn run(mut self) {
+        // Log the startup of the code
+        self.log(LogLevel::Info, "Starting Up...".to_string());
+        // Start the mainloop
+        self.mainloop();
+        // Log that the editor is closing
+        self.log(LogLevel::Info, format!("Closing..."));
     }
 }
 
