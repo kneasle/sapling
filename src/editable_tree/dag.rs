@@ -20,6 +20,15 @@ pub struct DAG<Node: ASTSpec<Index>> {
     undo_history: Vec<Index>,
 }
 
+impl<Node: ASTSpec<Index>> DAG<Node> {
+    fn from_tree(node_map: VecNodeMap<Node>) -> Self {
+        DAG {
+            undo_history: vec![],
+            node_map,
+        }
+    }
+}
+
 impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for DAG<Node> {
     fn get_node(&self, id: Index) -> Option<&Node> {
         self.node_map.get_node(id)
@@ -32,11 +41,7 @@ impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for DAG<Node> {
 
 impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
     fn new() -> Self {
-        let node_map = VecNodeMap::with_default_root();
-        DAG {
-            undo_history: vec![],
-            node_map,
-        }
+        Self::from_tree(VecNodeMap::with_default_root())
     }
 
     fn cursor(&self) -> Index {
