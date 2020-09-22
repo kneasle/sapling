@@ -14,6 +14,8 @@ const CHAR_TRUE: char = 't';
 const CHAR_FALSE: char = 'f';
 const CHAR_ARRAY: char = 'a';
 const CHAR_OBJECT: char = 'o';
+const CHAR_FIELD: char = 'i';
+const CHAR_STRING: char = 's';
 
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
@@ -28,21 +30,40 @@ pub enum JSON<Ref: Reference> {
     Array(Vec<Ref>),
     /// A JSON object, represented as a map of [`String`]s to more JSON values.
     /// Corresponds to a string `{"<key1>": <v1>, "<key2>": <v2>, ...}` where `<key1>`, `<key2>`,
-    /// ... are the keys, and `<v1>`, `<v2>`, ... are the corresponding JSON values.
-    Object(Vec<(String, Ref)>),
+    /// ... are the keys, and `<v1>`, `<v2>`, ... are the corresponding JSON values.  The `Ref`s
+    /// contained inside this must be [`Field`](JSON::Field)s.
+    Object(Vec<Ref>),
+    /// A JSON object field.  The first `Ref` must be a [`Str`](JSON::Str), and the second is any
+    /// JSON object
+    Field(Ref, Ref),
+    /// A JSON string
+    Str(String),
 }
 
 impl<Ref: Reference> JSON<Ref> {
     /// Return an iterator over all the possible chars that could represent JSON nodes
-    fn all_chars() -> Box<dyn Iterator<Item = char>> {
+    fn all_object_chars() -> Box<dyn Iterator<Item = char>> {
         Box::new(
-            [CHAR_TRUE, CHAR_FALSE, CHAR_ARRAY, CHAR_OBJECT]
+            [CHAR_TRUE, CHAR_FALSE, CHAR_ARRAY, CHAR_OBJECT, CHAR_STRING]
                 .iter()
                 .copied(),
         )
     }
 
     fn write_text_compact(&self, node_map: &impl NodeMap<Ref, Self>, string: &mut String) {
+        macro_rules! draw_recursive {
+            ($ref_expr: expr) => {{
+                let r = $ref_expr;
+                match node_map.get_node(r) {
+                    Some(node) => {
+                        node.write_text_compact(node_map, string);
+                    }
+                    None => {
+                        string.push_str(&format!("<INVALID REF {:?}>", r));
+                    }
+                }
+            }};
+        };
         match self {
             JSON::True => {
                 string.push_str("true");
@@ -62,14 +83,7 @@ impl<Ref: Reference> JSON<Ref> {
                     }
                     is_first_child = false;
                     // Push the field's name then a colon then the child value
-                    match node_map.get_node(child) {
-                        Some(node) => {
-                            node.write_text_compact(node_map, string);
-                        }
-                        None => {
-                            string.push_str(&format!("<INVALID REF {:?}>", child));
-                        }
-                    }
+                    draw_recursive!(child);
                 }
                 // Finish the array with a ']'
                 string.push(']');
@@ -79,27 +93,32 @@ impl<Ref: Reference> JSON<Ref> {
                 string.push('{');
                 // Append all the children, separated by commas
                 let mut is_first_child = true;
-                for (name, child) in fields.iter() {
+                for field in fields.iter().copied() {
                     // Add the comma if this isn't the first element
                     if !is_first_child {
                         string.push_str(", ");
                     }
                     is_first_child = false;
                     // Push the field's name then a colon then the child value
-                    string.push('"');
-                    string.push_str(name);
-                    string.push_str("\": ");
-                    match node_map.get_node(*child) {
-                        Some(node) => {
-                            node.write_text_compact(node_map, string);
-                        }
-                        None => {
-                            string.push_str(&format!("<INVALID REF {:?}>", child));
-                        }
-                    }
+                    draw_recursive!(field);
                 }
                 // Finish the array with a '}'
                 string.push('}');
+            }
+            JSON::Field(key, value) => {
+                /* We want to generate the string `<key>: <value>` */
+                // Push the 'key' node
+                draw_recursive!(*key);
+                // Push the ': '
+                string.push_str(": ");
+                // Push the 'value' node
+                draw_recursive!(*value);
+            }
+            JSON::Str(content) => {
+                // Just push `"<content>"` - we won't worry about proper escaping yet
+                string.push('"');
+                string.push_str(&content);
+                string.push('"');
             }
         }
     }
@@ -110,6 +129,19 @@ impl<Ref: Reference> JSON<Ref> {
         string: &mut String,
         indentation_buffer: &mut String,
     ) {
+        macro_rules! draw_recursive {
+            ($ref_expr: expr) => {{
+                let r = $ref_expr;
+                match node_map.get_node(r) {
+                    Some(node) => {
+                        node.write_text_pretty(node_map, string, indentation_buffer);
+                    }
+                    None => {
+                        string.push_str(&format!("<INVALID REF {:?}>", r));
+                    }
+                }
+            }};
+        };
         // Insert the text for this JSON tree
         match self {
             JSON::True => {
@@ -135,14 +167,7 @@ impl<Ref: Reference> JSON<Ref> {
                         is_first_child = false;
                         // Indent and then render the child
                         string.push_str(indentation_buffer);
-                        match node_map.get_node(child) {
-                            Some(node) => {
-                                node.write_text_pretty(node_map, string, indentation_buffer);
-                            }
-                            None => {
-                                string.push_str(&format!("<INVALID REF {:?}>", child));
-                            }
-                        }
+                        draw_recursive!(child);
                     }
                     // Return to the current indentation level
                     for _ in 0..4 {
@@ -163,36 +188,42 @@ impl<Ref: Reference> JSON<Ref> {
                     indentation_buffer.push_str("    ");
                     // Append all the children, separated by commas
                     let mut is_first_child = true;
-                    for (name, child) in fields.iter() {
+                    for field in fields.iter().copied() {
                         // Add the comma if this isn't the first element
                         if !is_first_child {
                             string.push_str(",\n");
                         }
                         is_first_child = false;
-                        // Indent the right number of times
+                        // Indent and then render the child
                         string.push_str(indentation_buffer);
-                        // Push the field's name then a colon then the child value
-                        string.push('"');
-                        string.push_str(name);
-                        string.push_str("\": ");
-                        match node_map.get_node(*child) {
-                            Some(node) => {
-                                node.write_text_pretty(node_map, string, indentation_buffer);
-                            }
-                            None => {
-                                string.push_str(&format!("<INVALID REF {:?}>", child));
-                            }
-                        }
+                        draw_recursive!(field);
                     }
                     // Return to the current indentation level
                     for _ in 0..4 {
                         indentation_buffer.pop();
                     }
-                    // Put the finishing '}' on its own line
+                    // Put the finishing ']' on its own line
                     string.push('\n');
                     string.push_str(indentation_buffer);
                 }
+                // Push a closing '}'
                 string.push('}');
+            }
+            JSON::Field(key, value) => {
+                /* We want to generate the string `<key>: <value>` */
+
+                // Push the 'key' node
+                draw_recursive!(*key);
+                // Push the ': '
+                string.push_str(": ");
+                // Push the 'value' node
+                draw_recursive!(*value);
+            }
+            JSON::Str(content) => {
+                // Just push `"<content>"` - we won't worry about proper escaping yet
+                string.push('"');
+                string.push_str(&content);
+                string.push('"');
             }
         }
     }
@@ -230,9 +261,12 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
     fn children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a> {
         match self {
-            JSON::True | JSON::False => Box::new(std::iter::empty()),
+            JSON::True | JSON::False | JSON::Str(_) => Box::new(std::iter::empty()),
             JSON::Array(children) => Box::new(children.iter().copied()),
-            JSON::Object(fields) => Box::new(fields.iter().map(|x| x.1)),
+            JSON::Object(fields) => Box::new(fields.iter().copied()),
+            JSON::Field(key, value) => {
+                Box::new(std::iter::once(*key).chain(std::iter::once(*value)))
+            }
         }
     }
 
@@ -242,13 +276,15 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
             JSON::False => "false".to_string(),
             JSON::Array(_) => "array".to_string(),
             JSON::Object(_) => "object".to_string(),
+            JSON::Field(_, _) => "field".to_string(),
+            JSON::Str(content) => format!(r#""{}""#, content),
         }
     }
 
     /* AST EDITING FUNCTIONS */
 
     fn replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
-        Self::all_chars()
+        Self::all_object_chars()
     }
 
     fn from_replace_char(&self, c: char) -> Option<Self> {
@@ -257,14 +293,18 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
             CHAR_FALSE => Some(JSON::False),
             CHAR_ARRAY => Some(JSON::Array(vec![])),
             CHAR_OBJECT => Some(JSON::Object(vec![])),
+            CHAR_STRING => Some(JSON::Str("".to_string())),
             _ => None,
         }
     }
 
     fn insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
         match self {
-            JSON::True | JSON::False => Box::new(std::iter::empty()),
-            JSON::Object(_) | JSON::Array(_) => Self::all_chars(),
+            JSON::True | JSON::False | JSON::Field(_, _) | JSON::Str(_) => {
+                Box::new(std::iter::empty())
+            }
+            JSON::Object(_) => Box::new(std::iter::once(CHAR_FIELD)),
+            JSON::Array(_) => Self::all_object_chars(),
         }
     }
 }

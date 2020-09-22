@@ -24,12 +24,16 @@ impl TestJSON {
                     .collect::<Vec<Ref>>();
                 map.add_node(JSON::Array(child_refs))
             }
-            TestJSON::Object(child_nodes) => {
-                let child_refs = child_nodes
-                    .iter()
-                    .map(|x| (x.0.clone(), x.1.recursive_add_node_to_map(map)))
-                    .collect::<Vec<(String, Ref)>>();
-                map.add_node(JSON::Object(child_refs))
+            TestJSON::Object(fields) => {
+                let mut children = Vec::with_capacity(fields.len());
+                for (key, value) in fields.iter() {
+                    // Add both child nodes
+                    let s = map.add_node(JSON::Str(key.clone()));
+                    let v = value.recursive_add_node_to_map(map);
+                    // Combine the two nodes into a fields
+                    children.push(map.add_node(JSON::Field(s, v)));
+                }
+                map.add_node(JSON::Object(children))
             }
         }
     }
