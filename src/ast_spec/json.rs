@@ -35,7 +35,7 @@ pub enum JSON<Ref: Reference> {
     Object(Vec<Ref>),
     /// A JSON object field.  The first `Ref` must be a [`Str`](JSON::Str), and the second is any
     /// JSON object
-    Field(Ref, Ref),
+    Field([Ref; 2]),
     /// A JSON string
     Str(String),
 }
@@ -105,7 +105,7 @@ impl<Ref: Reference> JSON<Ref> {
                 // Finish the array with a '}'
                 string.push('}');
             }
-            JSON::Field(key, value) => {
+            JSON::Field([key, value]) => {
                 /* We want to generate the string `<key>: <value>` */
                 // Push the 'key' node
                 draw_recursive!(*key);
@@ -209,7 +209,7 @@ impl<Ref: Reference> JSON<Ref> {
                 // Push a closing '}'
                 string.push('}');
             }
-            JSON::Field(key, value) => {
+            JSON::Field([key, value]) => {
                 /* We want to generate the string `<key>: <value>` */
 
                 // Push the 'key' node
@@ -259,14 +259,12 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
     /* DEBUG VIEW FUNCTIONS */
 
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a> {
+    fn children(&self) -> &[Ref] {
         match self {
-            JSON::True | JSON::False | JSON::Str(_) => Box::new(std::iter::empty()),
-            JSON::Array(children) => Box::new(children.iter().copied()),
-            JSON::Object(fields) => Box::new(fields.iter().copied()),
-            JSON::Field(key, value) => {
-                Box::new(std::iter::once(*key).chain(std::iter::once(*value)))
-            }
+            JSON::True | JSON::False | JSON::Str(_) => &[],
+            JSON::Array(children) => &children,
+            JSON::Object(fields) => &fields,
+            JSON::Field(key_value) => &key_value[..],
         }
     }
 
@@ -276,7 +274,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
             JSON::False => "false".to_string(),
             JSON::Array(_) => "array".to_string(),
             JSON::Object(_) => "object".to_string(),
-            JSON::Field(_, _) => "field".to_string(),
+            JSON::Field(_) => "field".to_string(),
             JSON::Str(content) => format!(r#""{}""#, content),
         }
     }
@@ -300,7 +298,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
     fn insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
         match self {
-            JSON::True | JSON::False | JSON::Field(_, _) | JSON::Str(_) => {
+            JSON::True | JSON::False | JSON::Field(_) | JSON::Str(_) => {
                 Box::new(std::iter::empty())
             }
             JSON::Object(_) => Box::new(std::iter::once(CHAR_FIELD)),

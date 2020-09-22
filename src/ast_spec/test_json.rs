@@ -36,7 +36,7 @@ impl TestJSON {
                     let s = map.add_node(JSON::Str(key.clone()));
                     let v = value.recursive_add_node_to_map(map);
                     // Combine the two nodes into a fields
-                    children.push(map.add_node(JSON::Field(s, v)));
+                    children.push(map.add_node(JSON::Field([s, v])));
                 }
                 map.add_node(JSON::Object(children))
             }

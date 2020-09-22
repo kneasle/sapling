@@ -138,13 +138,15 @@ mod tests {
             }
         }
 
-        fn children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a> {
+        fn children(&self) -> &[Ref] {
             match self {
                 ExampleNode::DefaultValue
                 | ExampleNode::Value1
                 | ExampleNode::Value2
-                | ExampleNode::WithPayload(_) => Box::new(std::iter::empty()),
-                ExampleNode::Recursive(child_ref) => Box::new(std::iter::once(*child_ref)),
+                | ExampleNode::WithPayload(_) => &[],
+                ExampleNode::Recursive(child_ref) => unsafe {
+                    std::slice::from_raw_parts(child_ref, 1)
+                },
             }
         }
 

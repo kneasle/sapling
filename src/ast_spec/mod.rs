@@ -122,8 +122,8 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
 
     /* DEBUG VIEW FUNCTIONS */
 
-    /// Get an iterator over the direct children of this node
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = Ref> + 'a>;
+    /// Get a slice over the direct children of this node
+    fn children(&self) -> &[Ref];
 
     /// Get the display name of this node
     fn display_name(&self) -> String;
