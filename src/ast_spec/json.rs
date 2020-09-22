@@ -287,7 +287,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
         Self::all_object_chars()
     }
 
-    fn from_replace_char(&self, c: char) -> Option<Self> {
+    fn from_char(&self, c: char) -> Option<Self> {
         match c {
             CHAR_TRUE => Some(JSON::True),
             CHAR_FALSE => Some(JSON::False),

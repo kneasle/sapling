@@ -166,7 +166,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// Generate a new node from a [`char`] that a user typed as part of the `r` command.  If `c` is
     /// an element of [`get_replace_chars`](ASTSpec::replace_chars), this must return [`Some`] node,
     /// if it isn't, then this should return [`None`].
-    fn from_replace_char(&self, c: char) -> Option<Self>;
+    fn from_char(&self, c: char) -> Option<Self>;
 
     /// Generate an iterator over the possible shorthand [`char`]s that a user could type to insert
     /// other nodes into this one

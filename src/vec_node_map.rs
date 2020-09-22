@@ -163,7 +163,7 @@ mod tests {
             Box::new(std::iter::empty())
         }
 
-        fn from_replace_char(&self, _c: char) -> Option<Self> {
+        fn from_char(&self, _c: char) -> Option<Self> {
             None
         }
 

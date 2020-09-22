@@ -115,7 +115,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
     fn replace_cursor(&mut self, c: char) {
         if self.tree.cursor_node().is_replace_char(c) {
             // We know that `c` corresponds to a valid node, so we can unwrap
-            let new_node = self.tree.cursor_node().from_replace_char(c).unwrap();
+            let new_node = self.tree.cursor_node().from_char(c).unwrap();
             self.log(
                 LogLevel::Debug,
                 format!("Replacing with '{}'/{:?}", c, new_node),
