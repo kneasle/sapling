@@ -46,7 +46,12 @@ enum Action {
 
 /// Attempt to convert a command as a `&`[`str`] into an [`Action`].
 /// This parses the string from the start, and returns when it finds a valid command.
-/// Therefore, `"q489flshb"` will be treated like `"q"`, and will return `Some(Action::Quit)`.
+/// Therefore, `"q489flshb"` will be treated like `"q"`, and will return `Some(Action::Quit)` even
+/// though `"q489flshb"` is not technically valid.
+/// This function is run every time the user types a command character, and so the user would not
+/// be able to input `"q489flshb"` to this function because doing so would require them to first
+/// input every possible prefix of `"q489flshb"`, including `"q"`.
+///
 /// This returns:
 /// - [`None`] if the command is incomplete.
 /// - [`Action::Undefined`] if the command is not defined (like the command "X").
