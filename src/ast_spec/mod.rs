@@ -158,6 +158,11 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// this node with something else.
     fn replace_chars(&self) -> Box<dyn Iterator<Item = char>>;
 
+    /// Returns whether or not a given [`char`] is in [`self::replace_chars()`]
+    fn is_replace_char(&self, c: char) -> bool {
+        self.replace_chars().any(|x| x == c)
+    }
+
     /// Generate a new node from a [`char`] that a user typed as part of the `r` command.  If `c` is
     /// an element of [`get_replace_chars`](ASTSpec::replace_chars), this must return [`Some`] node,
     /// if it isn't, then this should return [`None`].
@@ -166,4 +171,9 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// Generate an iterator over the possible shorthand [`char`]s that a user could type to insert
     /// other nodes into this one
     fn insert_chars(&self) -> Box<dyn Iterator<Item = char>>;
+
+    /// Returns whether or not a given [`char`] is in [`self::insert_chars()`]
+    fn is_insert_char(&self, c: char) -> bool {
+        self.insert_chars().any(|x| x == c)
+    }
 }
