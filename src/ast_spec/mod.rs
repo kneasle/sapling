@@ -158,7 +158,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// this node with something else.
     fn replace_chars(&self) -> Box<dyn Iterator<Item = char>>;
 
-    /// Returns whether or not a given [`char`] is in [`self::replace_chars()`]
+    /// Returns whether or not a given [`char`] is in [`Self::replace_chars`]
     fn is_replace_char(&self, c: char) -> bool {
         self.replace_chars().any(|x| x == c)
     }
@@ -172,7 +172,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// other nodes into this one
     fn insert_chars(&self) -> Box<dyn Iterator<Item = char>>;
 
-    /// Returns whether or not a given [`char`] is in [`self::insert_chars()`]
+    /// Returns whether or not a given [`char`] is in [`Self::insert_chars`]
     fn is_insert_char(&self, c: char) -> bool {
         self.insert_chars().any(|x| x == c)
     }
