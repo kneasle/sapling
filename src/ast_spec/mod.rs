@@ -122,7 +122,8 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
 
     /* DEBUG VIEW FUNCTIONS */
 
-    /// Get a slice over the direct children of this node
+    /// Get a slice over the direct children of this node.  This operation is expected to be
+    /// cheap - it will be used a lot of times without caching the results.
     fn children(&self) -> &[Ref];
 
     /// Get the display name of this node
