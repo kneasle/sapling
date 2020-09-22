@@ -144,9 +144,7 @@ mod tests {
                 | ExampleNode::Value1
                 | ExampleNode::Value2
                 | ExampleNode::WithPayload(_) => &[],
-                ExampleNode::Recursive(child_ref) => unsafe {
-                    std::slice::from_raw_parts(child_ref, 1)
-                },
+                ExampleNode::Recursive(child_ref) => std::slice::from_ref(child_ref),
             }
         }
 
