@@ -1,6 +1,7 @@
 use super::EditableTree;
 use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap};
 use crate::vec_node_map::{Index, VecNodeMap};
+use super::cursor_path;
 
 /// An [`EditableTree`] that stores the history as a DAG (Directed Acyclic Graph) of **immutable**
 /// nodes.
@@ -18,6 +19,7 @@ use crate::vec_node_map::{Index, VecNodeMap};
 pub struct DAG<Node: ASTSpec<Index>> {
     node_map: VecNodeMap<Node>,
     undo_history: Vec<Index>,
+    current_path: Vec<cursor_path::Segment>,
 }
 
 impl<Node: ASTSpec<Index>> DAG<Node> {
@@ -25,6 +27,7 @@ impl<Node: ASTSpec<Index>> DAG<Node> {
     pub fn from_tree(node_map: VecNodeMap<Node>) -> Self {
         DAG {
             undo_history: vec![],
+            current_path: vec![cursor_path::Segment::root(node_map.root())],
             node_map,
         }
     }
@@ -36,7 +39,8 @@ impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for DAG<Node> {
     }
 
     fn root(&self) -> Index {
-        self.node_map.root()
+        // We require that current_path.len() >= 1, so we don't have to worry about panics
+        self.current_path[0].node_index
     }
 }
 
@@ -46,8 +50,8 @@ impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
     }
 
     fn cursor(&self) -> Index {
-        // TODO: Allow the user to move the cursor
-        self.root()
+        // We require that `self.current_path.len() >= 1, so we can unwrap without fearing panics
+        self.current_path.last().unwrap().node_index
     }
 
     fn replace_cursor(&mut self, new_node: Node) {
