@@ -29,7 +29,7 @@ impl<Node: ASTSpec<Index>> Snapshot<Node> {
 }
 
 /// An [`EditableTree`] that is used as a specification to test other [`EditableTree`]
-/// implementations against.  No effort at all is made to make `Spec` performant in any way - the
+/// implementations against.  No effort is made to make `Spec` performant in any way - the
 /// important thing is that it should be difficult to introduce unintended behaviour.
 ///
 /// This works by storing the history as a [`Snapshot`] of [`VecNodeMap`]s for the trees along with

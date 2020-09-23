@@ -5,9 +5,11 @@ use crate::vec_node_map::{Index, VecNodeMap};
 
 /// An [`EditableTree`] that stores the history as a DAG (Directed Acyclic Graph) of **immutable**
 /// nodes.
+///
 /// This means that every node that has ever been created exists somewhere in the DAG, and when
 /// changes are made, every ancestor of that node is cloned until the root is reached and that
-/// root becomes the new 'current' root.
+/// root becomes the new 'current' root.  This is very similar to the way Git stores the commits,
+/// and every edit is analogous to a Git rebase.
 ///
 /// Therefore, moving back through the history is as simple as reading a different root node from
 /// the `roots` vector, and following its descendants through the DAG of nodes.

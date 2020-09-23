@@ -1,3 +1,5 @@
+//! Module containing an implementation of `NodeMap` that stores the `Node`s in a simple vector
+
 use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap, Reference};
 
 // An import solely used by doc-comments

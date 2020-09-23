@@ -1,3 +1,5 @@
+//! The top-level functionality of Sapling
+
 use crate::ast_spec::{ASTSpec, Reference};
 use crate::editable_tree::EditableTree;
 use tuikit::prelude::*;
@@ -46,6 +48,7 @@ enum Action {
 
 /// Attempt to convert a command as a `&`[`str`] into an [`Action`].
 /// This parses the string from the start, and returns when it finds a valid command.
+///
 /// Therefore, `"q489flshb"` will be treated like `"q"`, and will return `Some(Action::Quit)` even
 /// though `"q489flshb"` is not technically valid.
 /// This function is run every time the user types a command character, and so the user would not
@@ -89,10 +92,15 @@ fn parse_command(command: &str) -> Option<Action> {
 
 /// A struct to hold the top-level components of the editor.
 pub struct Editor<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> {
+    /// The [`EditableTree`] that the `Editor` is editing
     tree: E,
+    /// The log as a [`Vec`] of logged messages
     log: Vec<(LogLevel, String)>,
+    /// The style that the tree is being printed to the screen
     format_style: T::FormatStyle,
+    /// The `tuikit` terminal that the `Editor` is rendering to
     term: Term,
+    /// The current contents of the command buffer
     command: String,
 }
 

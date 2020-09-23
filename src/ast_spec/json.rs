@@ -4,7 +4,7 @@ use super::{ASTSpec, NodeMap, Reference};
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum JSONFormat {
     /// The most compact representation, has minimal whitespace.
-    /// E.g. `[{"foo": true, "bar: false}, true]`
+    /// E.g. `[{"foo": true, "bar": false}, true]`
     Compact,
     /// A prettified representation, with pretty indenting and every element on a newline.
     Pretty,
