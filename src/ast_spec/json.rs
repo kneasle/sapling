@@ -314,7 +314,7 @@ mod tests {
     use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap};
     use crate::vec_node_map::{Index, VecNodeMap};
 
-    /// None-generic version of [`TestJSON::build_node_map`] that always returns a [`VecNodeMap`].
+    /// Non-generic version of [`TestJSON::build_node_map`] that always returns a [`VecNodeMap`].
     fn build_vec_node_map(tree: &TestJSON) -> VecNodeMap<JSON<Index>> {
         tree.build_node_map::<Index, VecNodeMap<JSON<Index>>>()
     }
