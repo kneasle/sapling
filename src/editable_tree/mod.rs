@@ -1,4 +1,5 @@
 pub mod dag;
+pub mod cursor_path;
 
 use crate::ast_spec::{ASTSpec, ReadableNodeMap, Reference};
 
