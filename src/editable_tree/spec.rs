@@ -24,7 +24,7 @@ impl<Node: ASTSpec<Index>> Snapshot<Node> {
 
     /// Gets the [`Index`] of the current path
     fn cursor(&self) -> Index {
-        self.cursor_path.last().unwrap().node_index
+        self.cursor_path.last().unwrap().node
     }
 }
 

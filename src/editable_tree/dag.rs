@@ -40,7 +40,7 @@ impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for DAG<Node> {
 
     fn root(&self) -> Index {
         // We require that current_path.len() >= 1, so we don't have to worry about panics
-        self.current_path[0].node_index
+        self.current_path[0].node
     }
 }
 
@@ -51,7 +51,7 @@ impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
 
     fn cursor(&self) -> Index {
         // We require that `self.current_path.len() >= 1, so we can unwrap without fearing panics
-        self.current_path.last().unwrap().node_index
+        self.current_path.last().unwrap().node
     }
 
     fn replace_cursor(&mut self, new_node: Node) {

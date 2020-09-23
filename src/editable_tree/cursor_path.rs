@@ -7,7 +7,7 @@ use crate::ast_spec::Reference;
 /// often will) have multiple parents and therefore it's very badly defined which one to use.
 #[derive(Debug, Clone)]
 pub(super) struct Segment<Ref: Reference> {
-    pub node_index: Ref,
+    pub node: Ref,
     pub sibling_index: usize,
 }
 
@@ -15,7 +15,7 @@ impl<Ref: Reference> Segment<Ref> {
     /// Constructs a new `CursorLocationSegment` from its component parts
     pub fn new(node_index: Ref, sibling_index: usize) -> Self {
         Segment {
-            node_index,
+            node: node_index,
             sibling_index,
         }
     }
