@@ -1,8 +1,18 @@
 # Sapling
 ![Sapling logo](https://raw.githubusercontent.com/kneasle/sapling/master/sapling.gif)
+
 A highly experimental code editor where you write code not text.
 
-This project is an experiment to determine if an editor like this is actually useful.  If it is, then the sapling might grow into a tree.
+Most of the ideas for this project come from my friend Shtanton's [blog post](http://shtanton.com/ex.html), and Sapling's editing model will be largely inspired by that of Vim.
+
+This project is highly experimental in nature - many of these ideas have not been implemented before (as far as I'm aware).
+Contributions/issues are welcome, but Sapling is currently so young and the codebase so small that the code churn of my rapid iterating would probably cause PRs to immediately generate merge conflicts.  Once the code-base becomes remotely stable, I will gladly accept issues/PRs.
+
+## Goals of Sapling
+- Sapling's main goal is to make an editor that allows power users to edit code as close to their thinking speed as possible.
+  Sapling is willing to sacrifice a potentially steep learning curve in favour of increased editing power.
+- Sapling's default key bindings should be familiar to people used to Vim/Vi, although they have to edit ASTs not text.
+- Sapling's internal data structures should be as resource light as is possible without sacrificing safety.
 
 ## But why?
 When writing code with any text editor, you are usually only interested in a tiny subset of valid strings of text - those that correspond to valid
@@ -13,7 +23,20 @@ This is incredibly inefficient.
 
 To be fair, editors like Vim and Emacs do better than most by providing shortcuts to do common text manipulations which is a step in the right direction.
 
-## Pros
-- Because the editor already knows the syntactic structure of your program, you get the following essentially for free:
+## Pros of AST-based editing
+- Because the editor already knows the syntactic structure of your program, the following are **much** easier to implement for every language supported by Sapling:
   - Syntax highlighting
   - Code folding
+  - Auto-formatting of code
+- Syntax trees will potentially have lots of duplication (how many times does the identifier `i` appear in codebases?), so ASTs of a program could potentially be stored in much less space than the equivalent text, as well as being fast to edit (though probably not to render).
+- It will hopefully be **FAST** to edit code
+
+## Cons of AST-based editing (otherwise known as 'extra fun challenges')
+Because the editor *has* to hold a valid program, the following things that other editors take for granted are hard to implement:
+- Just opening a file - opening a syntactically correct file is essentially the same as writing a compiler-esque parser for every language you want to load
+  (not an easy task but there's plenty of literature/libraries already existing for this).
+  
+  However, what happens if you open a syntactically incorrect file?
+  Ideally you'd want to parse as much of the file as possible (e.g. by having a `BadInput(String)` node in every syntax tree type for cases when part of the tree is invalid).
+  Also, this parser would ideally not have to be rewritten for every single language that Sapling needs to edit.
+  So we would have to write an error-correcting parser that can parse any langauge - the closest project I've found to this is [`rust-analyzer`](https://github.com/rust-analyzer/rust-analyzer), but that only has to parse Rust code.
