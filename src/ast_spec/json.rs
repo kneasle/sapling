@@ -311,7 +311,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 mod tests {
     use super::{JSONFormat, JSON};
     use crate::ast_spec::test_json::TestJSON;
-    use crate::ast_spec::NodeMap;
+    use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap};
     use crate::vec_node_map::{Index, VecNodeMap};
 
     /// None-generic version of [`TestJSON::build_node_map`] that always returns a [`VecNodeMap`].
@@ -410,6 +410,64 @@ mod tests {
                 build_vec_node_map(tree).to_text(&JSONFormat::Pretty),
                 *expected_string
             );
+        }
+    }
+
+    #[test]
+    fn to_tree_view() {
+        for (tree, expected_string) in &[
+            (TestJSON::True, "true"),
+            (TestJSON::False, "false"),
+            (TestJSON::Array(vec![]), "array"),
+            (TestJSON::Object(vec![]), "object"),
+            (
+                TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
+                "array
+  true
+  false",
+            ),
+            (
+                TestJSON::Object(vec![
+                    ("foo".to_string(), TestJSON::True),
+                    ("bar".to_string(), TestJSON::False),
+                ]),
+                r#"object
+  field
+    "foo"
+    true
+  field
+    "bar"
+    false"#,
+            ),
+            (
+                TestJSON::Array(vec![
+                    TestJSON::Object(vec![
+                        (
+                            "foos".to_string(),
+                            TestJSON::Array(vec![TestJSON::False, TestJSON::True, TestJSON::False]),
+                        ),
+                        ("bar".to_string(), TestJSON::False),
+                    ]),
+                    TestJSON::True,
+                ]),
+                r#"array
+  object
+    field
+      "foos"
+      array
+        false
+        true
+        false
+    field
+      "bar"
+      false
+  true"#,
+            ),
+        ] {
+            let mut s = String::new();
+            let node_map = build_vec_node_map(tree);
+            node_map.root_node().write_tree_view(&node_map, &mut s);
+            assert_eq!(s, *expected_string);
         }
     }
 

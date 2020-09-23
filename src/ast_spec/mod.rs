@@ -139,13 +139,29 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
         string: &mut String,
         indentation_string: &mut String,
     ) {
-        unimplemented!();
+        // Push the node's display name with indentation and a newline
+        string.push_str(indentation_string);
+        string.push_str(&self.display_name());
+        string.push('\n');
+        // Indent by two spaces
+        indentation_string.push_str("  ");
+        for child_ref in self.children().iter() {
+            if let Some(child) = node_map.get_node(*child_ref) {
+                child.write_tree_view_recursive(node_map, string, indentation_string);
+            }
+        }
+        // Reset indentation
+        for _ in 0..2 {
+            indentation_string.pop();
+        }
     }
 
     /// Render a tree view of this node, similar to the output of the Unix command 'tree'
     fn write_tree_view(&self, node_map: &impl NodeMap<Ref, Self>, string: &mut String) {
         let mut indentation_string = String::new();
         self.write_tree_view_recursive(node_map, string, &mut indentation_string);
+        // Pop the unnecessary newline at the end
+        debug_assert_eq!(Some('\n'), string.pop());
     }
 
     /// Build a string of the a tree view of this node, similar to the output of the Unix command
