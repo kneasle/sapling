@@ -1,4 +1,4 @@
-use crate::vec_node_map::Index;
+use crate::ast_spec::Reference;
 
 /// One part of a path from the root of a tree to the cursor.
 /// A [`Vec`] of these allows the [`DAG`] [`EditableTree`] to climb back up the trees to the root
@@ -6,14 +6,14 @@ use crate::vec_node_map::Index;
 /// Keeping backpointers inside a **DAG** is particularly probablematic since each node can (and
 /// often will) have multiple parents and therefore it's very badly defined which one to use.
 #[derive(Debug, Clone)]
-pub(super) struct Segment {
-    pub node_index: Index,
+pub(super) struct Segment<Ref: Reference> {
+    pub node_index: Ref,
     pub sibling_index: usize,
 }
 
-impl Segment {
+impl<Ref: Reference> Segment<Ref> {
     /// Constructs a new `CursorLocationSegment` from its component parts
-    pub fn new(node_index: Index, sibling_index: usize) -> Self {
+    pub fn new(node_index: Ref, sibling_index: usize) -> Self {
         Segment {
             node_index,
             sibling_index,
@@ -21,7 +21,7 @@ impl Segment {
     }
 
     /// Constructs a `CursorLocationSegment` that is correct for representing the root of a tree
-    pub fn root(node_index: Index) -> Self {
+    pub fn root(node_index: Ref) -> Self {
         Self::new(node_index, 0)
     }
 }

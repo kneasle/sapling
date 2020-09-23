@@ -19,7 +19,7 @@ use crate::vec_node_map::{Index, VecNodeMap};
 pub struct DAG<Node: ASTSpec<Index>> {
     node_map: VecNodeMap<Node>,
     undo_history: Vec<Index>,
-    current_path: Vec<cursor_path::Segment>,
+    current_path: Vec<cursor_path::Segment<Index>>,
 }
 
 impl<Node: ASTSpec<Index>> DAG<Node> {

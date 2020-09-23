@@ -8,7 +8,7 @@ use crate::vec_node_map::{Index, VecNodeMap};
 struct Snapshot<Node: ASTSpec<Index>> {
     /// The [`NodeMap`] containing the tree at this point in the undo history
     pub node_map: VecNodeMap<Node>,
-    pub cursor_path: Vec<cursor_path::Segment>,
+    pub cursor_path: Vec<cursor_path::Segment<Index>>,
 }
 
 impl<Node: ASTSpec<Index>> Snapshot<Node> {
