@@ -35,13 +35,11 @@ pub struct VecNodeMap<Node> {
 }
 
 impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for VecNodeMap<Node> {
-    /// Get the reference of the root node of the tree
     #[inline]
     fn root(&self) -> Index {
         self.root
     }
 
-    /// Gets node from a reference, returning [`None`] if the reference is invalid.
     #[inline]
     fn get_node(&self, id: Index) -> Option<&Node> {
         self.nodes.get(id.as_usize())
@@ -49,7 +47,6 @@ impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for VecNodeMap<Node> {
 }
 
 impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
-    /// Create a new `NodeMap` with a given `Node` as root
     fn with_root(node: Node) -> Self {
         VecNodeMap {
             nodes: vec![node],
@@ -57,15 +54,11 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
         }
     }
 
-    /// Gets mutable node from a reference, returning [`None`] if the reference is invalid.
     #[inline]
     fn get_node_mut(&mut self, id: Index) -> Option<&mut Node> {
         self.nodes.get_mut(id.as_usize())
     }
 
-    /// Set the root of the tree to be the node at a given reference, returning `true` if the
-    /// reference was valid.  If the reference was invalid, the root will not be replaced and
-    /// `false` will be returned.
     fn set_root(&mut self, new_root: Index) -> bool {
         let is_ref_valid = self.get_node(new_root).is_some();
         if is_ref_valid {
@@ -74,7 +67,6 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
         is_ref_valid
     }
 
-    /// Add a new `Node` to the tree, and return its reference
     #[inline]
     fn add_node(&mut self, node: Node) -> Index {
         self.nodes.push(node);
