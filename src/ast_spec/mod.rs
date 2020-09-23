@@ -91,6 +91,10 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
 
     /// Add a new `Node` to the tree, and return its reference
     fn add_node(&mut self, node: Node) -> Ref;
+
+    /// Overwrite a node currently in the tree with another one.  Returns 'true' if `id` points to
+    /// an existing node, if not it will return 'false' and not do the subsitution.
+    fn overwrite_node(&mut self, id: Ref, node: Node) -> bool;
 }
 
 /// The specification of an AST that sapling can edit

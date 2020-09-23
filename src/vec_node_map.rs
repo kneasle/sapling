@@ -72,6 +72,14 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
         self.nodes.push(node);
         Index::new(self.nodes.len() - 1)
     }
+
+    fn overwrite_node(&mut self, id: Index, node: Node) -> bool {
+        let is_ref_valid = self.get_node(id).is_some();
+        if is_ref_valid {
+            self.nodes[id.as_usize()] = node;
+        }
+        is_ref_valid
+    }
 }
 
 #[cfg(test)]
