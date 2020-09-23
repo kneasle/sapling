@@ -39,15 +39,6 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
         Self::with_root(Node::default())
     }
 
-    /// Gets mutable node from a reference, returning [`None`] if the reference is invalid.
-    fn get_node_mut(&mut self, id: Ref) -> Option<&mut Node>;
-
-    /// Get the node that is the root of the current tree
-    fn root_node_mut(&mut self) -> &mut Node {
-        // We can unwrap here, because self.root() is required to be a valid reference.
-        self.get_node_mut(self.root()).unwrap()
-    }
-
     /// Set the root of the tree to be the node at a given reference, returning `true` if the
     /// reference was valid.  If the reference was invalid, the root will not be replaced and
     /// `false` will be returned.
@@ -87,6 +78,15 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
             Some(root) => root.to_text(self, format_style),
             None => "<INVALID ROOT NODE>".to_string(),
         }
+    }
+
+    /// Gets mutable node from a reference, returning [`None`] if the reference is invalid.
+    fn get_node_mut(&mut self, id: Ref) -> Option<&mut Node>;
+
+    /// Get the node that is the root of the current tree
+    fn root_node_mut(&mut self) -> &mut Node {
+        // We can unwrap here, because self.root() is required to be a valid reference.
+        self.get_node_mut(self.root()).unwrap()
     }
 
     /// Add a new `Node` to the tree, and return its reference
