@@ -320,108 +320,19 @@ mod tests {
     }
 
     #[test]
-    fn to_text_compact() {
-        for (tree, expected_string) in &[
-            (TestJSON::True, "true"),
-            (TestJSON::False, "false"),
-            (TestJSON::Array(vec![]), "[]"),
-            (TestJSON::Object(vec![]), "{}"),
+    fn to_text() {
+        for (tree, compact_string, pretty_string, tree_string) in &[
+            (TestJSON::True, "true", "true", "true"),
+            (TestJSON::False, "false", "false", "false"),
+            (TestJSON::Array(vec![]), "[]", "[]", "array"),
+            (TestJSON::Object(vec![]), "{}", "{}", "object"),
             (
                 TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
                 "[true, false]",
-            ),
-            (
-                TestJSON::Object(vec![
-                    ("foo".to_string(), TestJSON::True),
-                    ("bar".to_string(), TestJSON::False),
-                ]),
-                r#"{"foo": true, "bar": false}"#,
-            ),
-            (
-                TestJSON::Array(vec![
-                    TestJSON::Object(vec![
-                        (
-                            "foos".to_string(),
-                            TestJSON::Array(vec![TestJSON::False, TestJSON::True, TestJSON::False]),
-                        ),
-                        ("bar".to_string(), TestJSON::False),
-                    ]),
-                    TestJSON::True,
-                ]),
-                r#"[{"foos": [false, true, false], "bar": false}, true]"#,
-            ),
-        ] {
-            assert_eq!(
-                build_vec_node_map(tree).to_text(&JSONFormat::Compact),
-                *expected_string
-            );
-        }
-    }
-
-    #[test]
-    fn to_text_pretty() {
-        for (tree, expected_string) in &[
-            (TestJSON::True, "true"),
-            (TestJSON::False, "false"),
-            (TestJSON::Array(vec![]), "[]"),
-            (TestJSON::Object(vec![]), "{}"),
-            (
-                TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
                 "[
     true,
     false
 ]",
-            ),
-            (
-                TestJSON::Object(vec![
-                    ("foo".to_string(), TestJSON::True),
-                    ("bar".to_string(), TestJSON::False),
-                ]),
-                r#"{
-    "foo": true,
-    "bar": false
-}"#,
-            ),
-            (
-                TestJSON::Array(vec![
-                    TestJSON::Object(vec![
-                        (
-                            "foos".to_string(),
-                            TestJSON::Array(vec![TestJSON::False, TestJSON::True, TestJSON::False]),
-                        ),
-                        ("bar".to_string(), TestJSON::False),
-                    ]),
-                    TestJSON::True,
-                ]),
-                r#"[
-    {
-        "foos": [
-            false,
-            true,
-            false
-        ],
-        "bar": false
-    },
-    true
-]"#,
-            ),
-        ] {
-            assert_eq!(
-                build_vec_node_map(tree).to_text(&JSONFormat::Pretty),
-                *expected_string
-            );
-        }
-    }
-
-    #[test]
-    fn to_tree_view() {
-        for (tree, expected_string) in &[
-            (TestJSON::True, "true"),
-            (TestJSON::False, "false"),
-            (TestJSON::Array(vec![]), "array"),
-            (TestJSON::Object(vec![]), "object"),
-            (
-                TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
                 "array
   true
   false",
@@ -431,6 +342,11 @@ mod tests {
                     ("foo".to_string(), TestJSON::True),
                     ("bar".to_string(), TestJSON::False),
                 ]),
+                r#"{"foo": true, "bar": false}"#,
+                r#"{
+    "foo": true,
+    "bar": false
+}"#,
                 r#"object
   field
     "foo"
@@ -450,6 +366,18 @@ mod tests {
                     ]),
                     TestJSON::True,
                 ]),
+                r#"[{"foos": [false, true, false], "bar": false}, true]"#,
+                r#"[
+    {
+        "foos": [
+            false,
+            true,
+            false
+        ],
+        "bar": false
+    },
+    true
+]"#,
                 r#"array
   object
     field
@@ -464,33 +392,21 @@ mod tests {
   true"#,
             ),
         ] {
+            // Test compact string
+            assert_eq!(
+                build_vec_node_map(tree).to_text(&JSONFormat::Compact),
+                *compact_string
+            );
+            // Test pretty string
+            assert_eq!(
+                build_vec_node_map(tree).to_text(&JSONFormat::Pretty),
+                *pretty_string
+            );
+            // Test debug tree view
             let mut s = String::new();
             let node_map = build_vec_node_map(tree);
             node_map.root_node().write_tree_view(&node_map, &mut s);
-            assert_eq!(s, *expected_string);
+            assert_eq!(s, *tree_string);
         }
     }
-
-    /*
-        // This function actually tests `write_tree_view` from 'ast/mod.rs', but since that is a trait
-        // method, it can only be tested on a concrete implementation of AST
-        #[test]
-        fn tree_view() {
-            for (tree, expected_string) in &[
-                (TestJSON::True, "true"),
-                (TestJSON::False, "false"),
-                (TestJSON::Object(vec![]), "object"),
-                (TestJSON::Array(vec![]), "array"),
-                (
-                    TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
-                    "array
-    ├── true
-    └── false",
-                ),
-            ] {
-                let node_map = tree.build_node_map();
-                assert_eq!(node_map.root_node().tree_view(&node_map), *expected_string);
-            }
-        }
-    */
 }
