@@ -1,7 +1,7 @@
 use super::{cursor_path, EditableTree};
 use crate::ast_spec::ASTSpec;
 use crate::node_map::vec::{Index, VecNodeMap};
-use crate::node_map::{NodeMap, ReadableNodeMap};
+use crate::node_map::{NodeMap, NodeMapMut};
 
 /// A snapshot of the undo history of a specification [`EditableTree`].  This is cloned every time
 /// a changes is made to the [`Spec`] struct.
@@ -76,7 +76,7 @@ impl<Node: ASTSpec<Index>> Spec<Node> {
     }
 }
 
-impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for Spec<Node> {
+impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for Spec<Node> {
     fn get_node(&self, id: Index) -> Option<&Node> {
         self.snapshot().node_map.get_node(id)
     }

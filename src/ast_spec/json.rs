@@ -1,4 +1,4 @@
-use super::{ASTSpec, NodeMap, Reference};
+use super::{ASTSpec, NodeMapMut, Reference};
 
 /// An enum to hold the different ways that a JSON AST can be formatted
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -50,7 +50,7 @@ impl<Ref: Reference> JSON<Ref> {
         )
     }
 
-    fn write_text_compact(&self, node_map: &impl NodeMap<Ref, Self>, string: &mut String) {
+    fn write_text_compact(&self, node_map: &impl NodeMapMut<Ref, Self>, string: &mut String) {
         macro_rules! draw_recursive {
             ($ref_expr: expr) => {{
                 let r = $ref_expr;
@@ -125,7 +125,7 @@ impl<Ref: Reference> JSON<Ref> {
 
     fn write_text_pretty(
         &self,
-        node_map: &impl NodeMap<Ref, Self>,
+        node_map: &impl NodeMapMut<Ref, Self>,
         string: &mut String,
         indentation_buffer: &mut String,
     ) {
@@ -242,7 +242,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
     fn write_text(
         &self,
-        node_map: &impl NodeMap<Ref, Self>,
+        node_map: &impl NodeMapMut<Ref, Self>,
         string: &mut String,
         format_style: &JSONFormat,
     ) {
@@ -322,7 +322,7 @@ mod tests {
     use crate::ast_spec::test_json::TestJSON;
     use crate::ast_spec::ASTSpec;
     use crate::node_map::vec::{Index, VecNodeMap};
-    use crate::node_map::{NodeMap, ReadableNodeMap};
+    use crate::node_map::{NodeMap, NodeMapMut};
 
     /// Non-generic version of [`TestJSON::build_node_map`] that always returns a [`VecNodeMap`].
     fn build_vec_node_map(tree: &TestJSON) -> VecNodeMap<JSON<Index>> {

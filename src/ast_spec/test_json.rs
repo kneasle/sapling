@@ -1,10 +1,12 @@
 use super::json::JSON;
-use crate::node_map::{NodeMap, Reference};
+use crate::node_map::{NodeMapMut, Reference};
 
 // Imports used solely by doc comments.  rustc/clippy can't see that they're used, so we surpress
 // the warning because we know it's OK.
 #[allow(unused_imports)]
 use crate::node_map::vec::VecNodeMap;
+#[allow(unused_imports)]
+use crate::node_map::NodeMap;
 
 /// A copy of [`JSON`] that does not rely on a [`NodeMap`] for recursive types
 pub enum TestJSON {
@@ -15,7 +17,7 @@ pub enum TestJSON {
 }
 
 impl TestJSON {
-    fn recursive_add_node_to_map<Ref: Reference, M: NodeMap<Ref, JSON<Ref>>>(
+    fn recursive_add_node_to_map<Ref: Reference, M: NodeMapMut<Ref, JSON<Ref>>>(
         &self,
         map: &mut M,
     ) -> Ref {
@@ -45,7 +47,7 @@ impl TestJSON {
 
     /// Turn this node into a [`VecNodeMap`] which contains the corresponding [`JSON`] node as
     /// root. This also adds all the children to that VecNodeMap.
-    pub fn build_node_map<Ref: Reference, M: NodeMap<Ref, JSON<Ref>>>(&self) -> M {
+    pub fn build_node_map<Ref: Reference, M: NodeMapMut<Ref, JSON<Ref>>>(&self) -> M {
         let mut node_map = M::with_default_root();
         let root = self.recursive_add_node_to_map(&mut node_map);
         node_map.set_root(root);

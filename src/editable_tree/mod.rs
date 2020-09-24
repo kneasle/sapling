@@ -5,12 +5,10 @@ pub mod dag;
 pub mod spec;
 
 use crate::ast_spec::ASTSpec;
-use crate::node_map::{ReadableNodeMap, Reference};
+use crate::node_map::{NodeMap, Reference};
 
 /// A trait specifying an editable, undoable buffer of trees
-pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>:
-    ReadableNodeMap<Ref, Node> + Sized
-{
+pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> + Sized {
     /* CONSTRUCTOR METHODS */
 
     /// Build a new `EditableTree` with the default AST of the given type

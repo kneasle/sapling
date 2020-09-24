@@ -1,6 +1,6 @@
 //! Module containing an implementation of `NodeMap` that stores the `Node`s in a simple vector
 
-use super::{NodeMap, ReadableNodeMap, Reference};
+use super::{NodeMap, NodeMapMut, Reference};
 use crate::ast_spec::ASTSpec;
 
 // An import solely used by doc-comments
@@ -37,7 +37,7 @@ pub struct VecNodeMap<Node> {
     root: Index,
 }
 
-impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for VecNodeMap<Node> {
+impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
     #[inline]
     fn root(&self) -> Index {
         self.root
@@ -49,7 +49,7 @@ impl<Node: ASTSpec<Index>> ReadableNodeMap<Index, Node> for VecNodeMap<Node> {
     }
 }
 
-impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
+impl<Node: ASTSpec<Index>> NodeMapMut<Index, Node> for VecNodeMap<Node> {
     fn with_root(node: Node) -> Self {
         VecNodeMap {
             nodes: vec![node],
@@ -89,7 +89,7 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
 mod tests {
     use super::{Index, VecNodeMap};
     use crate::ast_spec::ASTSpec;
-    use crate::node_map::{NodeMap, ReadableNodeMap, Reference};
+    use crate::node_map::{NodeMap, NodeMapMut, Reference};
 
     /// An extremely basic node type, used for testing [VecNodeMap].
     #[derive(Debug, Eq, PartialEq, Hash, Clone)]
@@ -113,7 +113,7 @@ mod tests {
 
         fn write_text(
             &self,
-            node_map: &impl NodeMap<Ref, Self>,
+            node_map: &impl NodeMapMut<Ref, Self>,
             string: &mut String,
             format_style: &Self::FormatStyle,
         ) {

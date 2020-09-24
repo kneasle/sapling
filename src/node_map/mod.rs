@@ -4,12 +4,16 @@ pub mod vec;
 
 use crate::ast_spec::ASTSpec;
 
+// Imports used solely for doc-comments
+#[allow(unused_imports)]
+use crate::editable_tree::EditableTree;
+
 /// A trait bound that specifies what types can be used as a reference to a Node in an [`NodeMap`]
 pub trait Reference: Copy + Eq + std::fmt::Debug + std::hash::Hash {}
 
 /// A trait bound for a type that can be used to access nodes (used to give [`NodeMap`]-like
-/// attributes to [`EditableTree`]s).
-pub trait ReadableNodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
+/// attributes to [`EditableTree`]s).  If you need to be able to change nodes, see [`NodeMapMut`].
+pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
     /// Gets node from a reference, returning [`None`] if the reference is invalid.
     fn get_node(&self, id: Ref) -> Option<&Node>;
 
@@ -25,7 +29,7 @@ pub trait ReadableNodeMap<Ref: Reference, Node: ASTSpec<Ref>> {
 }
 
 /// A trait bound for a type that can store `Node`s, accessible by references.
-pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node> {
+pub trait NodeMapMut<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> {
     /// Create a new `NodeMap` with a given `Node` as root
     fn with_root(root: Node) -> Self;
 
@@ -51,7 +55,7 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
     }
 
     /// Writes the text rendering of the root node to a string (same as calling
-    /// [`to_text`](ASTSpec::to_text) on the [`root`](ReadableNodeMap::root)).
+    /// [`to_text`](ASTSpec::to_text) on the [`root`](NodeMap::root)).
     fn write_text(&self, string: &mut String, format_style: &Node::FormatStyle)
     where
         Self: Sized,
@@ -67,7 +71,7 @@ pub trait NodeMap<Ref: Reference, Node: ASTSpec<Ref>>: ReadableNodeMap<Ref, Node
     }
 
     /// Generates the text rendering of the root node (same as calling [`to_text`](ASTSpec::to_text)
-    /// on the [`root`](ReadableNodeMap::root)).
+    /// on the [`root`](NodeMap::root)).
     fn to_text(&self, format_style: &Node::FormatStyle) -> String
     where
         Self: Sized,
