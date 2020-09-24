@@ -268,6 +268,15 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
         }
     }
 
+    fn children_mut(&mut self) -> &mut [Ref] {
+        match self {
+            JSON::True | JSON::False | JSON::Str(_) => &mut [],
+            JSON::Array(children) => children,
+            JSON::Object(fields) => fields,
+            JSON::Field(key_value) => &mut key_value[..],
+        }
+    }
+
     fn display_name(&self) -> String {
         match self {
             JSON::True => "true".to_string(),
@@ -311,8 +320,9 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 mod tests {
     use super::{JSONFormat, JSON};
     use crate::ast_spec::test_json::TestJSON;
-    use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap};
-    use crate::vec_node_map::{Index, VecNodeMap};
+    use crate::ast_spec::ASTSpec;
+    use crate::node_map::vec::{Index, VecNodeMap};
+    use crate::node_map::{NodeMap, ReadableNodeMap};
 
     /// Non-generic version of [`TestJSON::build_node_map`] that always returns a [`VecNodeMap`].
     fn build_vec_node_map(tree: &TestJSON) -> VecNodeMap<JSON<Index>> {

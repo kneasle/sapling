@@ -2,8 +2,7 @@ use sapling::ast_spec::json::{JSONFormat, JSON};
 use sapling::ast_spec::test_json::TestJSON;
 use sapling::editable_tree::dag::DAG;
 use sapling::editor::Editor;
-use sapling::vec_node_map::Index;
-use sapling::vec_node_map::VecNodeMap;
+use sapling::node_map::vec::{Index, VecNodeMap};
 
 fn main() {
     // For the time being, start the editor with some pre-made JSON

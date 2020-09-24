@@ -1,6 +1,7 @@
 //! Module containing an implementation of `NodeMap` that stores the `Node`s in a simple vector
 
-use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap, Reference};
+use super::{NodeMap, ReadableNodeMap, Reference};
+use crate::ast_spec::ASTSpec;
 
 // An import solely used by doc-comments
 #[allow(unused_imports)]
@@ -87,7 +88,8 @@ impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for VecNodeMap<Node> {
 #[cfg(test)]
 mod tests {
     use super::{Index, VecNodeMap};
-    use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap, Reference};
+    use crate::ast_spec::ASTSpec;
+    use crate::node_map::{NodeMap, ReadableNodeMap, Reference};
 
     /// An extremely basic node type, used for testing [VecNodeMap].
     #[derive(Debug, Eq, PartialEq, Hash, Clone)]
@@ -147,6 +149,16 @@ mod tests {
                 | ExampleNode::Value2
                 | ExampleNode::WithPayload(_) => &[],
                 ExampleNode::Recursive(child_ref) => std::slice::from_ref(child_ref),
+            }
+        }
+
+        fn children_mut(&mut self) -> &mut [Ref] {
+            match self {
+                ExampleNode::DefaultValue
+                | ExampleNode::Value1
+                | ExampleNode::Value2
+                | ExampleNode::WithPayload(_) => &mut [],
+                ExampleNode::Recursive(child_ref) => std::slice::from_mut(child_ref),
             }
         }
 

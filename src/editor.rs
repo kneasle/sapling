@@ -1,7 +1,8 @@
 //! The top-level functionality of Sapling
 
-use crate::ast_spec::{ASTSpec, Reference};
+use crate::ast_spec::ASTSpec;
 use crate::editable_tree::EditableTree;
+use crate::node_map::Reference;
 use tuikit::prelude::*;
 
 /// The possible log levels

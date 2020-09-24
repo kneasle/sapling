@@ -1,10 +1,10 @@
 use super::json::JSON;
-use crate::ast_spec::{NodeMap, Reference};
+use crate::node_map::{NodeMap, Reference};
 
 // Imports used solely by doc comments.  rustc/clippy can't see that they're used, so we surpress
 // the warning because we know it's OK.
 #[allow(unused_imports)]
-use crate::vec_node_map::VecNodeMap;
+use crate::node_map::vec::VecNodeMap;
 
 /// A copy of [`JSON`] that does not rely on a [`NodeMap`] for recursive types
 pub enum TestJSON {

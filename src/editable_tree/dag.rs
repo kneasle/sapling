@@ -1,7 +1,8 @@
 use super::cursor_path;
 use super::EditableTree;
-use crate::ast_spec::{ASTSpec, NodeMap, ReadableNodeMap};
-use crate::vec_node_map::{Index, VecNodeMap};
+use crate::ast_spec::ASTSpec;
+use crate::node_map::vec::{Index, VecNodeMap};
+use crate::node_map::{NodeMap, ReadableNodeMap};
 
 /// An [`EditableTree`] that stores the history as a DAG (Directed Acyclic Graph) of **immutable**
 /// nodes.

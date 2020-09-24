@@ -1,15 +1,15 @@
-use crate::ast_spec::Reference;
+use crate::node_map::Reference;
 
 // Imports solely for doc comments
 #[allow(unused_imports)]
-use crate::editable_tree::EditableTree;
-#[allow(unused_imports)]
 use crate::editable_tree::dag::DAG;
+#[allow(unused_imports)]
+use crate::editable_tree::EditableTree;
 
 /// One part of a path from the root of a tree to the cursor.
 ///
 /// A [`Vec`] of these allows the [`DAG`] [`EditableTree`] to climb back up the trees to the root
-/// without having to keep backpointers updated in the DAG - keeping backpointers inside a **DAG** 
+/// without having to keep backpointers updated in the DAG - keeping backpointers inside a **DAG**
 /// is particularly probablematic since each node can (and often will) have multiple parents and
 /// therefore it's very badly defined which one to use.
 ///

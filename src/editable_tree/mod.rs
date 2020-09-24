@@ -4,7 +4,8 @@ pub mod cursor_path;
 pub mod dag;
 pub mod spec;
 
-use crate::ast_spec::{ASTSpec, ReadableNodeMap, Reference};
+use crate::ast_spec::ASTSpec;
+use crate::node_map::{ReadableNodeMap, Reference};
 
 /// A trait specifying an editable, undoable buffer of trees
 pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>:
