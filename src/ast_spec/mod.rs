@@ -61,6 +61,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
         string.push('\n');
         // Indent by two spaces
         indentation_string.push_str("  ");
+        // Write all the children
         for child_ref in self.children().iter() {
             if let Some(child) = node_map.get_node(*child_ref) {
                 child.write_tree_view_recursive(node_map, string, indentation_string);
@@ -77,7 +78,8 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
         let mut indentation_string = String::new();
         self.write_tree_view_recursive(node_map, string, &mut indentation_string);
         // Pop the unnecessary newline at the end
-        debug_assert_eq!(Some('\n'), string.pop());
+        let popped_char = string.pop();
+        debug_assert_eq!(Some('\n'), popped_char);
     }
 
     /// Build a string of the a tree view of this node, similar to the output of the Unix command
