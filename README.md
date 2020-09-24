@@ -12,8 +12,8 @@ Contributions/issues are welcome, but Sapling is currently so young and the code
 - Sapling's main goal is to make an editor that allows power users to edit code as close to their thinking speed as possible.
   Sapling is willing to sacrifice a potentially steep learning curve in favour of increased editing power.
 - Sapling's default key bindings should be familiar to people used to Vim/Vi, although they have to edit ASTs not text.
-- Sapling's internal data structures should be as resource light as is possible without sacrificing safety.
-  Spicy data structures are absolutely allowed so long as they increase the performance and don't hinder the safety.
+- Sapling should be as snappy and resource light as is possible without sacrificing safety.
+  Spicy data structures are absolutely allowed so long as they increase the performance and don't hinder safety.
 
 ## But why?
 When writing code with any text editor, you are usually only interested in a tiny subset of valid strings of text - those that correspond to valid
