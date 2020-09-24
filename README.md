@@ -11,7 +11,7 @@ Contributions/issues are welcome, but Sapling is currently so young and the code
 ## Goals of Sapling
 - Sapling's main goal is to make an editor that allows power users to edit code as close to their thinking speed as possible.
   Sapling is willing to sacrifice a potentially steep learning curve in favour of increased editing power.
-- Sapling's default key bindings should be familiar to people used to Vim/Vi, although they have to edit ASTs not text.
+- Sapling's default key bindings should be familiar to people used to Vim/Vi, although some alterations will be necessary as they have to edit ASTs not text.
 - Sapling should be as snappy and resource light as is possible without sacrificing safety.
   Spicy data structures are absolutely allowed so long as they increase the performance and don't hinder safety.
 
