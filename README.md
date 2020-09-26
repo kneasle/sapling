@@ -16,7 +16,7 @@ Contributions/issues are welcome, but Sapling is currently so young and the code
   Spicy data structures are absolutely allowed so long as they increase the performance and don't hinder safety.
 
 ## But why?
-When writing code with any text editor, you are usually only interested in a tiny subset of valid strings of text - those that correspond to valid
+When writing code with any text editor, you are usually only interested in a tiny subset of all the possible strings of text - those that correspond to valid
 programs in whatever language you're writing.  In a **text** editor, you will spend the overwhelming majority of your time
 with the text in your editor being invalid as you make edits to move between valid programs.
 
