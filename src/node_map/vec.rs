@@ -88,6 +88,7 @@ impl<Node: ASTSpec<Index>> NodeMapMut<Index, Node> for VecNodeMap<Node> {
 #[cfg(test)]
 mod tests {
     use super::{Index, VecNodeMap};
+    use crate::ast_spec::size::Size;
     use crate::ast_spec::ASTSpec;
     use crate::node_map::{NodeMap, NodeMapMut, Reference};
 
@@ -110,6 +111,14 @@ mod tests {
 
     impl<Ref: Reference> ASTSpec<Ref> for ExampleNode<Ref> {
         type FormatStyle = ();
+
+        fn size(
+            &self,
+            _node_map: &impl NodeMap<Ref, Self>,
+            _format_style: &Self::FormatStyle,
+        ) -> Size {
+            unimplemented!();
+        }
 
         fn write_text(
             &self,

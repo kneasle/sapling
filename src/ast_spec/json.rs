@@ -1,4 +1,6 @@
-use super::{ASTSpec, NodeMapMut, Reference};
+use super::size::Size;
+use super::{ASTSpec, Reference};
+use crate::node_map::{NodeMap, NodeMapMut};
 
 /// An enum to hold the different ways that a JSON AST can be formatted
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -240,6 +242,111 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
     /* FORMATTING FUNCTIONS */
 
+    fn size(&self, node_map: &impl NodeMap<Ref, Self>, format_style: &Self::FormatStyle) -> Size {
+        /// A cheeky macro that expands to the code that generates the size of another node
+        macro_rules! get_size {
+            ($ref: expr) => {
+                node_map
+                    .get_node($ref)
+                    .unwrap()
+                    .size(node_map, format_style)
+            };
+        };
+
+        match format_style {
+            JSONFormat::Pretty => {
+                match self {
+                    JSON::True => Size::new(0, 4),  // same as Size::from("true")
+                    JSON::False => Size::new(0, 5), // same as Size::from("false")
+                    JSON::Str(string) => {
+                        Size::new(0, 1) + Size::from(string.as_str()) + Size::new(0, 1)
+                    }
+                    JSON::Field([key, value]) => {
+                        get_size!(*key) + Size::new(0, 2) + get_size!(*value)
+                    }
+                    JSON::Object(fields) => {
+                        // Special case: if the object is empty, then it will be rendered as "{}",
+                        // which only takes up one line
+                        if fields.len() == 0 {
+                            return Size::new(0, 2); // same as Size::from("{}")
+                        }
+                        /* For an object, we are only interested in how many lines are occupied -
+                         * the last line will always just be "}" */
+                        // We initialise this to 1 because the opening '{' occupies its own line.
+                        let mut number_of_lines = 1;
+                        for f in fields {
+                            // The `+ 1` accounts for the extra newline char generated between
+                            // every field.
+                            number_of_lines += get_size!(*f).lines() + 1;
+                        }
+                        Size::new(number_of_lines, 1)
+                    }
+                    JSON::Array(children) => {
+                        // Special case: if the array is empty, then it will be rendered as "[]",
+                        // which only takes up one line
+                        if children.len() == 0 {
+                            return Size::new(0, 2); // same as Size::from("[]");
+                        }
+                        /* For an array, we are only interested in how many lines are occupied -
+                         * the last line will always just be "]" */
+                        // We initialise this to 1 because the opening '[' occupies its own line.
+                        let mut number_of_lines = 1;
+                        for c in children {
+                            // The `+ 1` accounts for the extra newline char generated between
+                            // every child.
+                            number_of_lines += get_size!(*c).lines() + 1;
+                        }
+                        Size::new(number_of_lines, 1)
+                    }
+                }
+            }
+            JSONFormat::Compact => {
+                match self {
+                    JSON::True => Size::new(0, 4),  // same as Size::from("true")
+                    JSON::False => Size::new(0, 5), // same as Size::from("false")
+                    JSON::Str(string) => {
+                        Size::new(0, 1) + Size::from(string.as_str()) + Size::new(0, 1)
+                    }
+                    JSON::Field([key, value]) => {
+                        get_size!(*key) + Size::new(0, 2) + get_size!(*value)
+                    }
+                    JSON::Object(fields) => {
+                        // Size accumulator - starts with just the size of "{"
+                        let mut size = Size::new(0, 1);
+                        // Append all the children, and put ", " between all of them
+                        let mut is_first_child = true;
+                        for f in fields {
+                            // If we're not on the first child, add a ", "
+                            if !is_first_child {
+                                size += Size::new(0, 2);
+                            }
+                            is_first_child = false;
+                            size += get_size!(*f);
+                        }
+                        // Append one more char for "}" to the end, and return
+                        size + Size::new(0, 1)
+                    }
+                    JSON::Array(children) => {
+                        // Size accumulator - starts with just the size of "["
+                        let mut size = Size::new(0, 1);
+                        // Append all the children, and put ", " between all of them
+                        let mut is_first_child = true;
+                        for c in children {
+                            // If we're not on the first child, add a ", "
+                            if !is_first_child {
+                                size += Size::new(0, 2);
+                            }
+                            is_first_child = false;
+                            size += get_size!(*c);
+                        }
+                        // Append one more char for "]" to the end, and return
+                        size + Size::new(0, 1)
+                    }
+                }
+            }
+        }
+    }
+
     fn write_text(
         &self,
         node_map: &impl NodeMapMut<Ref, Self>,
@@ -319,6 +426,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 #[cfg(test)]
 mod tests {
     use super::{JSONFormat, JSON};
+    use crate::ast_spec::size::Size;
     use crate::ast_spec::test_json::TestJSON;
     use crate::ast_spec::ASTSpec;
     use crate::node_map::vec::{Index, VecNodeMap};
@@ -331,7 +439,7 @@ mod tests {
 
     #[test]
     fn to_text() {
-        for (tree, compact_string, pretty_string, tree_string) in &[
+        for (tree, expected_compact_string, expected_pretty_string, tree_string) in &[
             (TestJSON::True, "true", "true", "true"),
             (TestJSON::False, "false", "false", "false"),
             (TestJSON::Array(vec![]), "[]", "[]", "array"),
@@ -402,15 +510,22 @@ mod tests {
   true"#,
             ),
         ] {
+            println!("Testing {}", expected_compact_string);
+
+            let node_map = build_vec_node_map(tree);
             // Test compact string
+            let compact_string = node_map.to_text(&JSONFormat::Compact);
+            assert_eq!(compact_string, *expected_compact_string);
             assert_eq!(
-                build_vec_node_map(tree).to_text(&JSONFormat::Compact),
-                *compact_string
+                node_map.root_node().size(&node_map, &JSONFormat::Compact),
+                Size::from(*expected_compact_string)
             );
             // Test pretty string
+            let pretty_string = node_map.to_text(&JSONFormat::Pretty);
+            assert_eq!(pretty_string, *expected_pretty_string);
             assert_eq!(
-                build_vec_node_map(tree).to_text(&JSONFormat::Pretty),
-                *pretty_string
+                node_map.root_node().size(&node_map, &JSONFormat::Pretty),
+                Size::from(*expected_pretty_string)
             );
             // Test debug tree view
             let mut s = String::new();

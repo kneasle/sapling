@@ -1,10 +1,13 @@
 //! A module to contain Rust representations of ASTs in a format that sapling can work with.
 
 pub mod json;
+pub mod size;
 pub mod test_json;
 
-use crate::node_map::{NodeMapMut, Reference};
+use crate::node_map::{NodeMap, NodeMapMut, Reference};
+use size::Size;
 
+// Import used only for doc comments
 #[allow(unused_imports)]
 use crate::editable_tree::EditableTree;
 
@@ -14,6 +17,9 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     type FormatStyle;
 
     /* FORMATTING FUNCTIONS */
+
+    /// Determine the space on the screen occupied by this node in an AST
+    fn size(&self, node_map: &impl NodeMap<Ref, Self>, format_style: &Self::FormatStyle) -> Size;
 
     /// Write the textual representation of this AST to a string
     fn write_text(
