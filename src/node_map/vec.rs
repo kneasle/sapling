@@ -126,7 +126,7 @@ mod tests {
 
         fn write_text(
             &self,
-            node_map: &impl NodeMapMut<Ref, Self>,
+            node_map: &impl NodeMap<Ref, Self>,
             string: &mut String,
             format_style: &Self::FormatStyle,
         ) {

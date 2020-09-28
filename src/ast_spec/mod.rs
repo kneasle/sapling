@@ -4,7 +4,7 @@ pub mod json;
 pub mod size;
 pub mod test_json;
 
-use crate::node_map::{NodeMap, NodeMapMut, Reference};
+use crate::node_map::{NodeMap, Reference};
 use size::Size;
 
 // Import used only for doc comments
@@ -45,7 +45,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// Write the textual representation of this AST to a string
     fn write_text(
         &self,
-        node_map: &impl NodeMapMut<Ref, Self>,
+        node_map: &impl NodeMap<Ref, Self>,
         string: &mut String,
         format_style: &Self::FormatStyle,
     );
@@ -54,7 +54,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// Same as [`write_text`](ASTSpec::write_text) but creates a new [`String`].
     fn to_text(
         &self,
-        node_map: &impl NodeMapMut<Ref, Self>,
+        node_map: &impl NodeMap<Ref, Self>,
         format_style: &Self::FormatStyle,
     ) -> String {
         let mut s = String::new();
@@ -78,7 +78,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
 
     fn write_tree_view_recursive(
         &self,
-        node_map: &impl NodeMapMut<Ref, Self>,
+        node_map: &impl NodeMap<Ref, Self>,
         string: &mut String,
         indentation_string: &mut String,
     ) {
@@ -101,7 +101,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     }
 
     /// Render a tree view of this node, similar to the output of the Unix command 'tree'
-    fn write_tree_view(&self, node_map: &impl NodeMapMut<Ref, Self>, string: &mut String) {
+    fn write_tree_view(&self, node_map: &impl NodeMap<Ref, Self>, string: &mut String) {
         let mut indentation_string = String::new();
         self.write_tree_view_recursive(node_map, string, &mut indentation_string);
         // Pop the unnecessary newline at the end
@@ -112,7 +112,7 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// Build a string of the a tree view of this node, similar to the output of the Unix command
     /// 'tree'.  This is the same as [`write_tree_view`](ASTSpec::write_tree_view), except that it
     /// returns a [`String`] rather than appending to an existing [`String`].
-    fn tree_view(&self, node_map: &impl NodeMapMut<Ref, Self>) -> String {
+    fn tree_view(&self, node_map: &impl NodeMap<Ref, Self>) -> String {
         let mut s = String::new();
         self.write_tree_view(node_map, &mut s);
         s

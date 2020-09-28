@@ -1,6 +1,6 @@
 use super::size::Size;
 use super::{ASTSpec, DisplayToken, Reference};
-use crate::node_map::{NodeMap, NodeMapMut};
+use crate::node_map::NodeMap;
 
 /// An enum to hold the different ways that a JSON AST can be formatted
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -52,7 +52,7 @@ impl<Ref: Reference> JSON<Ref> {
         )
     }
 
-    fn write_text_compact(&self, node_map: &impl NodeMapMut<Ref, Self>, string: &mut String) {
+    fn write_text_compact(&self, node_map: &impl NodeMap<Ref, Self>, string: &mut String) {
         macro_rules! draw_recursive {
             ($ref_expr: expr) => {{
                 let r = $ref_expr;
@@ -127,7 +127,7 @@ impl<Ref: Reference> JSON<Ref> {
 
     fn write_text_pretty(
         &self,
-        node_map: &impl NodeMapMut<Ref, Self>,
+        node_map: &impl NodeMap<Ref, Self>,
         string: &mut String,
         indentation_buffer: &mut String,
     ) {
@@ -429,7 +429,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
     fn write_text(
         &self,
-        node_map: &impl NodeMapMut<Ref, Self>,
+        node_map: &impl NodeMap<Ref, Self>,
         string: &mut String,
         format_style: &JSONFormat,
     ) {
