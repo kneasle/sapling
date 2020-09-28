@@ -11,12 +11,33 @@ use size::Size;
 #[allow(unused_imports)]
 use crate::editable_tree::EditableTree;
 
+/// A single piece of a node that can be rendered to the screen
+#[derive(Debug, Clone)]
+pub enum DisplayToken<Ref: Reference> {
+    /// Some text should be rendered to the screen
+    Text(String),
+    /// A child of this node should be rendered to the screen
+    Child(Ref),
+    /// Add some number of spaces worth of whitespace
+    Whitespace(usize),
+    /// Put the next token onto a new line
+    Newline,
+    /// Add another indent level to the code
+    Indent,
+    /// Remove an indent level from the code
+    Dedent,
+}
+
 /// The specification of an AST that sapling can edit
 pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
     /// A type parameter that will represent the different ways this AST can be rendered
     type FormatStyle;
 
     /* FORMATTING FUNCTIONS */
+
+    /// Returns an iterator of all the items that need to be rendered to the screen to make up this
+    /// node, along with their on-screen locations.
+    fn display_tokens(&self, format_style: &Self::FormatStyle) -> Vec<DisplayToken<Ref>>;
 
     /// Determine the space on the screen occupied by this node in an AST
     fn size(&self, node_map: &impl NodeMap<Ref, Self>, format_style: &Self::FormatStyle) -> Size;

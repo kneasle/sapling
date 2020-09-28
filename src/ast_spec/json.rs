@@ -1,5 +1,5 @@
 use super::size::Size;
-use super::{ASTSpec, Reference};
+use super::{ASTSpec, DisplayToken, Reference};
 use crate::node_map::{NodeMap, NodeMapMut};
 
 /// An enum to hold the different ways that a JSON AST can be formatted
@@ -241,6 +241,86 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
     type FormatStyle = JSONFormat;
 
     /* FORMATTING FUNCTIONS */
+
+    fn display_tokens(&self, format_style: &Self::FormatStyle) -> Vec<DisplayToken<Ref>> {
+        let is_pretty = format_style == &JSONFormat::Pretty;
+        match self {
+            JSON::True => vec![DisplayToken::Text("true".to_string())],
+            JSON::False => vec![DisplayToken::Text("false".to_string())],
+            JSON::Str(string) => vec![DisplayToken::Text(format!(r#""{}""#, string))],
+            JSON::Field([key, value]) => vec![
+                DisplayToken::Child(*key),
+                DisplayToken::Text(": ".to_string()),
+                DisplayToken::Child(*value),
+            ],
+            JSON::Array(children) => {
+                let mut tokens = Vec::with_capacity(6 + 3 * children.len());
+                // Push some initial tokens
+                tokens.push(DisplayToken::Text("[".to_string()));
+                if is_pretty {
+                    tokens.push(DisplayToken::Newline);
+                    tokens.push(DisplayToken::Indent);
+                }
+                // Push the children, delimited by commas
+                let mut is_first_child = true;
+                for c in children {
+                    // Push the delimiting
+                    if !is_first_child {
+                        tokens.push(DisplayToken::Text(",".to_string()));
+                        if is_pretty {
+                            tokens.push(DisplayToken::Newline);
+                        } else {
+                            tokens.push(DisplayToken::Whitespace(1));
+                        }
+                    }
+                    is_first_child = false;
+                    // Push the single child
+                    tokens.push(DisplayToken::Child(*c));
+                }
+                // Push the closing bracket
+                if is_pretty {
+                    tokens.push(DisplayToken::Newline);
+                    tokens.push(DisplayToken::Dedent);
+                }
+                tokens.push(DisplayToken::Text("]".to_string()));
+                // Return the token stream
+                tokens
+            }
+            JSON::Object(fields) => {
+                let mut tokens = Vec::with_capacity(6 + 3 * fields.len());
+                // Push some initial tokens
+                tokens.push(DisplayToken::Text("{".to_string()));
+                if is_pretty {
+                    tokens.push(DisplayToken::Newline);
+                    tokens.push(DisplayToken::Indent);
+                }
+                // Push the children, delimited by commas
+                let mut is_first_child = true;
+                for f in fields {
+                    // Push the delimiting
+                    if !is_first_child {
+                        tokens.push(DisplayToken::Text(",".to_string()));
+                        if is_pretty {
+                            tokens.push(DisplayToken::Newline);
+                        } else {
+                            tokens.push(DisplayToken::Whitespace(1));
+                        }
+                    }
+                    is_first_child = false;
+                    // Push the single child
+                    tokens.push(DisplayToken::Child(*f));
+                }
+                // Push the closing bracket
+                if is_pretty {
+                    tokens.push(DisplayToken::Newline);
+                    tokens.push(DisplayToken::Dedent);
+                }
+                tokens.push(DisplayToken::Text("}".to_string()));
+                // Return the token stream
+                tokens
+            }
+        }
+    }
 
     fn size(&self, node_map: &impl NodeMap<Ref, Self>, format_style: &Self::FormatStyle) -> Size {
         /// A cheeky macro that expands to the code that generates the size of another node

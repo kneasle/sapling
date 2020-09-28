@@ -89,7 +89,7 @@ impl<Node: ASTSpec<Index>> NodeMapMut<Index, Node> for VecNodeMap<Node> {
 mod tests {
     use super::{Index, VecNodeMap};
     use crate::ast_spec::size::Size;
-    use crate::ast_spec::ASTSpec;
+    use crate::ast_spec::{ASTSpec, DisplayToken};
     use crate::node_map::{NodeMap, NodeMapMut, Reference};
 
     /// An extremely basic node type, used for testing [VecNodeMap].
@@ -111,6 +111,10 @@ mod tests {
 
     impl<Ref: Reference> ASTSpec<Ref> for ExampleNode<Ref> {
         type FormatStyle = ();
+
+        fn display_tokens(&self, _format_style: &Self::FormatStyle) -> Vec<DisplayToken<Ref>> {
+            unimplemented!();
+        }
 
         fn size(
             &self,
