@@ -8,6 +8,7 @@ Most of the ideas for this project come from my friend Shtanton's [blog post](ht
 This project is highly experimental in nature - many of these ideas and datastructures have never been used before (as far as I'm aware).
 Contributions/issues are welcome, but Sapling is currently so young and the codebase so small that the code churn of my rapid iterating would probably cause PRs to immediately generate merge conflicts.
 Once the codebase becomes remotely stable, I will gladly accept PRs.
+
 I'm also treating this current codebase as a kind of prototype - I'm using it to explore implentation options before commiting to the best one and then aggressively refactoring out the unused code.
 
 ## Goals of Sapling
