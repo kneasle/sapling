@@ -4,6 +4,8 @@ use crate::ast_spec::display_token::{flat_tokens, DisplayToken};
 use crate::ast_spec::{size, ASTSpec};
 use crate::editable_tree::EditableTree;
 use crate::node_map::Reference;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hasher;
 use tuikit::prelude::*;
 
 /// The possible log levels
@@ -158,10 +160,89 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
 
     /// Render the tree to the screen
     fn render_tree(&self, row: usize, col: usize) {
-        let tokens = flat_tokens(&self.tree, self.tree.root(), &self.format_style);
+        // Mutable variables to track where the terminal cursor should go
+        let mut row = row;
+        let mut col = col;
+        let mut indentation_amount = 0;
 
-        for (i, (r, t)) in tokens.iter().enumerate() {
-            self.term.print(row + i, col, &format!("{:?}: {:?}", r, t)).unwrap();
+        let cols = [
+            Color::MAGENTA,
+            Color::RED,
+            Color::YELLOW,
+            Color::GREEN,
+            Color::CYAN,
+            Color::BLUE,
+            Color::WHITE,
+            Color::LIGHT_RED,
+            Color::LIGHT_BLUE,
+            Color::LIGHT_CYAN,
+            Color::LIGHT_GREEN,
+            Color::LIGHT_YELLOW,
+            Color::LIGHT_MAGENTA,
+            Color::LIGHT_WHITE,
+        ];
+
+        /// A cheeky macro to print a string to the terminal
+        macro_rules! term_print {
+            ($string: expr) => {{
+                let string = $string;
+                // Print the string
+                self.term.print(row, col, string).unwrap();
+                // Move the cursor to the end of the string
+                let size = size::Size::from(string);
+                if size.lines() == 0 {
+                    col += size.last_line_length();
+                } else {
+                    row += size.lines();
+                    col = size.last_line_length();
+                }
+            }};
+            ($string: expr, $attr: expr) => {{
+                let string = $string;
+                // Print the string
+                self.term.print_with_attr(row, col, string, $attr).unwrap();
+                // Move the cursor to the end of the string
+                let size = size::Size::from(string);
+                if size.lines() == 0 {
+                    col += size.last_line_length();
+                } else {
+                    row += size.lines();
+                    col = size.last_line_length();
+                }
+            }};
+        };
+
+        for (r, t) in flat_tokens(&self.tree, self.tree.root(), &self.format_style) {
+            match t {
+                DisplayToken::Text(s) => {
+                    // Hash the reference value
+                    let mut hasher = DefaultHasher::new();
+                    r.hash(&mut hasher);
+                    let hash = hasher.finish();
+                    // Print the token
+                    term_print!(s.as_str(), cols[hash as usize % cols.len()]);
+                }
+                DisplayToken::Whitespace(n) => {
+                    col += n;
+                }
+                DisplayToken::Child(_) => {
+                    unreachable!();
+                }
+                DisplayToken::Newline => {
+                    row += 1;
+                    col = indentation_amount;
+                }
+                DisplayToken::Indent => {
+                    indentation_amount += 4;
+                }
+                DisplayToken::Dedent => {
+                    indentation_amount -= 4;
+                }
+                DisplayToken::InvalidRef => {
+                    let error = format!("<INVALID REF {:?}>", r);
+                    term_print!(error.as_str());
+                }
+            }
         }
     }
 
