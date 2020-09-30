@@ -254,6 +254,11 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                 DisplayToken::Child(*value),
             ],
             JSON::Array(children) => {
+                // Special case: if this array is empty, render it as '[]'
+                if children.is_empty() {
+                    return vec![DisplayToken::Text("[]".to_string())];
+                }
+
                 let mut tokens = Vec::with_capacity(6 + 3 * children.len());
                 // Push some initial tokens
                 tokens.push(DisplayToken::Text("[".to_string()));
@@ -287,6 +292,11 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                 tokens
             }
             JSON::Object(fields) => {
+                // Special case: if this object is empty, render it as '{}'
+                if fields.is_empty() {
+                    return vec![DisplayToken::Text("{}".to_string())];
+                }
+
                 let mut tokens = Vec::with_capacity(6 + 3 * fields.len());
                 // Push some initial tokens
                 tokens.push(DisplayToken::Text("{".to_string()));
