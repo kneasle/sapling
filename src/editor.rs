@@ -155,6 +155,14 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
         }
     }
 
+    /// Render the tree to the screen
+    fn render_tree(&self, row: usize, col: usize) {
+        let text = self.tree.to_text(&self.format_style);
+        for (i, line) in text.lines().enumerate() {
+            self.term.print(row + i, col, line).unwrap();
+        }
+    }
+
     /* ===== MAIN FUNCTIONS ===== */
 
     /// Update the terminal UI display
@@ -166,10 +174,7 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
         self.term.clear().unwrap();
 
         /* RENDER MAIN TEXT VIEW */
-        let text = self.tree.to_text(&self.format_style);
-        for (i, line) in text.lines().enumerate() {
-            self.term.print(i, 0, line).unwrap();
-        }
+        self.render_tree(0, 0);
 
         /* RENDER LOG SECTION */
         for (i, (level, message)) in self.log.iter().enumerate() {
