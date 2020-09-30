@@ -88,8 +88,9 @@ impl<Node: ASTSpec<Index>> NodeMapMut<Index, Node> for VecNodeMap<Node> {
 #[cfg(test)]
 mod tests {
     use super::{Index, VecNodeMap};
+    use crate::ast_spec::display_token::DisplayToken;
     use crate::ast_spec::size::Size;
-    use crate::ast_spec::{ASTSpec, DisplayToken};
+    use crate::ast_spec::ASTSpec;
     use crate::node_map::{NodeMap, NodeMapMut, Reference};
 
     /// An extremely basic node type, used for testing [VecNodeMap].
