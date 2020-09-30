@@ -155,7 +155,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
     }
 
     fn size(&self, node_map: &impl NodeMap<Ref, Self>, format_style: &Self::FormatStyle) -> Size {
-        /// A cheeky macro that expands to the code that generates the size of another node
+        /// A cheeky macro that generates a recursive call to get the size of a child node
         macro_rules! get_size {
             ($ref: expr) => {
                 node_map
