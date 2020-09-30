@@ -215,12 +215,21 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
         for (r, t) in flat_tokens(&self.tree, self.tree.root(), &self.format_style) {
             match t {
                 DisplayToken::Text(s) => {
-                    // Hash the reference value
-                    let mut hasher = DefaultHasher::new();
-                    r.hash(&mut hasher);
-                    let hash = hasher.finish();
+                    // Hash the ref to decide on the colour
+                    let col = {
+                        let mut hasher = DefaultHasher::new();
+                        r.hash(&mut hasher);
+                        let hash = hasher.finish();
+                        cols[hash as usize % cols.len()]
+                    };
+                    // Generate the display attributes depending on if the node is selected
+                    let attr = if r == self.tree.cursor() {
+                        Attr::default().fg(Color::BLACK).bg(col)
+                    } else {
+                        Attr::default().fg(col)
+                    };
                     // Print the token
-                    term_print!(s.as_str(), cols[hash as usize % cols.len()]);
+                    term_print!(s.as_str(), attr);
                 }
                 DisplayToken::Whitespace(n) => {
                     col += n;
