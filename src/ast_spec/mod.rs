@@ -29,23 +29,23 @@ pub trait ASTSpec<Ref: Reference>: std::fmt::Debug + Clone + Eq + Default {
 
     /// Write the textual representation of this AST to a string
     fn write_text(
-        &self,
+        root: Ref,
         node_map: &impl NodeMap<Ref, Self>,
         string: &mut String,
         format_style: &Self::FormatStyle,
     ) {
-        write_tokens(self, node_map, string, format_style);
+        write_tokens(root, node_map, string, format_style);
     }
 
     /// Make a [`String`] representing this AST.
     /// Same as [`write_text`](ASTSpec::write_text) but creates a new [`String`].
     fn to_text(
-        &self,
+        root: Ref,
         node_map: &impl NodeMap<Ref, Self>,
         format_style: &Self::FormatStyle,
     ) -> String {
         let mut s = String::new();
-        self.write_text(node_map, &mut s, format_style);
+        Self::write_text(root, node_map, &mut s, format_style);
         s
     }
 

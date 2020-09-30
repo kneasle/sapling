@@ -60,14 +60,7 @@ pub trait NodeMapMut<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> {
     where
         Self: Sized,
     {
-        match self.get_node(self.root()) {
-            Some(root) => {
-                root.write_text(self, string, format_style);
-            }
-            None => {
-                string.push_str("<INVALID ROOT NODE>");
-            }
-        }
+        Node::write_text(self.root(), self, string, format_style);
     }
 
     /// Generates the text rendering of the root node (same as calling [`to_text`](ASTSpec::to_text)
@@ -76,10 +69,7 @@ pub trait NodeMapMut<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> {
     where
         Self: Sized,
     {
-        match self.get_node(self.root()) {
-            Some(root) => root.to_text(self, format_style),
-            None => "<INVALID ROOT NODE>".to_string(),
-        }
+        Node::to_text(self.root(), self, format_style)
     }
 
     /// Gets mutable node from a reference, returning [`None`] if the reference is invalid.

@@ -19,48 +19,27 @@ pub enum DisplayToken<Ref: Reference> {
     Indent,
     /// Remove an indent level from the code
     Dedent,
+    /// The node doesn't exist
+    InvalidRef,
 }
 
-/// Write a stream of display tokens to a string, given an indentation string
-fn write_tokens_with_indent<Ref: Reference, Node: ASTSpec<Ref>>(
-    node: &Node,
+/// Write a stream of display tokens to a string
+pub fn write_tokens<Ref: Reference, Node: ASTSpec<Ref>>(
+    root: Ref,
     node_map: &impl NodeMap<Ref, Node>,
     string: &mut String,
-    indentation_string: &mut String,
     format_style: &Node::FormatStyle,
 ) {
-    let mut token_vec = node.display_tokens(format_style);
-    // If we every encounter a newline followed by an indent/dedent, we should swap them round so
-    // that the indent/dedent is always first.
-    for i in 0..token_vec.len() - 1 {
-        if token_vec[i] == DisplayToken::Newline
-            && (token_vec[i + 1] == DisplayToken::Indent
-                || token_vec[i + 1] == DisplayToken::Dedent)
-        {
-            token_vec.swap(i, i + 1);
-        }
-    }
+    let mut indentation_string = String::new();
     // Process the token string
-    for token in token_vec {
+    for (id, token) in flat_tokens(node_map, root, format_style) {
         match token {
             DisplayToken::Text(s) => {
                 // Push the string we've been given
                 string.push_str(&s);
             }
             DisplayToken::Child(c) => {
-                if let Some(child) = node_map.get_node(c) {
-                    // If the child reference is valid, then recursively write that child
-                    write_tokens_with_indent(
-                        child,
-                        node_map,
-                        string,
-                        indentation_string,
-                        format_style,
-                    );
-                } else {
-                    // If the child reference isn't valid, then write an error message
-                    string.push_str(&format!("<INVALID NODE {:?}>", c));
-                }
+                unreachable!();
             }
             DisplayToken::Whitespace(n) => {
                 // Push 'n' many spaces
@@ -71,7 +50,7 @@ fn write_tokens_with_indent<Ref: Reference, Node: ASTSpec<Ref>>(
             DisplayToken::Newline => {
                 // Push a newline and keep indentation
                 string.push('\n');
-                string.push_str(indentation_string);
+                string.push_str(&indentation_string);
             }
             DisplayToken::Indent => {
                 // Add `INDENT_WIDTH` spaces to the indentation_string
@@ -86,23 +65,57 @@ fn write_tokens_with_indent<Ref: Reference, Node: ASTSpec<Ref>>(
                     debug_assert_eq!(popped_char, Some(' '));
                 }
             }
+            DisplayToken::InvalidRef => {
+                // Add a helpful error string
+                string.push_str(&format!("<INVALID REF {:?}>", id));
+            }
         }
     }
 }
 
-/// Write a stream of display tokens to a string
-pub fn write_tokens<Ref: Reference, Node: ASTSpec<Ref>>(
-    root: &Node,
+fn flat_tokens_rec<Ref: Reference, Node: ASTSpec<Ref>>(
     node_map: &impl NodeMap<Ref, Node>,
-    string: &mut String,
+    id: Ref,
+    output_vec: &mut Vec<(Ref, DisplayToken<Ref>)>,
     format_style: &Node::FormatStyle,
 ) {
-    let mut indentation_string = String::new();
-    write_tokens_with_indent(
-        root,
-        node_map,
-        string,
-        &mut indentation_string,
-        format_style,
-    );
+    if let Some(node) = node_map.get_node(id) {
+        let mut token_vec = node.display_tokens(format_style);
+        // If we every encounter a newline followed by an indent/dedent, we should swap them round so
+        // that the indent/dedent is always first.
+        for i in 0..token_vec.len() - 1 {
+            if token_vec[i] == DisplayToken::Newline
+                && (token_vec[i + 1] == DisplayToken::Indent
+                    || token_vec[i + 1] == DisplayToken::Dedent)
+            {
+                token_vec.swap(i, i + 1);
+            }
+        }
+
+        for tok in token_vec {
+            match tok {
+                // If a node is a child, we should flatten its tree first
+                DisplayToken::Child(c) => {
+                    flat_tokens_rec(node_map, c, output_vec, format_style);
+                }
+                // If it isn't a child, we can just copy it as-is
+                x => {
+                    output_vec.push((id, x));
+                }
+            }
+        }
+    } else {
+        output_vec.push((id, DisplayToken::InvalidRef));
+    }
+}
+
+/// Return a flat vector of [`DisplayToken`] along with references to the nodes that own them
+pub fn flat_tokens<Ref: Reference, Node: ASTSpec<Ref>>(
+    node_map: &impl NodeMap<Ref, Node>,
+    id: Ref,
+    format_style: &Node::FormatStyle,
+) -> Vec<(Ref, DisplayToken<Ref>)> {
+    let mut flat_vec = Vec::new();
+    flat_tokens_rec(node_map, id, &mut flat_vec, format_style);
+    flat_vec
 }

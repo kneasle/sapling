@@ -1,6 +1,7 @@
 //! The top-level functionality of Sapling
 
-use crate::ast_spec::ASTSpec;
+use crate::ast_spec::display_token::{flat_tokens, DisplayToken};
+use crate::ast_spec::{size, ASTSpec};
 use crate::editable_tree::EditableTree;
 use crate::node_map::Reference;
 use tuikit::prelude::*;
@@ -105,9 +106,9 @@ pub struct Editor<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> {
     command: String,
 }
 
-impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
+impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref, Node, E> {
     /// Create a new [`Editor`] with the default AST.
-    pub fn new(tree: E, format_style: T::FormatStyle) -> Editor<R, T, E> {
+    pub fn new(tree: E, format_style: Node::FormatStyle) -> Editor<Ref, Node, E> {
         let term = Term::new().unwrap();
         Editor {
             tree,
@@ -157,9 +158,10 @@ impl<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> Editor<R, T, E> {
 
     /// Render the tree to the screen
     fn render_tree(&self, row: usize, col: usize) {
-        let text = self.tree.to_text(&self.format_style);
-        for (i, line) in text.lines().enumerate() {
-            self.term.print(row + i, col, line).unwrap();
+        let tokens = flat_tokens(&self.tree, self.tree.root(), &self.format_style);
+
+        for (i, (r, t)) in tokens.iter().enumerate() {
+            self.term.print(row + i, col, &format!("{:?}: {:?}", r, t)).unwrap();
         }
     }
 

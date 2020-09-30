@@ -114,7 +114,19 @@ mod tests {
         type FormatStyle = ();
 
         fn display_tokens(&self, _format_style: &Self::FormatStyle) -> Vec<DisplayToken<Ref>> {
-            unimplemented!();
+            match &self {
+                ExampleNode::DefaultValue => vec![DisplayToken::Text("default".to_string())],
+                ExampleNode::Value1 => vec![DisplayToken::Text("value1".to_string())],
+                ExampleNode::Value2 => vec![DisplayToken::Text("value2".to_string())],
+                ExampleNode::WithPayload(payload) => {
+                    vec![DisplayToken::Text(format!("with_payload({})", payload))]
+                }
+                ExampleNode::Recursive(child_ref) => vec![
+                    DisplayToken::Text("recursive(".to_string()),
+                    DisplayToken::Child(*child_ref),
+                    DisplayToken::Text(")".to_string()),
+                ],
+            }
         }
 
         fn size(
@@ -123,37 +135,6 @@ mod tests {
             _format_style: &Self::FormatStyle,
         ) -> Size {
             unimplemented!();
-        }
-
-        fn write_text(
-            &self,
-            node_map: &impl NodeMap<Ref, Self>,
-            string: &mut String,
-            format_style: &Self::FormatStyle,
-        ) {
-            match self {
-                ExampleNode::DefaultValue => {
-                    string.push_str("default");
-                }
-                ExampleNode::Value1 => {
-                    string.push_str("value1");
-                }
-                ExampleNode::Value2 => {
-                    string.push_str("value2");
-                }
-                ExampleNode::WithPayload(payload) => {
-                    string.push_str(&format!("with_payload({})", payload));
-                }
-                ExampleNode::Recursive(child_ref) => {
-                    string.push_str("recursive(");
-                    if let Some(node) = node_map.get_node(*child_ref) {
-                        node.write_text(node_map, string, format_style);
-                    } else {
-                        string.push_str(&format!("<INVALID NODE REF {:?}>", child_ref));
-                    }
-                    string.push(')');
-                }
-            }
         }
 
         fn children(&self) -> &[Ref] {
