@@ -179,7 +179,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                     JSON::Object(fields) => {
                         // Special case: if the object is empty, then it will be rendered as "{}",
                         // which only takes up one line
-                        if fields.len() == 0 {
+                        if fields.is_empty() {
                             return Size::new(0, 2); // same as Size::from("{}")
                         }
                         /* For an object, we are only interested in how many lines are occupied -
@@ -196,7 +196,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                     JSON::Array(children) => {
                         // Special case: if the array is empty, then it will be rendered as "[]",
                         // which only takes up one line
-                        if children.len() == 0 {
+                        if children.is_empty() {
                             return Size::new(0, 2); // same as Size::from("[]");
                         }
                         /* For an array, we are only interested in how many lines are occupied -
