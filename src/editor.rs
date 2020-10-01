@@ -48,6 +48,10 @@ enum Action {
     Replace(char),
     /// Insert a new node (given by some [`char`]) as the first child of the selected node
     InsertChild(char),
+    /// Undo the last change
+    Undo,
+    /// Redo a change
+    Redo,
 }
 
 /// Attempt to convert a command as a `&`[`str`] into an [`Action`].
@@ -84,6 +88,12 @@ fn parse_command(command: &str) -> Option<Action> {
                 if let Some(replace_char) = command_char_iter.next() {
                     return Some(Action::Replace(replace_char));
                 }
+            }
+            'u' => {
+                return Some(Action::Undo);
+            }
+            'R' => {
+                return Some(Action::Redo);
             }
             _ => {
                 return Some(Action::Undefined);
@@ -155,6 +165,24 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
                 LogLevel::Warning,
                 format!("Cannot replace node with '{}'", c),
             );
+        }
+    }
+
+    /// Undo the latest change
+    fn undo(&mut self) {
+        if self.tree.undo() {
+            self.log(LogLevel::Debug, "Undo successful".to_string());
+        } else {
+            self.log(LogLevel::Info, "No changes to undo".to_string());
+        }
+    }
+
+    /// Move one change forward in the history
+    fn redo(&mut self) {
+        if self.tree.redo() {
+            self.log(LogLevel::Debug, "Redo successful".to_string());
+        } else {
+            self.log(LogLevel::Info, "No changes to redo".to_string());
         }
     }
 
@@ -320,6 +348,12 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
                                 }
                                 Action::InsertChild(c) => {
                                     self.insert_child(c);
+                                }
+                                Action::Undo => {
+                                    self.undo();
+                                }
+                                Action::Redo => {
+                                    self.redo();
                                 }
                             }
                             // Clear the command box

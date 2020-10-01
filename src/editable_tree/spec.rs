@@ -92,6 +92,24 @@ impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for Spec<Node> {
         Self::from_tree(VecNodeMap::with_default_root())
     }
 
+    fn undo(&mut self) -> bool {
+        if self.current_snapshot_index > 0 {
+            self.current_snapshot_index -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn redo(&mut self) -> bool {
+        if self.current_snapshot_index < self.history.len() - 1 {
+            self.current_snapshot_index += 1;
+            true
+        } else {
+            false
+        }
+    }
+
     fn cursor(&self) -> Index {
         self.snapshot().cursor()
     }

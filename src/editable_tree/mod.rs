@@ -14,7 +14,16 @@ pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> +
     /// Build a new `EditableTree` with the default AST of the given type
     fn new() -> Self;
 
-    /* EDIT METHODS */
+    /* HISTORY METHODS */
+
+    /// Move one step back in the tree history, returning `false` if there are no more changes
+    fn undo(&mut self) -> bool;
+
+    /// Move one step forward in the tree history, return `false` if there was no change to be
+    /// redone
+    fn redo(&mut self) -> bool;
+
+    /* NAVIGATION METHODS */
 
     /// Returns a reference to the node that is currently under the cursor.  This reference must
     /// point to a valid node.  I.e. `self.get_node(self.cursor())` should return [None].  Doing so
@@ -26,6 +35,8 @@ pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> +
     fn cursor_node(&self) -> &Node {
         self.get_node(self.cursor()).unwrap()
     }
+
+    /* EDIT METHODS */
 
     /// Updates the internal state so that the tree now contains `new_node` in the position of the
     /// `cursor`.

@@ -52,6 +52,14 @@ impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
         Self::from_tree(VecNodeMap::with_default_root())
     }
 
+    fn undo(&mut self) -> bool {
+        unimplemented!();
+    }
+
+    fn redo(&mut self) -> bool {
+        unimplemented!();
+    }
+
     fn cursor(&self) -> Index {
         // We require that `self.current_path.len() >= 1, so we can unwrap without fearing panics
         self.current_path.last().unwrap().node
