@@ -38,7 +38,7 @@ pub fn write_tokens<Ref: Reference, Node: ASTSpec<Ref>>(
                 // Push the string we've been given
                 string.push_str(&s);
             }
-            DisplayToken::Child(c) => {
+            DisplayToken::Child(_c) => {
                 unreachable!();
             }
             DisplayToken::Whitespace(n) => {
