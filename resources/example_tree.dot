@@ -1,0 +1,80 @@
+digraph ExampleTree {
+    foo [shape=none, margin=0, label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR>
+                <TD COLSPAN="2">function</TD>
+            </TR>
+            <TR>
+                <TD>name</TD>
+                <TD>foo</TD>
+            </TR>
+        </TABLE>
+    >];
+
+    param_x [shape=none, margin=0, label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR>
+                <TD COLSPAN="2">parameter</TD>
+            </TR>
+            <TR>
+                <TD>name</TD>
+                <TD>x</TD>
+            </TR>
+            <TR>
+                <TD>type</TD>
+                <TD>u64</TD>
+            </TR>
+        </TABLE>
+    >];
+
+    param_y [shape=none, margin=0, label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR>
+                <TD COLSPAN="2">parameter</TD>
+            </TR>
+            <TR>
+                <TD>name</TD>
+                <TD>y</TD>
+            </TR>
+            <TR>
+                <TD>type</TD>
+                <TD>u32</TD>
+            </TR>
+        </TABLE>
+    >];
+
+    let [shape=none, margin=0, label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR>
+                <TD COLSPAN="2">let</TD>
+            </TR>
+            <TR>
+                <TD>name</TD>
+                <TD>x</TD>
+            </TR>
+        </TABLE>
+    >];
+
+    fn_call [shape=none, margin=0, label=<
+        <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+            <TR>
+                <TD COLSPAN="2">fn call</TD>
+            </TR>
+            <TR>
+                <TD>name</TD>
+                <TD>combine</TD>
+            </TR>
+        </TABLE>
+    >];
+
+    root -> foo -> params, body;
+    params -> param_x, param_y;
+    body -> let, fn_call;
+
+    let -> "+";
+    "+" -> "*", as;
+    "*" -> y, 3;
+    as -> z, u64;
+
+    fn_call -> args -> x, y;
+}

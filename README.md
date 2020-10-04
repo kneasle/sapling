@@ -29,24 +29,8 @@ fn foo(y: u64, z: u32) {
 }
 ```
 would correspond to a syntax tree something like the following (simplified for demonstration purposes):
-```
-ROOT
-  FUNCTION_DEFINITION(identifier="combine_with_3") // fn combine_with_3(y: u64) {
-    PARAMS:
-      PARAM(identifier="y", type="u64")
-    BODY:
-      STATEMENT:                                   // let x = y + 3;
-        DEFINITION(identifier="x"):
-          EXPRESSION:
-            ADD:
-              VARIABLE(identifier="y")
-              CONSTANT(3)
-      STATEMENT:                                   // combine(x, y);
-        FUNCTION_CALL(identifier="combine"):
-          PARAMS:
-            VARIABLE(identifier="x")
-            VARIABLE(identifier="y")
-```
+![Example tree](https://raw.githubusercontent.com/kneasle/sapling/master/resources/example_tree.png)
+
 
 ## But why?
 When writing code with any text editor, you are usually only interested in a tiny subset of all the possible strings of text - those that correspond to valid
