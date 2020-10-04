@@ -76,5 +76,13 @@ digraph ExampleTree {
     "*" -> y, 3;
     as -> z, u64;
 
-    fn_call -> args -> x, y;
+    y2 [label="y"];
+    fn_call -> args -> x, y2;
+
+    {
+        rank=same;
+        edge [style=invis];
+        x -> y2;
+        rankdir=LR;
+    }
 }
