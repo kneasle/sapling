@@ -1,5 +1,5 @@
 # Sapling
-![Sapling logo](https://raw.githubusercontent.com/kneasle/sapling/master/sapling.gif)
+![Sapling logo](https://raw.githubusercontent.com/kneasle/sapling/master/resources/sapling.gif)
 
 A highly experimental code editor where you write code not text.
 
@@ -23,8 +23,8 @@ AST stands for ['Abstract Syntax Tree'](https://en.wikipedia.org/wiki/Abstract_s
 
 For example, the following Rust code:
 ```rust
-fn combine_with_3(y: u64) {
-    let x = y + 3;
+fn foo(y: u64, z: u32) {
+    let x = y * 3 + z as u64;
     combine(x, y);
 }
 ```
