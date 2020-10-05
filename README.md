@@ -29,7 +29,7 @@ fn foo(y: u64, z: u32) {
 }
 ```
 would correspond to a syntax tree something like the following (simplified for demonstration purposes):
-![Example tree](https://raw.githubusercontent.com/kneasle/sapling/master/resources/example_tree.png)
+![Example tree](/resources/example_tree.png)
 
 
 ## But why?
