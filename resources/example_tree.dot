@@ -18,7 +18,7 @@ digraph ExampleTree {
             </TR>
             <TR>
                 <TD>name</TD>
-                <TD>x</TD>
+                <TD>y</TD>
             </TR>
             <TR>
                 <TD>type</TD>
@@ -34,7 +34,7 @@ digraph ExampleTree {
             </TR>
             <TR>
                 <TD>name</TD>
-                <TD>y</TD>
+                <TD>z</TD>
             </TR>
             <TR>
                 <TD>type</TD>
