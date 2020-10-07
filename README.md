@@ -58,9 +58,4 @@ And once we have a selection, we can perform actions directly on the tree to mak
 Because the editor *has* to hold a valid program, the following things that other editors take for granted are hard to implement:
 - Just opening a file - opening a syntactically correct file is essentially the same as writing a compiler-esque parser for every language you want to load
   (not an easy task but there's plenty of literature/libraries already existing for this).
-  
-  However, what happens if you open a syntactically incorrect file?
-  Ideally you'd want to parse as much of the file as possible and keep the invalid bits somehow, e.g. by having a `BadInput(String)` node in every syntax tree type for cases when part of the tree is invalid.
-  Additionally, this parser would ideally not have to be rewritten for every single language that Sapling needs to edit,
-  so we would have to write an error-correcting parser that can parse any language.
-  The closest project I've found to this is the parser of [`rust-analyzer`](https://github.com/rust-analyzer/rust-analyzer) but that only has to parse Rust code (a language with many features that make error-correction straightforward such as requiring statements to end with a semicolon).
+  However, I think [tree-sitter](https://github.com/tree-sitter/tree-sitter) has already solved this problem.
