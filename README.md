@@ -1,7 +1,7 @@
 # Sapling
 ![Sapling logo](https://raw.githubusercontent.com/kneasle/sapling/master/resources/sapling.gif)
 
-A highly experimental code editor where you write code not text.
+A highly experimental code editor where you edit code, not text.
 
 Most of the ideas for this project come from my friend Shtanton's [blog post](http://shtanton.com/ex.html), and Sapling's editing model will be largely inspired by that of Vim.
 
