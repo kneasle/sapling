@@ -5,7 +5,7 @@ A highly experimental code editor where you edit code, not text.
 
 Most of the ideas for this project come from my friend Shtanton's [blog post](http://shtanton.com/ex.html), and Sapling's editing model will be largely inspired by that of Vim.
 
-This project is highly experimental in nature - many of these ideas and datastructures have never been used before (as far as I'm aware).
+This project is highly experimental in nature - many (if not all) of these ideas and datastructures have never been used before (as far as I'm aware).
 Contributions/issues are welcome, but Sapling is currently so young and the codebase so small that the code churn of my rapid iterating would probably cause PRs to immediately generate merge conflicts.
 Once the codebase becomes remotely stable, I will gladly accept PRs.
 
