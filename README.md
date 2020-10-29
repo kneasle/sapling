@@ -3,6 +3,8 @@
 
 A highly experimental code editor where you edit code, not text.
 
+I will be streaming some of the development of Sapling over on [my YouTube channel](https://www.youtube.com/channel/UCKl0T4IDZC3vUz152hDAzGw) on 2pm EST on Saturdays.  Smash the subscribe button to not miss upcoming streams!
+
 Most of the ideas for this project come from my friend Shtanton's [blog post](http://shtanton.com/ex.html), and Sapling's editing model will be largely inspired by that of Vim.
 
 This project is highly experimental in nature - many (if not all) of these ideas and datastructures have never been used before (as far as I'm aware).
