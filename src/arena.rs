@@ -4,6 +4,7 @@ use typed_arena::Arena as TyArena;
 
 /// An item that is stored in the [`Arena`].  This allows the [`Arena`] to build on
 /// [`typed_arena::Arena`] by storing extra detail about the nodes stored in the arena.
+#[derive(Debug, Clone)]
 struct Item<T> {
     node: T,
 }
@@ -40,7 +41,7 @@ impl<T> Arena<T> {
     }
 
     /// Add a new node to the `Arena`, and returns an immutable reference to its final location.
-    pub fn alloc(&mut self, node: T) -> &T {
+    pub fn alloc(&self, node: T) -> &T {
         &self.base_arena.alloc(Item::new(node)).node
     }
 }

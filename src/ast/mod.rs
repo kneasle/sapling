@@ -5,7 +5,7 @@ pub mod json;
 pub mod size;
 pub mod test_json;
 
-use display_token::{write_tokens, DisplayToken};
+use display_token::{write_tokens, DisplayToken, RecTok};
 use size::Size;
 
 // Import used only for doc comments
@@ -13,7 +13,7 @@ use size::Size;
 use crate::editable_tree::EditableTree;
 
 /// The specification of an AST that sapling can edit
-pub trait Ast: std::fmt::Debug + Clone + Eq + Default {
+pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash {
     /// A type parameter that will represent the different ways this AST can be rendered
     type FormatStyle;
 
@@ -21,21 +21,42 @@ pub trait Ast: std::fmt::Debug + Clone + Eq + Default {
 
     /// Returns an iterator of all the items that need to be rendered to the screen to make up this
     /// node, along with their on-screen locations.
-    fn display_tokens(&self, format_style: &Self::FormatStyle) -> Vec<DisplayToken<Self>>;
+    fn display_tokens_rec(
+        &'arena self,
+        format_style: &Self::FormatStyle,
+    ) -> Vec<RecTok<'arena, Self>>;
+
+    fn display_tokens(
+        &'arena self,
+        format_style: &Self::FormatStyle,
+    ) -> Vec<(&'arena Self, DisplayToken)> {
+        let mut tok_pairs: Vec<(&'arena Self, DisplayToken)> = Vec::new();
+        for i in self.display_tokens_rec(format_style) {
+            match i {
+                RecTok::Tok(t) => {
+                    tok_pairs.push((self, t));
+                }
+                RecTok::Child(c) => {
+                    tok_pairs.extend(c.display_tokens(format_style));
+                }
+            }
+        }
+        tok_pairs
+    }
 
     /// Determine the space on the screen occupied by this node in an AST
     fn size(&self, format_style: &Self::FormatStyle) -> Size;
 
     /// Write the textual representation of this AST to a string
-    fn write_text(&self, string: &mut String, format_style: &Self::FormatStyle) {
-        write_tokens(string, format_style);
+    fn write_text(&'arena self, string: &mut String, format_style: &Self::FormatStyle) {
+        write_tokens(self, string, format_style);
     }
 
     /// Make a [`String`] representing this AST.
     /// Same as [`write_text`](ASTSpec::write_text) but creates a new [`String`].
-    fn to_text(&self, format_style: &Self::FormatStyle) -> String {
+    fn to_text(&'arena self, format_style: &Self::FormatStyle) -> String {
         let mut s = String::new();
-        Self::write_text(&mut s, format_style);
+        self.write_text(&mut s, format_style);
         s
     }
 
@@ -43,17 +64,21 @@ pub trait Ast: std::fmt::Debug + Clone + Eq + Default {
 
     /// Get a slice over the direct children of this node.  This operation is expected to be
     /// cheap - it will be used a lot of times without caching the results.
-    fn children(&self) -> &[&Self];
+    fn children(&'arena self) -> &[&Self];
 
     /// Get a mutable slice over the direct children of this node.  Like
     /// [`children`](ASTSpec::children), this operation is expected to be
     /// cheap - it will be used a lot of times without caching the results.
-    fn children_mut(&mut self) -> &mut [&Self];
+    fn children_mut(&'arena mut self) -> &mut [&Self];
 
     /// Get the display name of this node
     fn display_name(&self) -> String;
 
-    fn write_tree_view_recursive(&self, string: &mut String, indentation_string: &mut String) {
+    fn write_tree_view_recursive(
+        &'arena self,
+        string: &mut String,
+        indentation_string: &mut String,
+    ) {
         // Push the node's display name with indentation and a newline
         string.push_str(indentation_string);
         string.push_str(&self.display_name());
@@ -71,7 +96,7 @@ pub trait Ast: std::fmt::Debug + Clone + Eq + Default {
     }
 
     /// Render a tree view of this node, similar to the output of the Unix command 'tree'
-    fn write_tree_view(&self, string: &mut String) {
+    fn write_tree_view(&'arena self, string: &mut String) {
         let mut indentation_string = String::new();
         self.write_tree_view_recursive(string, &mut indentation_string);
         // Pop the unnecessary newline at the end
@@ -82,7 +107,7 @@ pub trait Ast: std::fmt::Debug + Clone + Eq + Default {
     /// Build a string of the a tree view of this node, similar to the output of the Unix command
     /// 'tree'.  This is the same as [`write_tree_view`](ASTSpec::write_tree_view), except that it
     /// returns a [`String`] rather than appending to an existing [`String`].
-    fn tree_view(&self) -> String {
+    fn tree_view(&'arena self) -> String {
         let mut s = String::new();
         self.write_tree_view(&mut s);
         s

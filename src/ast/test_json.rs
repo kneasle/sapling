@@ -1,14 +1,7 @@
 use super::json::JSON;
-use crate::node_map::{NodeMapMut, Reference};
+use crate::arena::Arena;
 
-// Imports used solely by doc comments.  rustc/clippy can't see that they're used, so we surpress
-// the warning because we know it's OK.
-#[allow(unused_imports)]
-use crate::node_map::vec::VecNodeMap;
-#[allow(unused_imports)]
-use crate::node_map::NodeMap;
-
-/// A copy of [`JSON`] that does not rely on a [`NodeMap`] for recursive types
+/// A copy of [`JSON`] where nodes own their children
 pub enum TestJSON {
     True,
     False,
@@ -17,40 +10,30 @@ pub enum TestJSON {
 }
 
 impl TestJSON {
-    fn recursive_add_node_to_map<Ref: Reference, M: NodeMapMut<Ref, JSON<Ref>>>(
-        &self,
-        map: &mut M,
-    ) -> Ref {
+    /// Convert this node into a standard [`JSON`], where all the nodes are stored in a given
+    /// [`Arena`]
+    pub fn add_to_arena<'arena>(&self, arena: &'arena Arena<JSON<'arena>>) -> &'arena JSON<'arena> {
         match self {
-            TestJSON::True => map.add_node(JSON::True),
-            TestJSON::False => map.add_node(JSON::False),
-            TestJSON::Array(child_nodes) => {
-                let child_refs = child_nodes
-                    .iter()
-                    .map(|x| x.recursive_add_node_to_map(map))
-                    .collect::<Vec<Ref>>();
-                map.add_node(JSON::Array(child_refs))
+            TestJSON::True => arena.alloc(JSON::True),
+            TestJSON::False => arena.alloc(JSON::False),
+            TestJSON::Array(children) => {
+                let mut child_vec: Vec<&'arena JSON<'arena>> = Vec::with_capacity(children.len());
+                for c in children {
+                    child_vec.push(c.add_to_arena(arena));
+                }
+                arena.alloc(JSON::Array(child_vec))
             }
             TestJSON::Object(fields) => {
                 let mut children = Vec::with_capacity(fields.len());
                 for (key, value) in fields.iter() {
                     // Add both child nodes
-                    let s = map.add_node(JSON::Str(key.clone()));
-                    let v = value.recursive_add_node_to_map(map);
+                    let s = arena.alloc(JSON::Str(key.clone()));
+                    let v = value.add_to_arena(arena);
                     // Combine the two nodes into a fields
-                    children.push(map.add_node(JSON::Field([s, v])));
+                    children.push(arena.alloc(JSON::Field([s, v])));
                 }
-                map.add_node(JSON::Object(children))
+                arena.alloc(JSON::Object(children))
             }
         }
-    }
-
-    /// Turn this node into a [`VecNodeMap`] which contains the corresponding [`JSON`] node as
-    /// root. This also adds all the children to that VecNodeMap.
-    pub fn build_node_map<Ref: Reference, M: NodeMapMut<Ref, JSON<Ref>>>(&self) -> M {
-        let mut node_map = M::with_default_root();
-        let root = self.recursive_add_node_to_map(&mut node_map);
-        node_map.set_root(root);
-        node_map
     }
 }

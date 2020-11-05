@@ -18,18 +18,28 @@ pub enum DisplayToken {
     Dedent,
 }
 
+/// A wrapper for [`DisplayToken`] that will be returned by [`Ast::display_tokens`] and allows for
+/// child references to be recursively expanded.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum RecTok<'arena, Node> {
+    Tok(DisplayToken),
+    Child(&'arena Node),
+}
+
 /// Write a stream of display tokens to a string
-pub fn write_tokens<Node: Ast>(root: &Node, string: &mut String, format_style: &Node::FormatStyle) {
+pub fn write_tokens<'arena, Node: Ast<'arena>>(
+    root: &'arena Node,
+    string: &mut String,
+    format_style: &Node::FormatStyle,
+) {
     let mut indentation_string = String::new();
+
     // Process the token string
-    for (id, token) in root.display_tokens(format_style) {
-        match token {
+    for (_id, tok) in root.display_tokens(format_style) {
+        match tok {
             DisplayToken::Text(s) => {
                 // Push the string we've been given
                 string.push_str(&s);
-            }
-            DisplayToken::Child(_c) => {
-                unreachable!();
             }
             DisplayToken::Whitespace(n) => {
                 // Push 'n' many spaces
@@ -54,10 +64,6 @@ pub fn write_tokens<Node: Ast>(root: &Node, string: &mut String, format_style: &
                     let popped_char = indentation_string.pop();
                     debug_assert_eq!(popped_char, Some(' '));
                 }
-            }
-            DisplayToken::InvalidRef => {
-                // Add a helpful error string
-                string.push_str(&format!("<INVALID REF {:?}>", id));
             }
         }
     }
