@@ -1,5 +1,5 @@
 use super::size::Size;
-use super::{ASTSpec, DisplayToken, Reference};
+use super::{Ast, DisplayToken, Reference};
 use crate::node_map::NodeMap;
 
 /// An enum to hold the different ways that a JSON AST can be formatted
@@ -59,7 +59,7 @@ impl<Ref: Reference> Default for JSON<Ref> {
     }
 }
 
-impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
+impl<Ref: Reference> Ast<Ref> for JSON<Ref> {
     type FormatStyle = JSONFormat;
 
     /* FORMATTING FUNCTIONS */
