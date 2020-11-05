@@ -1,4 +1,4 @@
-use super::{cursor_path, EditableTree};
+use super::{cursor_path, Direction, EditableTree};
 use crate::ast_spec::ASTSpec;
 use crate::node_map::vec::{Index, VecNodeMap};
 use crate::node_map::{NodeMap, NodeMapMut};
@@ -8,24 +8,23 @@ use crate::node_map::{NodeMap, NodeMapMut};
 #[derive(Debug, Clone)]
 struct Snapshot<Node: ASTSpec<Index>> {
     /// The [`NodeMap`] containing the tree at this point in the undo history
-    pub node_map: VecNodeMap<Node>,
-    pub cursor_path: Vec<cursor_path::Segment<Index>>,
+    node_map: VecNodeMap<Node>,
+    cursor_path: cursor_path::SegPath<Index>,
 }
 
 impl<Node: ASTSpec<Index>> Snapshot<Node> {
     /// Makes a `Snapshot` from a given [`VecNodeMap`] with the cursor selecting the root of that
     /// tree
     fn from_node_map(node_map: VecNodeMap<Node>) -> Self {
-        let cursor = node_map.root();
         Snapshot {
+            cursor_path: cursor_path::SegPath::with_root(node_map.root()),
             node_map,
-            cursor_path: vec![cursor_path::Segment::new(cursor, 0)],
         }
     }
 
     /// Gets the [`Index`] of the current path
     fn cursor(&self) -> Index {
-        self.cursor_path.last().unwrap().node
+        self.cursor_path.node()
     }
 }
 
@@ -61,6 +60,13 @@ impl<Node: ASTSpec<Index>> Spec<Node> {
         // We don't have to worry about bounds checks because we require that
         // `self.current_snapshot_index` is a valid index in `self.history`
         &self.history[self.current_snapshot_index]
+    }
+
+    /// Returns the currently viewed [`Snapshot`] as a mutable reference
+    fn snapshot_mut(&mut self) -> &mut Snapshot<Node> {
+        // We don't have to worry about bounds checks because we require that
+        // `self.current_snapshot_index` is a valid index in `self.history`
+        &mut self.history[self.current_snapshot_index]
     }
 
     /// Adds a new snapshot to the tree history (deleting the current redo history if needed).
@@ -112,6 +118,10 @@ impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for Spec<Node> {
 
     fn cursor(&self) -> Index {
         self.snapshot().cursor()
+    }
+
+    fn move_cursor(&mut self, direction: Direction) -> Option<String> {
+        self.snapshot_mut().cursor_path._move(direction, self)
     }
 
     fn replace_cursor(&mut self, new_node: Node) {

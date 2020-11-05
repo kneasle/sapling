@@ -65,6 +65,10 @@ impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
         self.current_path.last().unwrap().node
     }
 
+    fn move_cursor(&mut self, _delta: super::Direction) -> Option<String> {
+        unimplemented!();
+    }
+
     fn replace_cursor(&mut self, new_node: Node) {
         self.node_map.add_as_root(new_node);
     }

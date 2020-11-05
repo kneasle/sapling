@@ -2,7 +2,7 @@
 
 use crate::ast_spec::display_token::{flat_tokens, DisplayToken};
 use crate::ast_spec::{size, ASTSpec};
-use crate::editable_tree::EditableTree;
+use crate::editable_tree::{Direction, EditableTree};
 use crate::node_map::Reference;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
@@ -48,6 +48,8 @@ enum Action {
     Replace(char),
     /// Insert a new node (given by some [`char`]) as the first child of the selected node
     InsertChild(char),
+    /// Move the node in a given direction
+    MoveCursor(Direction),
     /// Undo the last change
     Undo,
     /// Redo a change
@@ -88,6 +90,18 @@ fn parse_command(command: &str) -> Option<Action> {
                 if let Some(replace_char) = command_char_iter.next() {
                     return Some(Action::Replace(replace_char));
                 }
+            }
+            'c' => {
+                return Some(Action::MoveCursor(Direction::Down));
+            }
+            'p' => {
+                return Some(Action::MoveCursor(Direction::Up));
+            }
+            'k' => {
+                return Some(Action::MoveCursor(Direction::Prev));
+            }
+            'j' => {
+                return Some(Action::MoveCursor(Direction::Next));
             }
             'u' => {
                 return Some(Action::Undo);
@@ -154,6 +168,11 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
                 format!("Cannot replace node with '{}'", c),
             );
         }
+    }
+
+    /// Move the cursor
+    fn move_cursor(&mut self, direction: Direction) {
+        self.tree.move_cursor(direction);
     }
 
     /// Insert new child as the first child of the selected node
@@ -343,6 +362,9 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
                                     // Break the mainloop to quit
                                     break;
                                 }
+                                Action::MoveCursor(direction) => {
+                                    self.move_cursor(direction);
+                                }
                                 Action::Replace(c) => {
                                     self.replace_cursor(c);
                                 }
@@ -388,13 +410,14 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
 #[cfg(test)]
 mod tests {
     use super::{parse_command, Action};
+    use crate::editable_tree::Direction;
 
     #[test]
     fn parse_command_complete() {
         for (command, expected_effect) in &[
             ("q", Action::Quit),
             ("x", Action::Undefined),
-            ("pajlbsi", Action::Undefined),
+            ("pajlbsi", Action::MoveCursor(Direction::Up)),
             ("Pxx", Action::Undefined),
             ("Qsx", Action::Undefined),
             ("ra", Action::Replace('a')),

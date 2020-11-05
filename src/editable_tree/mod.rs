@@ -7,6 +7,15 @@ pub mod spec;
 use crate::ast_spec::ASTSpec;
 use crate::node_map::{NodeMap, Reference};
 
+/// The possible ways you can move the cursor
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Direction {
+    Up,
+    Down,
+    Prev,
+    Next,
+}
+
 /// A trait specifying an editable, undoable buffer of trees
 pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> + Sized {
     /* CONSTRUCTOR METHODS */
@@ -35,6 +44,10 @@ pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> +
     fn cursor_node(&self) -> &Node {
         self.get_node(self.cursor()).unwrap()
     }
+
+    /// Move the cursor in a given direction across the tree.  Returns [`Some`] error string if an
+    /// error is found, or [`None`] if the movement was possible.
+    fn move_cursor(&mut self, direction: Direction) -> Option<String>;
 
     /* EDIT METHODS */
 
