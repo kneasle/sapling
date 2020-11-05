@@ -170,6 +170,7 @@ name = "sapling"
 version = "0.1.0"
 dependencies = [
  "tuikit",
+ "typed-arena",
 ]
 
 [[package]]
@@ -195,6 +196,12 @@ dependencies = [
  "term",
  "unicode-width",
 ]
+
+[[package]]
+name = "typed-arena"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0685c84d5d54d1c26f7d3eb96cd41550adb97baed141a761cf335d3d33bcd0ae"
 
 [[package]]
 name = "unicode-width"
