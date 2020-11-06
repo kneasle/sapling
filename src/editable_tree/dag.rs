@@ -1,8 +1,6 @@
-use super::cursor_path;
-use super::EditableTree;
-use crate::ast_spec::ASTSpec;
-use crate::node_map::vec::{Index, VecNodeMap};
-use crate::node_map::{NodeMap, NodeMapMut};
+use super::{Direction, EditableTree};
+use crate::arena::Arena;
+use crate::ast::Ast;
 
 /// An [`EditableTree`] that stores the history as a DAG (Directed Acyclic Graph) of **immutable**
 /// nodes.
@@ -14,63 +12,72 @@ use crate::node_map::{NodeMap, NodeMapMut};
 ///
 /// Therefore, moving back through the history is as simple as reading a different root node from
 /// the `roots` vector, and following its descendants through the DAG of nodes.
-///
-/// This also allows for compression of identical nodes (so that an AST representing
-/// `(1 + 1) * (1 + 1)` would only use 4 nodes: `1`, `1 + 1`, `(1 + 1)`, `(1 + 1) * (1 + 1)`).
-/// This compression has not been implemented yet.
-#[derive(Debug, Clone)]
-pub struct DAG<Node: ASTSpec<Index>> {
-    node_map: VecNodeMap<Node>,
-    undo_history: Vec<Index>,
-    current_path: Vec<cursor_path::Segment<Index>>,
+pub struct DAG<'arena, Node: Ast<'arena>> {
+    /// The arena in which all the [`Node`]s will be stored
+    arena: &'arena Arena<Node>,
+    /// A [`Vec`] containing a reference to the root node at every edit in the undo history.  This
+    /// is required to always have length at least one.
+    root_history: Vec<&'arena Node>,
+    /// An index into [`root_history`](DAG::root_history) of the current edit.  This is required to
+    /// be in `0..root_history.len()`.
+    history_index: usize,
 }
 
-impl<Node: ASTSpec<Index>> DAG<Node> {
-    /// Makes a `DAG` that contains the tree stored inside `node_map`
-    pub fn from_tree(node_map: VecNodeMap<Node>) -> Self {
+impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node> {
+    fn new(arena: &'arena Arena<Node>, root: &'arena Node) -> Self {
         DAG {
-            undo_history: vec![],
-            current_path: vec![cursor_path::Segment::root(node_map.root())],
-            node_map,
+            arena,
+            root_history: vec![root],
+            history_index: 0,
         }
     }
-}
 
-impl<Node: ASTSpec<Index>> NodeMap<Index, Node> for DAG<Node> {
-    fn get_node(&self, id: Index) -> Option<&Node> {
-        self.node_map.get_node(id)
-    }
-
-    fn root(&self) -> Index {
-        // We require that current_path.len() >= 1, so we don't have to worry about panics
-        self.current_path[0].node
-    }
-}
-
-impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
-    fn new() -> Self {
-        Self::from_tree(VecNodeMap::with_default_root())
-    }
+    /* HISTORY METHODS */
 
     fn undo(&mut self) -> bool {
-        unimplemented!();
+        if self.history_index > 0 {
+            self.history_index -= 1;
+            true
+        } else {
+            false
+        }
     }
 
     fn redo(&mut self) -> bool {
-        unimplemented!();
+        if self.history_index < self.root_history.len() - 1 {
+            self.history_index += 1;
+            true
+        } else {
+            false
+        }
     }
 
-    fn cursor(&self) -> Index {
-        // We require that `self.current_path.len() >= 1, so we can unwrap without fearing panics
-        self.current_path.last().unwrap().node
+    /* NAVIGATION METHODS */
+
+    fn root(&self) -> &'arena Node {
+        // This indexing cannot panic because we require that `self.history_index` is a valid index
+        // into `self.root_history`, and `self.root_history` has at least one element
+        self.root_history[self.history_index]
     }
 
-    fn move_cursor(&mut self, _delta: super::Direction) -> Option<String> {
+    fn cursor(&self) -> &'arena Node {
+        self.root()
+    }
+
+    fn move_cursor(&mut self, _direction: Direction) -> Option<String> {
         unimplemented!();
     }
 
     fn replace_cursor(&mut self, new_node: Node) {
-        self.node_map.add_as_root(new_node);
+        // Removing future tree from the history vector until we're at the latest change.
+        while self.history_index < self.root_history.len() - 1 {
+            // TODO: Deallocate the tree so that we don't get a memory leak
+            self.root_history.pop();
+        }
+        // TODO: Once cursor movent is fixed, this needs to not replace the root.
+        let new_root = self.arena.alloc(new_node);
+        self.root_history.push(new_root);
+        self.history_index = self.root_history.len() - 1;
     }
 
     fn insert_child(&mut self, _new_node: Node) {
@@ -78,6 +85,6 @@ impl<Node: ASTSpec<Index>> EditableTree<Index, Node> for DAG<Node> {
     }
 
     fn write_text(&self, string: &mut String, format: &Node::FormatStyle) {
-        self.node_map.write_text(string, format);
+        self.root().write_text(string, format);
     }
 }

@@ -1,11 +1,9 @@
 //! Specification of an editable, undoable buffer of trees and some implementations thereof.
 
-pub mod cursor_path;
 pub mod dag;
-pub mod spec;
 
-use crate::ast_spec::ASTSpec;
-use crate::node_map::{NodeMap, Reference};
+use crate::arena::Arena;
+use crate::ast::Ast;
 
 /// The possible ways you can move the cursor
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -17,11 +15,11 @@ pub enum Direction {
 }
 
 /// A trait specifying an editable, undoable buffer of trees
-pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> + Sized {
+pub trait EditableTree<'arena, Node: Ast<'arena>>: Sized {
     /* CONSTRUCTOR METHODS */
 
-    /// Build a new `EditableTree` with the default AST of the given type
-    fn new() -> Self;
+    /// Build a new `EditableTree`, given a tree
+    fn new(arena: &'arena Arena<Node>, root: &'arena Node) -> Self;
 
     /* HISTORY METHODS */
 
@@ -34,16 +32,11 @@ pub trait EditableTree<Ref: Reference, Node: ASTSpec<Ref>>: NodeMap<Ref, Node> +
 
     /* NAVIGATION METHODS */
 
-    /// Returns a reference to the node that is currently under the cursor.  This reference must
-    /// point to a valid node.  I.e. `self.get_node(self.cursor())` should return [None].  Doing so
-    /// is quite likely to cause a panic.
-    fn cursor(&self) -> Ref;
+    /// Returns a reference to the node that is currently the root of the AST.
+    fn root(&self) -> &'arena Node;
 
-    /// Returns the node referenced by the cursor.
-    #[inline]
-    fn cursor_node(&self) -> &Node {
-        self.get_node(self.cursor()).unwrap()
-    }
+    /// Returns a reference to the node that is currently under the cursor.
+    fn cursor(&self) -> &'arena Node;
 
     /// Move the cursor in a given direction across the tree.  Returns [`Some`] error string if an
     /// error is found, or [`None`] if the movement was possible.
