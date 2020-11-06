@@ -1,8 +1,13 @@
-use sapling::arena::Arena;
-use sapling::ast::json::JSONFormat;
-use sapling::ast::test_json::TestJSON;
-use sapling::editable_tree::{dag::DAG, EditableTree};
-use sapling::editor::Editor;
+pub mod arena;
+pub mod ast;
+pub mod editable_tree;
+pub mod editor;
+
+use crate::arena::Arena;
+use crate::ast::json::JSONFormat;
+use crate::ast::test_json::TestJSON;
+use crate::editable_tree::{dag::DAG, EditableTree};
+use crate::editor::Editor;
 
 fn main() {
     // Create an empty arena for Sapling to use
