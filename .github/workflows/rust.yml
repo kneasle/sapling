@@ -21,4 +21,4 @@ jobs:
     - name: Run tests
       run: cargo test --verbose
     - name: Run rustfmt
-      run: cargo fmt --check
+      run: rustfmt src/**/*.rs --check
