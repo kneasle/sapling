@@ -1,18 +1,21 @@
-use sapling::ast_spec::json::{JSONFormat, JSON};
-use sapling::ast_spec::test_json::TestJSON;
-use sapling::editable_tree::spec::Spec;
+use sapling::arena::Arena;
+use sapling::ast::json::JSONFormat;
+use sapling::ast::test_json::TestJSON;
+use sapling::editable_tree::{dag::DAG, EditableTree};
 use sapling::editor::Editor;
-use sapling::node_map::vec::{Index, VecNodeMap};
 
 fn main() {
+    // Create an empty arena for Sapling to use
+    let arena = Arena::new();
     // For the time being, start the editor with some pre-made JSON
-    let start_node_map: VecNodeMap<JSON<Index>> = TestJSON::Array(vec![
+    let root = TestJSON::Array(vec![
         TestJSON::True,
         TestJSON::False,
         TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
     ])
-    .build_node_map();
-    let tree: Spec<JSON<Index>> = Spec::from_tree(start_node_map);
-    let editor = Editor::new(tree, JSONFormat::Pretty);
+    .add_to_arena(&arena);
+
+    let mut tree = DAG::new(&arena, root);
+    let editor = Editor::new(&mut tree, JSONFormat::Pretty);
     editor.run();
 }
