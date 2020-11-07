@@ -173,7 +173,9 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
 
     /// Move the cursor
     fn move_cursor(&mut self, direction: Direction) {
-        self.tree.move_cursor(direction);
+        if let Some(error_message) = self.tree.move_cursor(direction) {
+            self.log.push((LogLevel::Warning, error_message));
+        }
     }
 
     /// Insert new child as the first child of the selected node
