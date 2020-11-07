@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 tuikit = "*"
+typed-arena = "2.0.1"

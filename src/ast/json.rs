@@ -1,6 +1,6 @@
+use super::display_token::{DisplayToken, RecTok};
 use super::size::Size;
-use super::{ASTSpec, DisplayToken, Reference};
-use crate::node_map::NodeMap;
+use super::Ast;
 
 /// An enum to hold the different ways that a JSON AST can be formatted
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -21,28 +21,28 @@ const CHAR_STRING: char = 's';
 
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub enum JSON<Ref: Reference> {
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+pub enum JSON<'arena> {
     /// The JSON value for 'true'.  Corresponds to the string `true`.
     True,
     /// The JSON value 'false'.  Corresponds to the string `false`.
     False,
     /// A JSON array of multiple values.
     /// Corresponds to a string `[<v1>, <v2>, ...]` where `v1`, `v2`, ... are JSON values.
-    Array(Vec<Ref>),
+    Array(Vec<&'arena JSON<'arena>>),
     /// A JSON object, represented as a map of [`String`]s to more JSON values.
     /// Corresponds to a string `{"<key1>": <v1>, "<key2>": <v2>, ...}` where `<key1>`, `<key2>`,
     /// ... are the keys, and `<v1>`, `<v2>`, ... are the corresponding JSON values.  The `Ref`s
     /// contained inside this must be [`Field`](JSON::Field)s.
-    Object(Vec<Ref>),
+    Object(Vec<&'arena JSON<'arena>>),
     /// A JSON object field.  The first `Ref` must be a [`Str`](JSON::Str), and the second is any
     /// JSON object
-    Field([Ref; 2]),
+    Field([&'arena JSON<'arena>; 2]),
     /// A JSON string
     Str(String),
 }
 
-impl<Ref: Reference> JSON<Ref> {
+impl JSON<'_> {
     /// Return an iterator over all the possible chars that could represent JSON nodes
     fn all_object_chars() -> Box<dyn Iterator<Item = char>> {
         Box::new(
@@ -53,118 +53,111 @@ impl<Ref: Reference> JSON<Ref> {
     }
 }
 
-impl<Ref: Reference> Default for JSON<Ref> {
-    fn default() -> JSON<Ref> {
+impl Default for JSON<'_> {
+    fn default() -> JSON<'static> {
         JSON::Object(vec![])
     }
 }
 
-impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
+impl<'arena> Ast<'arena> for JSON<'arena> {
     type FormatStyle = JSONFormat;
 
     /* FORMATTING FUNCTIONS */
 
-    fn display_tokens(&self, format_style: &Self::FormatStyle) -> Vec<DisplayToken<Ref>> {
+    fn display_tokens_rec(
+        &'arena self,
+        format_style: &Self::FormatStyle,
+    ) -> Vec<RecTok<'arena, Self>> {
         let is_pretty = format_style == &JSONFormat::Pretty;
         match self {
-            JSON::True => vec![DisplayToken::Text("true".to_string())],
-            JSON::False => vec![DisplayToken::Text("false".to_string())],
-            JSON::Str(string) => vec![DisplayToken::Text(format!(r#""{}""#, string))],
+            JSON::True => vec![RecTok::Tok(DisplayToken::Text("true".to_string()))],
+            JSON::False => vec![RecTok::Tok(DisplayToken::Text("false".to_string()))],
+            JSON::Str(string) => vec![RecTok::Tok(DisplayToken::Text(format!(r#""{}""#, string)))],
             JSON::Field([key, value]) => vec![
-                DisplayToken::Child(*key),
-                DisplayToken::Text(": ".to_string()),
-                DisplayToken::Child(*value),
+                RecTok::Child(key),
+                RecTok::Tok(DisplayToken::Text(": ".to_string())),
+                RecTok::Child(value),
             ],
             JSON::Array(children) => {
                 // Special case: if this array is empty, render it as '[]'
                 if children.is_empty() {
-                    return vec![DisplayToken::Text("[]".to_string())];
+                    return vec![RecTok::Tok(DisplayToken::Text("[]".to_string()))];
                 }
 
-                let mut tokens = Vec::with_capacity(6 + 3 * children.len());
+                let mut tokens: Vec<RecTok<'_, Self>> = Vec::with_capacity(6 + 3 * children.len());
                 // Push some initial tokens
-                tokens.push(DisplayToken::Text("[".to_string()));
+                tokens.push(RecTok::Tok(DisplayToken::Text("[".to_string())));
                 if is_pretty {
-                    tokens.push(DisplayToken::Newline);
-                    tokens.push(DisplayToken::Indent);
+                    tokens.push(RecTok::Tok(DisplayToken::Indent));
+                    tokens.push(RecTok::Tok(DisplayToken::Newline));
                 }
                 // Push the children, delimited by commas
                 let mut is_first_child = true;
                 for c in children {
                     // Push the delimiting
                     if !is_first_child {
-                        tokens.push(DisplayToken::Text(",".to_string()));
+                        tokens.push(RecTok::Tok(DisplayToken::Text(",".to_string())));
                         if is_pretty {
-                            tokens.push(DisplayToken::Newline);
+                            tokens.push(RecTok::Tok(DisplayToken::Newline));
                         } else {
-                            tokens.push(DisplayToken::Whitespace(1));
+                            tokens.push(RecTok::Tok(DisplayToken::Whitespace(1)));
                         }
                     }
                     is_first_child = false;
                     // Push the single child
-                    tokens.push(DisplayToken::Child(*c));
+                    tokens.push(RecTok::Child(c));
                 }
                 // Push the closing bracket
                 if is_pretty {
-                    tokens.push(DisplayToken::Newline);
-                    tokens.push(DisplayToken::Dedent);
+                    tokens.push(RecTok::Tok(DisplayToken::Dedent));
+                    tokens.push(RecTok::Tok(DisplayToken::Newline));
                 }
-                tokens.push(DisplayToken::Text("]".to_string()));
+                tokens.push(RecTok::Tok(DisplayToken::Text("]".to_string())));
                 // Return the token stream
                 tokens
             }
             JSON::Object(fields) => {
                 // Special case: if this object is empty, render it as '{}'
                 if fields.is_empty() {
-                    return vec![DisplayToken::Text("{}".to_string())];
+                    return vec![RecTok::Tok(DisplayToken::Text("{}".to_string()))];
                 }
 
-                let mut tokens = Vec::with_capacity(6 + 3 * fields.len());
+                let mut tokens: Vec<RecTok<'_, Self>> = Vec::with_capacity(6 + 3 * fields.len());
                 // Push some initial tokens
-                tokens.push(DisplayToken::Text("{".to_string()));
+                tokens.push(RecTok::Tok(DisplayToken::Text("{".to_string())));
                 if is_pretty {
-                    tokens.push(DisplayToken::Newline);
-                    tokens.push(DisplayToken::Indent);
+                    tokens.push(RecTok::Tok(DisplayToken::Indent));
+                    tokens.push(RecTok::Tok(DisplayToken::Newline));
                 }
                 // Push the children, delimited by commas
                 let mut is_first_child = true;
                 for f in fields {
                     // Push the delimiting
                     if !is_first_child {
-                        tokens.push(DisplayToken::Text(",".to_string()));
+                        tokens.push(RecTok::Tok(DisplayToken::Text(",".to_string())));
                         if is_pretty {
-                            tokens.push(DisplayToken::Newline);
+                            tokens.push(RecTok::Tok(DisplayToken::Newline));
                         } else {
-                            tokens.push(DisplayToken::Whitespace(1));
+                            tokens.push(RecTok::Tok(DisplayToken::Whitespace(1)));
                         }
                     }
                     is_first_child = false;
                     // Push the single child
-                    tokens.push(DisplayToken::Child(*f));
+                    tokens.push(RecTok::Child(f));
                 }
                 // Push the closing bracket
                 if is_pretty {
-                    tokens.push(DisplayToken::Newline);
-                    tokens.push(DisplayToken::Dedent);
+                    tokens.push(RecTok::Tok(DisplayToken::Dedent));
+                    tokens.push(RecTok::Tok(DisplayToken::Newline));
                 }
-                tokens.push(DisplayToken::Text("}".to_string()));
+                tokens.push(RecTok::Tok(DisplayToken::Text("}".to_string())));
                 // Return the token stream
                 tokens
             }
         }
     }
 
-    fn size(&self, node_map: &impl NodeMap<Ref, Self>, format_style: &Self::FormatStyle) -> Size {
-        /// A cheeky macro that generates a recursive call to get the size of a child node
-        macro_rules! get_size {
-            ($ref: expr) => {
-                node_map
-                    .get_node($ref)
-                    .unwrap()
-                    .size(node_map, format_style)
-            };
-        };
-
+    fn size(&self, format_style: &Self::FormatStyle) -> Size {
         match format_style {
             JSONFormat::Pretty => {
                 match self {
@@ -174,7 +167,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                         Size::new(0, 1) + Size::from(string.as_str()) + Size::new(0, 1)
                     }
                     JSON::Field([key, value]) => {
-                        get_size!(*key) + Size::new(0, 2) + get_size!(*value)
+                        key.size(format_style) + Size::new(0, 2) + value.size(format_style)
                     }
                     JSON::Object(fields) => {
                         // Special case: if the object is empty, then it will be rendered as "{}",
@@ -189,7 +182,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                         for f in fields {
                             // The `+ 1` accounts for the extra newline char generated between
                             // every field.
-                            number_of_lines += get_size!(*f).lines() + 1;
+                            number_of_lines += f.size(format_style).lines() + 1;
                         }
                         Size::new(number_of_lines, 1)
                     }
@@ -206,7 +199,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                         for c in children {
                             // The `+ 1` accounts for the extra newline char generated between
                             // every child.
-                            number_of_lines += get_size!(*c).lines() + 1;
+                            number_of_lines += c.size(format_style).lines() + 1;
                         }
                         Size::new(number_of_lines, 1)
                     }
@@ -220,7 +213,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                         Size::new(0, 1) + Size::from(string.as_str()) + Size::new(0, 1)
                     }
                     JSON::Field([key, value]) => {
-                        get_size!(*key) + Size::new(0, 2) + get_size!(*value)
+                        key.size(format_style) + Size::new(0, 2) + value.size(format_style)
                     }
                     JSON::Object(fields) => {
                         // Size accumulator - starts with just the size of "{"
@@ -233,7 +226,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                                 size += Size::new(0, 2);
                             }
                             is_first_child = false;
-                            size += get_size!(*f);
+                            size += f.size(format_style);
                         }
                         // Append one more char for "}" to the end, and return
                         size + Size::new(0, 1)
@@ -249,7 +242,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
                                 size += Size::new(0, 2);
                             }
                             is_first_child = false;
-                            size += get_size!(*c);
+                            size += c.size(format_style);
                         }
                         // Append one more char for "]" to the end, and return
                         size + Size::new(0, 1)
@@ -261,7 +254,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
     /* DEBUG VIEW FUNCTIONS */
 
-    fn children(&self) -> &[Ref] {
+    fn children(&'arena self) -> &[&JSON<'arena>] {
         match self {
             JSON::True | JSON::False | JSON::Str(_) => &[],
             JSON::Array(children) => &children,
@@ -270,7 +263,7 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
         }
     }
 
-    fn children_mut(&mut self) -> &mut [Ref] {
+    fn children_mut(&'arena mut self) -> &mut [&JSON<'arena>] {
         match self {
             JSON::True | JSON::False | JSON::Str(_) => &mut [],
             JSON::Array(children) => children,
@@ -320,17 +313,11 @@ impl<Ref: Reference> ASTSpec<Ref> for JSON<Ref> {
 
 #[cfg(test)]
 mod tests {
-    use super::{JSONFormat, JSON};
-    use crate::ast_spec::size::Size;
-    use crate::ast_spec::test_json::TestJSON;
-    use crate::ast_spec::ASTSpec;
-    use crate::node_map::vec::{Index, VecNodeMap};
-    use crate::node_map::{NodeMap, NodeMapMut};
-
-    /// Non-generic version of [`TestJSON::build_node_map`] that always returns a [`VecNodeMap`].
-    fn build_vec_node_map(tree: &TestJSON) -> VecNodeMap<JSON<Index>> {
-        tree.build_node_map::<Index, VecNodeMap<JSON<Index>>>()
-    }
+    use super::super::size::Size;
+    use super::super::test_json::TestJSON;
+    use super::JSONFormat;
+    use crate::arena::Arena;
+    use crate::ast::Ast;
 
     #[test]
     fn to_text() {
@@ -407,25 +394,25 @@ mod tests {
         ] {
             println!("Testing {}", expected_compact_string);
 
-            let node_map = build_vec_node_map(tree);
+            let arena = Arena::new();
+            let root = tree.add_to_arena(&arena);
             // Test compact string
-            let compact_string = node_map.to_text(&JSONFormat::Compact);
+            let compact_string = root.to_text(&JSONFormat::Compact);
             assert_eq!(compact_string, *expected_compact_string);
             assert_eq!(
-                node_map.root_node().size(&node_map, &JSONFormat::Compact),
+                root.size(&JSONFormat::Compact),
                 Size::from(*expected_compact_string)
             );
             // Test pretty string
-            let pretty_string = node_map.to_text(&JSONFormat::Pretty);
+            let pretty_string = root.to_text(&JSONFormat::Pretty);
             assert_eq!(pretty_string, *expected_pretty_string);
             assert_eq!(
-                node_map.root_node().size(&node_map, &JSONFormat::Pretty),
+                root.size(&JSONFormat::Pretty),
                 Size::from(*expected_pretty_string)
             );
             // Test debug tree view
             let mut s = String::new();
-            let node_map = build_vec_node_map(tree);
-            node_map.root_node().write_tree_view(&node_map, &mut s);
+            root.write_tree_view(&mut s);
             assert_eq!(s, *tree_string);
         }
     }

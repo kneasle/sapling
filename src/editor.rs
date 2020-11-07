@@ -1,9 +1,8 @@
 //! The top-level functionality of Sapling
 
-use crate::ast_spec::display_token::{flat_tokens, DisplayToken};
-use crate::ast_spec::{size, ASTSpec};
-use crate::editable_tree::EditableTree;
-use crate::node_map::Reference;
+use crate::ast::display_token::DisplayToken;
+use crate::ast::{size, Ast};
+use crate::editable_tree::{Direction, EditableTree};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
@@ -48,6 +47,8 @@ enum Action {
     Replace(char),
     /// Insert a new node (given by some [`char`]) as the first child of the selected node
     InsertChild(char),
+    /// Move the node in a given direction
+    MoveCursor(Direction),
     /// Undo the last change
     Undo,
     /// Redo a change
@@ -89,6 +90,18 @@ fn parse_command(command: &str) -> Option<Action> {
                     return Some(Action::Replace(replace_char));
                 }
             }
+            'c' => {
+                return Some(Action::MoveCursor(Direction::Down));
+            }
+            'p' => {
+                return Some(Action::MoveCursor(Direction::Up));
+            }
+            'k' => {
+                return Some(Action::MoveCursor(Direction::Prev));
+            }
+            'j' => {
+                return Some(Action::MoveCursor(Direction::Next));
+            }
             'u' => {
                 return Some(Action::Undo);
             }
@@ -105,22 +118,24 @@ fn parse_command(command: &str) -> Option<Action> {
 }
 
 /// A struct to hold the top-level components of the editor.
-pub struct Editor<R: Reference, T: ASTSpec<R>, E: EditableTree<R, T>> {
+pub struct Editor<'arena, Node: Ast<'arena>, E: EditableTree<'arena, Node> + 'arena> {
     /// The [`EditableTree`] that the `Editor` is editing
-    tree: E,
+    tree: &'arena mut E,
     /// The log as a [`Vec`] of logged messages
     log: Vec<(LogLevel, String)>,
     /// The style that the tree is being printed to the screen
-    format_style: T::FormatStyle,
+    format_style: Node::FormatStyle,
     /// The `tuikit` terminal that the `Editor` is rendering to
     term: Term,
     /// The current contents of the command buffer
     command: String,
 }
 
-impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref, Node, E> {
-    /// Create a new [`Editor`] with the default AST.
-    pub fn new(tree: E, format_style: Node::FormatStyle) -> Editor<Ref, Node, E> {
+impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
+    Editor<'arena, Node, E>
+{
+    /// Create a new [`Editor`] with a given tree
+    pub fn new(tree: &'arena mut E, format_style: Node::FormatStyle) -> Editor<'arena, Node, E> {
         let term = Term::new().unwrap();
         Editor {
             tree,
@@ -140,9 +155,9 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
 
     /// Replace the node under the cursor with the node represented by a given [`char`]
     fn replace_cursor(&mut self, c: char) {
-        if self.tree.cursor_node().is_replace_char(c) {
+        if self.tree.cursor().is_replace_char(c) {
             // We know that `c` corresponds to a valid node, so we can unwrap
-            let new_node = self.tree.cursor_node().from_char(c).unwrap();
+            let new_node = self.tree.cursor().from_char(c).unwrap();
             self.log(
                 LogLevel::Debug,
                 format!("Replacing with '{}'/{:?}", c, new_node),
@@ -156,9 +171,16 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
         }
     }
 
+    /// Move the cursor
+    fn move_cursor(&mut self, direction: Direction) {
+        if let Some(error_message) = self.tree.move_cursor(direction) {
+            self.log.push((LogLevel::Warning, error_message));
+        }
+    }
+
     /// Insert new child as the first child of the selected node
     fn insert_child(&mut self, c: char) {
-        if self.tree.cursor_node().is_insert_char(c) {
+        if self.tree.cursor().is_insert_char(c) {
             self.log(LogLevel::Debug, format!("Inserting with '{}'", c));
         } else {
             self.log(
@@ -240,18 +262,18 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
             }};
         };
 
-        for (r, t) in flat_tokens(&self.tree, self.tree.root(), &self.format_style) {
-            match t {
+        for (node, tok) in self.tree.root().display_tokens(&self.format_style) {
+            match tok {
                 DisplayToken::Text(s) => {
                     // Hash the ref to decide on the colour
                     let col = {
                         let mut hasher = DefaultHasher::new();
-                        r.hash(&mut hasher);
+                        node.hash(&mut hasher);
                         let hash = hasher.finish();
                         cols[hash as usize % cols.len()]
                     };
                     // Generate the display attributes depending on if the node is selected
-                    let attr = if r == self.tree.cursor() {
+                    let attr = if std::ptr::eq(node, self.tree.cursor()) {
                         Attr::default().fg(Color::BLACK).bg(col)
                     } else {
                         Attr::default().fg(col)
@@ -262,9 +284,6 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
                 DisplayToken::Whitespace(n) => {
                     col += n;
                 }
-                DisplayToken::Child(_) => {
-                    unreachable!();
-                }
                 DisplayToken::Newline => {
                     row += 1;
                     col = indentation_amount;
@@ -274,10 +293,6 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
                 }
                 DisplayToken::Dedent => {
                     indentation_amount -= 4;
-                }
-                DisplayToken::InvalidRef => {
-                    let error = format!("<INVALID REF {:?}>", r);
-                    term_print!(error.as_str());
                 }
             }
         }
@@ -343,6 +358,9 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
                                     // Break the mainloop to quit
                                     break;
                                 }
+                                Action::MoveCursor(direction) => {
+                                    self.move_cursor(direction);
+                                }
                                 Action::Replace(c) => {
                                     self.replace_cursor(c);
                                 }
@@ -388,13 +406,14 @@ impl<Ref: Reference, Node: ASTSpec<Ref>, E: EditableTree<Ref, Node>> Editor<Ref,
 #[cfg(test)]
 mod tests {
     use super::{parse_command, Action};
+    use crate::editable_tree::Direction;
 
     #[test]
     fn parse_command_complete() {
         for (command, expected_effect) in &[
             ("q", Action::Quit),
             ("x", Action::Undefined),
-            ("pajlbsi", Action::Undefined),
+            ("pajlbsi", Action::MoveCursor(Direction::Up)),
             ("Pxx", Action::Undefined),
             ("Qsx", Action::Undefined),
             ("ra", Action::Replace('a')),
