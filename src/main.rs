@@ -21,6 +21,6 @@ fn main() {
     .add_to_arena(&arena);
 
     let mut tree = DAG::new(&arena, root);
-    let editor = Editor::new(&mut tree, JSONFormat::Pretty);
+    let editor = Editor::new(&mut tree, JSONFormat::Pretty, editor::default_keymap());
     editor.run();
 }

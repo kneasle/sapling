@@ -36,6 +36,44 @@ impl LogLevel {
     }
 }
 
+/// The possible command typed by user without any parameters.
+/// It can be mapped to a single key.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum Command {
+    /// Quit Sapling
+    Quit,
+    /// Replace the selected node, expects an argument
+    Replace,
+    /// Insert a new node, expects an argument
+    InsertChild,
+    /// Move cursor in given direction
+    /// This is not considered a parameter as the direction is still specified by pressing specific
+    /// key.
+    MoveCursor(Direction),
+    /// Undo the last change
+    Undo,
+    /// Redo a change
+    Redo,
+}
+
+/// Mapping of keys to commands.
+/// Shortcut definition, also allows us to change the type if needed.
+pub type KeyMap = std::collections::HashMap<char, Command>;
+
+pub fn default_keymap() -> KeyMap {
+    hmap::hmap! {
+        'q' => Command::Quit,
+        'i' => Command::InsertChild,
+        'r' => Command::Replace,
+        'c' => Command::MoveCursor(Direction::Down), 
+        'p' => Command::MoveCursor(Direction::Up),
+        'k' => Command::MoveCursor(Direction::Prev),
+        'j' => Command::MoveCursor(Direction::Next),
+        'u' => Command::Undo,
+        'R' => Command::Redo
+    }
+}
+
 /// The possible meanings of a user-typed command
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum Action {
@@ -68,47 +106,38 @@ enum Action {
 /// - [`None`] if the command is incomplete.
 /// - [`Action::Undefined`] if the command is not defined (like the command "X").
 /// - The corresponding [`Action`], otherwise.
-fn parse_command(command: &str) -> Option<Action> {
+fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
     let mut command_char_iter = command.chars();
 
     // Consume the first char of the command
     if let Some(c) = command_char_iter.next() {
-        match c {
+        match keymap.get(&c) {
             // "q" quits Sapling
-            'q' => {
+            Some(Command::Quit) => {
                 return Some(Action::Quit);
             }
-            'i' => {
+            Some(Command::InsertChild) => {
                 // Consume the second char of the iterator
                 if let Some(insert_char) = command_char_iter.next() {
                     return Some(Action::InsertChild(insert_char));
                 }
             }
-            'r' => {
+            Some(Command::Replace) => {
                 // Consume the second char of the iterator
                 if let Some(replace_char) = command_char_iter.next() {
                     return Some(Action::Replace(replace_char));
                 }
             }
-            'c' => {
-                return Some(Action::MoveCursor(Direction::Down));
+            Some(Command::MoveCursor(direction)) => {
+                return Some(Action::MoveCursor(*direction));
             }
-            'p' => {
-                return Some(Action::MoveCursor(Direction::Up));
-            }
-            'k' => {
-                return Some(Action::MoveCursor(Direction::Prev));
-            }
-            'j' => {
-                return Some(Action::MoveCursor(Direction::Next));
-            }
-            'u' => {
+            Some(Command::Undo) => {
                 return Some(Action::Undo);
             }
-            'R' => {
+            Some(Command::Redo) => {
                 return Some(Action::Redo);
             }
-            _ => {
+            None => {
                 return Some(Action::Undefined);
             }
         }
@@ -129,13 +158,15 @@ pub struct Editor<'arena, Node: Ast<'arena>, E: EditableTree<'arena, Node> + 'ar
     term: Term,
     /// The current contents of the command buffer
     command: String,
+    /// The configured key map
+    keymap: KeyMap,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
     Editor<'arena, Node, E>
 {
     /// Create a new [`Editor`] with a given tree
-    pub fn new(tree: &'arena mut E, format_style: Node::FormatStyle) -> Editor<'arena, Node, E> {
+    pub fn new(tree: &'arena mut E, format_style: Node::FormatStyle, keymap: KeyMap) -> Editor<'arena, Node, E> {
         let term = Term::new().unwrap();
         Editor {
             tree,
@@ -143,6 +174,7 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             term,
             format_style,
             command: String::new(),
+            keymap,
         }
     }
 
@@ -345,7 +377,7 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
                         self.command.push(c);
                         // Attempt to parse the command, and take action if the command is
                         // complete
-                        if let Some(action) = parse_command(&self.command) {
+                        if let Some(action) = parse_command(&self.keymap, &self.command) {
                             // Respond to the action
                             match action {
                                 Action::Undefined => {
@@ -410,6 +442,7 @@ mod tests {
 
     #[test]
     fn parse_command_complete() {
+        let keymap = super::default_keymap();
         for (command, expected_effect) in &[
             ("q", Action::Quit),
             ("x", Action::Undefined),
@@ -421,14 +454,15 @@ mod tests {
             ("iX", Action::InsertChild('X')),
             ("iP", Action::InsertChild('P')),
         ] {
-            assert_eq!(parse_command(*command), Some(expected_effect.clone()));
+            assert_eq!(parse_command(&keymap, *command), Some(expected_effect.clone()));
         }
     }
 
     #[test]
     fn parse_command_incomplete() {
+        let keymap = super::default_keymap();
         for command in &["", "r", "i"] {
-            assert_eq!(parse_command(*command), None);
+            assert_eq!(parse_command(&keymap, *command), None);
         }
     }
 }
