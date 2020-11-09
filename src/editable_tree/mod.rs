@@ -6,7 +6,7 @@ use crate::arena::Arena;
 use crate::ast::Ast;
 
 /// The possible ways you can move the cursor
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Direction {
     Up,
     Down,

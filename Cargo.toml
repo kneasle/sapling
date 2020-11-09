@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 tuikit = "*"
 typed-arena = "2.0.1"
+hmap = "0.1.0"
