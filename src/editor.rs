@@ -430,6 +430,10 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         self.log(LogLevel::Info, "Starting Up...".to_string());
         // Start the mainloop
         self.mainloop();
+        // Show the cursor before closing so that the cursor isn't permanently disabled
+        // (see issue https://github.com/lotabout/tuikit/issues/28)
+        self.term.show_cursor(true).unwrap();
+        self.term.present().unwrap();
         // Log that the editor is closing
         self.log(LogLevel::Info, "Closing...".to_string());
     }
