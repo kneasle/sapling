@@ -123,15 +123,41 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
     }
 
     fn replace_cursor(&mut self, new_node: Node) {
-        // Removing future tree from the history vector until we're at the latest change.
+        // Remove future trees from the history vector so that the currently 'checked-out' tree is
+        // the most recent tree in the history.
         while self.history_index < self.root_history.len() - 1 {
-            // TODO: Deallocate the tree so that we don't get a memory leak
+            // TODO: Deallocate the tree so that we don't get a 'memory leak'
             self.root_history.pop();
         }
-        // TODO: Once cursor movent is fixed, this needs to not replace the root.
-        let new_root = self.arena.alloc(new_node);
-        // TODO: Once cursor movent is fixed, we need to somehow preserve the cursor location
-        self.root_history.push((new_root, vec![]));
+        // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
+        // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
+        // yield values from the root downwards, whereas we need the nodes in the opposite order.
+        let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
+        // The last value of nodes_to_clone is the node under the cursor, which we do not need to
+        // clone, so we pop that reference.
+        assert!(nodes_to_clone.pop().is_some());
+        /* Because AST nodes are immutable, we make changes to nodes by entirely cloning the path
+         * down to the node under the cursor.  We do this starting at the node under the cursor and
+         * work our way up parent by parent until we reach the root of the tree.  At that point,
+         * this node becomes the root of the new tree.
+         */
+        let mut node = self.arena.alloc(new_node);
+        // Iterate backwards over the child indices and the nodes, whilst cloning the tree and
+        // replacing the correct child reference to point to the newly created node.
+        for (n, child_index) in nodes_to_clone
+            .iter()
+            .rev()
+            .zip(self.current_cursor_path.iter().rev())
+        {
+            let mut cloned_node = (*n).clone();
+            cloned_node.children_mut()[*child_index] = node;
+            node = self.arena.alloc(cloned_node);
+        }
+        // At this point, `node` contains a reference to the root of the new tree, so we just add
+        // this to the history, along with the cursor path.
+        self.root_history
+            .push((node, self.current_cursor_path.clone()));
+        // Move the history index on by one so that we are pointing at the latest change
         self.history_index = self.root_history.len() - 1;
     }
 
