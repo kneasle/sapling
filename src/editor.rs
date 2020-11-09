@@ -65,7 +65,7 @@ pub fn default_keymap() -> KeyMap {
         'q' => Command::Quit,
         'i' => Command::InsertChild,
         'r' => Command::Replace,
-        'c' => Command::MoveCursor(Direction::Down), 
+        'c' => Command::MoveCursor(Direction::Down),
         'p' => Command::MoveCursor(Direction::Up),
         'k' => Command::MoveCursor(Direction::Prev),
         'j' => Command::MoveCursor(Direction::Next),
@@ -166,7 +166,11 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
     Editor<'arena, Node, E>
 {
     /// Create a new [`Editor`] with a given tree
-    pub fn new(tree: &'arena mut E, format_style: Node::FormatStyle, keymap: KeyMap) -> Editor<'arena, Node, E> {
+    pub fn new(
+        tree: &'arena mut E,
+        format_style: Node::FormatStyle,
+        keymap: KeyMap,
+    ) -> Editor<'arena, Node, E> {
         let term = Term::new().unwrap();
         Editor {
             tree,
@@ -458,7 +462,10 @@ mod tests {
             ("iX", Action::InsertChild('X')),
             ("iP", Action::InsertChild('P')),
         ] {
-            assert_eq!(parse_command(&keymap, *command), Some(expected_effect.clone()));
+            assert_eq!(
+                parse_command(&keymap, *command),
+                Some(expected_effect.clone())
+            );
         }
     }
 
