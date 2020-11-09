@@ -1,8 +1,7 @@
+use super::cursor_path::CursorPath;
 use super::{Direction, EditableTree};
 use crate::arena::Arena;
 use crate::ast::Ast;
-
-type Cursor = Vec<usize>;
 
 /// An [`EditableTree`] that stores the history as a DAG (Directed Acyclic Graph) of **immutable**
 /// nodes.
@@ -19,27 +18,17 @@ pub struct DAG<'arena, Node: Ast<'arena>> {
     arena: &'arena Arena<Node>,
     /// A [`Vec`] containing a reference to the root node at every edit in the undo history.  This
     /// is required to always have length at least one.
-    root_history: Vec<(&'arena Node, Cursor)>,
+    root_history: Vec<(&'arena Node, CursorPath)>,
     /// An index into [`root_history`](DAG::root_history) of the current edit.  This is required to
     /// be in `0..root_history.len()`.
     history_index: usize,
-    current_cursor_path: Cursor,
+    current_cursor_path: CursorPath,
 }
 
 impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
+    /// Returns the cursor node and its direct parent (if such a parent exists)
     fn cursor_and_parent(&self) -> (&'arena Node, Option<&'arena Node>) {
-        let mut node = self.root();
-        let mut parent: Option<&Node> = None;
-        for child_index in &self.current_cursor_path {
-            if let Some(new_node) = node.children().get(*child_index) {
-                parent = Some(node);
-                node = new_node;
-            } else {
-                // TODO: Print warning about the fact that the path was invalid
-                break;
-            }
-        }
-        (node, parent)
+        self.current_cursor_path.cursor_and_parent(self.root())
     }
 }
 
@@ -47,9 +36,9 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
     fn new(arena: &'arena Arena<Node>, root: &'arena Node) -> Self {
         DAG {
             arena,
-            root_history: vec![(root, vec![])],
+            root_history: vec![(root, CursorPath::root())],
             history_index: 0,
-            current_cursor_path: vec![],
+            current_cursor_path: CursorPath::root(),
         }
     }
 
@@ -82,8 +71,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
     }
 
     fn cursor(&self) -> &'arena Node {
-        // To find the cursor, first find it *and* its parent, and then ignore the parent pointer
-        self.cursor_and_parent().0
+        self.current_cursor_path.cursor(self.root())
     }
 
     fn move_cursor(&mut self, direction: Direction) -> Option<String> {
@@ -98,7 +86,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
                 }
             }
             Direction::Up => {
-                if self.current_cursor_path.is_empty() {
+                if self.current_cursor_path.is_root() {
                     return Some("Cannot move to the parent of the root.".to_string());
                 }
                 self.current_cursor_path.pop();
