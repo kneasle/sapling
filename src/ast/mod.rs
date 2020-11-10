@@ -64,12 +64,12 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
 
     /// Get a slice over the direct children of this node.  This operation is expected to be
     /// cheap - it will be used a lot of times without caching the results.
-    fn children(&'arena self) -> &[&Self];
+    fn children<'s>(&'s self) -> &'s [&'arena Self];
 
     /// Get a mutable slice over the direct children of this node.  Like
     /// [`children`](ASTSpec::children), this operation is expected to be
     /// cheap - it will be used a lot of times without caching the results.
-    fn children_mut(&'arena mut self) -> &mut [&Self];
+    fn children_mut<'s>(&'s mut self) -> &'s mut [&'arena Self];
 
     /// Get the display name of this node
     fn display_name(&self) -> String;

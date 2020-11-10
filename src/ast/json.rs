@@ -254,7 +254,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     /* DEBUG VIEW FUNCTIONS */
 
-    fn children(&'arena self) -> &[&JSON<'arena>] {
+    fn children<'s>(&'s self) -> &'s [&'arena JSON<'arena>] {
         match self {
             JSON::True | JSON::False | JSON::Str(_) => &[],
             JSON::Array(children) => &children,
@@ -263,7 +263,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         }
     }
 
-    fn children_mut(&'arena mut self) -> &mut [&JSON<'arena>] {
+    fn children_mut<'s>(&'s mut self) -> &'s mut [&'arena JSON<'arena>] {
         match self {
             JSON::True | JSON::False | JSON::Str(_) => &mut [],
             JSON::Array(children) => children,
