@@ -73,7 +73,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
     /* NAVIGATION METHODS */
 
     fn root(&self) -> &'arena Node {
-        // This indexing cannot panic because we require that `self.history_index` is a valid index
+        // This indexing shouldn't panic because we require that `self.history_index` is a valid index
         // into `self.root_history`, and `self.root_history` has at least one element
         self.root_history[self.history_index].0
     }
@@ -116,7 +116,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
                 if let Some(last_index) = self.current_cursor_path.last_mut() {
                     // We can unwrap here, because the only way for a node to not have a parent is
                     // if it's the root.  And if the cursor is at the root, then the `if let` would
-                    // fail, so this code would not run.
+                    // have failed and this code would not be run.
                     if *last_index + 1 < cursor_parent.unwrap().children().len() {
                         *last_index += 1;
                         None
