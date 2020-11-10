@@ -47,6 +47,10 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
     fn undo(&mut self) -> bool {
         if self.history_index > 0 {
             self.history_index -= 1;
+            // Follow the behaviour of other text editors and update the location of the cursor
+            // with its location in the snapshot we are going back to
+            self.current_cursor_path
+                .clone_from(&self.root_history[self.history_index].1);
             true
         } else {
             false
@@ -56,6 +60,10 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
     fn redo(&mut self) -> bool {
         if self.history_index < self.root_history.len() - 1 {
             self.history_index += 1;
+            // Follow the behaviour of other text editors and update the location of the cursor
+            // with its location in the snapshot we are going back to
+            self.current_cursor_path
+                .clone_from(&self.root_history[self.history_index].1);
             true
         } else {
             false
