@@ -45,3 +45,9 @@ impl<T> Arena<T> {
         &self.base_arena.alloc(Item::new(node)).node
     }
 }
+
+impl<T> Default for Arena<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}

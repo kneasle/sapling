@@ -101,7 +101,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
                         None
                     }
                 } else {
-                    return Some("Cannot move to a sibling of the root.".to_string());
+                    Some("Cannot move to a sibling of the root.".to_string())
                 }
             }
             Direction::Next => {
@@ -116,7 +116,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
                         Some("Cannot move past the last sibling of a node.".to_string())
                     }
                 } else {
-                    return Some("Cannot move to a sibling of the root.".to_string());
+                    Some("Cannot move to a sibling of the root.".to_string())
                 }
             }
         }
