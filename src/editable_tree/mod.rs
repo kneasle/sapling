@@ -1,5 +1,6 @@
 //! Specification of an editable, undoable buffer of trees and some implementations thereof.
 
+pub mod cursor_path;
 pub mod dag;
 
 use crate::arena::Arena;

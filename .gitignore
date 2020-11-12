@@ -1,2 +1,5 @@
 /target
 **/*.rs.bk
+
+# File used as the piped output of Sapling (I use it for debugging)
+log
