@@ -63,7 +63,7 @@ pub type KeyMap = std::collections::HashMap<char, Command>;
 pub fn default_keymap() -> KeyMap {
     hmap::hmap! {
         'q' => Command::Quit,
-        'i' => Command::InsertChild,
+        'o' => Command::InsertChild,
         'r' => Command::Replace,
         'c' => Command::MoveCursor(Direction::Down),
         'p' => Command::MoveCursor(Direction::Up),
@@ -471,8 +471,8 @@ mod tests {
             ("Qsx", Action::Undefined),
             ("ra", Action::Replace('a')),
             ("rg", Action::Replace('g')),
-            ("iX", Action::InsertChild('X')),
-            ("iP", Action::InsertChild('P')),
+            ("oX", Action::InsertChild('X')),
+            ("oP", Action::InsertChild('P')),
         ] {
             assert_eq!(
                 parse_command(&keymap, *command),
@@ -484,7 +484,7 @@ mod tests {
     #[test]
     fn parse_command_incomplete() {
         let keymap = super::default_keymap();
-        for command in &["", "r", "i"] {
+        for command in &["", "r", "o"] {
             assert_eq!(parse_command(&keymap, *command), None);
         }
     }
