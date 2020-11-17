@@ -33,6 +33,8 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 }
 
 impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node> {
+    type InsertError = Node::InsertError;
+
     fn new(arena: &'arena Arena<Node>, root: &'arena Node) -> Self {
         DAG {
             arena,
@@ -169,8 +171,48 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
         self.history_index = self.root_history.len() - 1;
     }
 
-    fn insert_child(&mut self, _new_node: Node) {
-        unimplemented!();
+    fn insert_child(&mut self, new_node: Node) -> Result<(), Self::InsertError> {
+        // Remove future trees from the history vector so that the currently 'checked-out' tree is
+        // the most recent tree in the history.
+        while self.history_index < self.root_history.len() - 1 {
+            // TODO: Deallocate the tree so that we don't get a 'memory leak'
+            self.root_history.pop();
+        }
+        // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
+        // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
+        // yield values from the root downwards, whereas we need the nodes in the opposite order.
+        let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
+        let new_child_node = self.arena.alloc(new_node);
+        // Clone the node that currently is the cursor, and add the new child to the end of its
+        // children.  Unwrapping here is fine, because `cursor_path::NodeIter` will always return
+        // one value.
+        let mut cloned_cursor = nodes_to_clone.pop().unwrap().clone();
+        // Add the new child to the children of the cloned cursor
+        cloned_cursor.insert_child(new_child_node, cloned_cursor.children().len())?;
+        /* Because AST nodes are immutable, we make changes to nodes by entirely cloning the path
+         * down to the node under the cursor.  We do this starting at the node under the cursor and
+         * work our way up parent by parent until we reach the root of the tree.  At that point,
+         * this node becomes the root of the new tree.
+         */
+        let mut node = self.arena.alloc(cloned_cursor);
+        // Iterate backwards over the child indices and the nodes, whilst cloning the tree and
+        // replacing the correct child reference to point to the newly created node.
+        for (n, child_index) in nodes_to_clone
+            .iter()
+            .rev()
+            .zip(self.current_cursor_path.iter().rev())
+        {
+            let mut cloned_node = (*n).clone();
+            cloned_node.children_mut()[*child_index] = node;
+            node = self.arena.alloc(cloned_node);
+        }
+        // At this point, `node` contains a reference to the root of the new tree, so we just add
+        // this to the history, along with the cursor path.
+        self.root_history
+            .push((node, self.current_cursor_path.clone()));
+        // Move the history index on by one so that we are pointing at the latest change
+        self.history_index = self.root_history.len() - 1;
+        Ok(())
     }
 
     fn write_text(&self, string: &mut String, format: &Node::FormatStyle) {

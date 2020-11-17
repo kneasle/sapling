@@ -216,12 +216,24 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
 
     /// Insert new child as the first child of the selected node
     fn insert_child(&mut self, c: char) {
-        if self.tree.cursor().is_insert_char(c) {
-            self.log(LogLevel::Debug, format!("Inserting with '{}'", c));
+        let cursor = self.tree.cursor();
+        if cursor.is_insert_char(c) {
+            if let Some(node) = cursor.from_char(c) {
+                if let Err(e) = self.tree.insert_child(node) {
+                    self.log(LogLevel::Error, format!("{}", e));
+                } else {
+                    self.log(LogLevel::Debug, format!("Inserting with '{}'", c));
+                }
+            } else {
+                self.log(
+                    LogLevel::Warning,
+                    format!("Char '{}' does not correspond to a valid node", c),
+                );
+            }
         } else {
             self.log(
                 LogLevel::Warning,
-                format!("Cannot replace node with '{}'", c),
+                format!("Cannot insert node with '{}'", c),
             );
         }
     }

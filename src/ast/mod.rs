@@ -16,6 +16,7 @@ use crate::editable_tree::EditableTree;
 pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash {
     /// A type parameter that will represent the different ways this AST can be rendered
     type FormatStyle;
+    type InsertError: std::error::Error;
 
     /* FORMATTING FUNCTIONS */
 
@@ -70,6 +71,13 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
     /// [`children`](ASTSpec::children), this operation is expected to be
     /// cheap - it will be used a lot of times without caching the results.
     fn children_mut<'s>(&'s mut self) -> &'s mut [&'arena Self];
+
+    /// Insert an extra child into the children of this node at a given index.
+    fn insert_child(
+        &mut self,
+        new_node: &'arena Self,
+        index: usize,
+    ) -> Result<(), Self::InsertError>;
 
     /// Get the display name of this node
     fn display_name(&self) -> String;

@@ -19,6 +19,33 @@ const CHAR_OBJECT: char = 'o';
 const CHAR_FIELD: char = 'i';
 const CHAR_STRING: char = 's';
 
+/// Error produced when inserting a child into a JSON node fails
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum InsertError {
+    /// A child was attempted to be inserted into a node such as `true` or `false`
+    /// which cannot have any children.
+    NoPossibleChildren(String),
+    /// A child was attempted to be inserted into a node that can only have a fixed number of
+    /// children.  The second argument is the number of children that this node has to have.  This
+    /// is used by nodes such as `field`, which is required to have 2 children.
+    FixedChildCount(String, usize),
+}
+
+impl std::fmt::Display for InsertError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InsertError::NoPossibleChildren(node) => {
+                write!(f, "Node {} cannot contain other nodes.", node)
+            }
+            InsertError::FixedChildCount(node, num_children) => {
+                write!(f, "Node {} can only have {} children.", node, num_children)
+            }
+        }
+    }
+}
+
+impl std::error::Error for InsertError {}
+
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
@@ -61,6 +88,7 @@ impl Default for JSON<'_> {
 
 impl<'arena> Ast<'arena> for JSON<'arena> {
     type FormatStyle = JSONFormat;
+    type InsertError = InsertError;
 
     /* FORMATTING FUNCTIONS */
 
@@ -269,6 +297,23 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
             JSON::Array(children) => children,
             JSON::Object(fields) => fields,
             JSON::Field(key_value) => &mut key_value[..],
+        }
+    }
+
+    fn insert_child(&mut self, new_node: &'arena Self, index: usize) -> Result<(), InsertError> {
+        match self {
+            JSON::True | JSON::False | JSON::Str(_) => {
+                Err(InsertError::NoPossibleChildren(self.display_name()))
+            }
+            JSON::Field(_) => Err(InsertError::FixedChildCount(self.display_name(), 2)),
+            JSON::Object(fields) => {
+                fields.insert(index, new_node);
+                Ok(())
+            }
+            JSON::Array(children) => {
+                children.insert(index, new_node);
+                Ok(())
+            }
         }
     }
 

@@ -5,6 +5,7 @@ pub mod dag;
 
 use crate::arena::Arena;
 use crate::ast::Ast;
+use std::error::Error;
 
 /// The possible ways you can move the cursor
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -17,6 +18,8 @@ pub enum Direction {
 
 /// A trait specifying an editable, undoable buffer of trees
 pub trait EditableTree<'arena, Node: Ast<'arena>>: Sized {
+    type InsertError: Error;
+
     /* CONSTRUCTOR METHODS */
 
     /// Build a new `EditableTree`, given a tree
@@ -51,7 +54,7 @@ pub trait EditableTree<'arena, Node: Ast<'arena>>: Sized {
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the first
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
-    fn insert_child(&mut self, new_node: Node);
+    fn insert_child(&mut self, new_node: Node) -> Result<(), Self::InsertError>;
 
     /* DISPLAY METHODS */
 
