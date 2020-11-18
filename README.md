@@ -65,8 +65,8 @@ manipulations which is a step in the right direction.  However, when you're writ
 thinking about the **code** not the text and the ideal editor is one that thinks the same way you
 do.
 
-The idea behind Sapling is that instead of using keyboard shortcuts to perform common edits on text
-(for example in Vim, `d3W` deletes forwards 3 whitespace-delimited words), we use keyboard
+The idea behind Sapling is that instead of using keyboard shortcuts to perform common edits on
+**text** (for example in Vim, `d3W` deletes forwards 3 whitespace-delimited words), we use keyboard
 shortcuts to directly edit the syntax tree of the code you're editing, which gets converted to text
 only when needed.  Instead of selecting substrings of text, we select nodes in the syntax tree (a
 node corresponds to any syntactic part of the code - from a single 'identifier' `variable_name` to
@@ -90,5 +90,15 @@ Because the editor *has* to hold a valid program, the following things that othe
 granted are hard to implement:
 - Just opening a file - opening a syntactically correct file is essentially the same as writing a
   compiler-esque parser for every language you want to load (not an easy task but there's plenty of
-  literature/libraries already existing for this).  However, I think
-  [tree-sitter](https://github.com/tree-sitter/tree-sitter) has already solved this problem.
+  literature/libraries already existing for this).  The real issue is that Sapling has to at least 
+  attempt to open any file, regardless of syntactic correctness, and this essentially boils down to
+  building an error-correcting parser that's generic enough to parse any language.
+  [tree-sitter](https://github.com/tree-sitter/tree-sitter) has already had a good crack at this
+  problem, but Tree Sitter is geared towards providing accurate syntax highlighting and has a few
+  missing features that Sapling needs:
+  - Sapling needs comments to be preserved when parsing (but whitespace is perhaps not so essential)
+  - Sapling needs to be able to render ASTs back to text, which I don't think tree-sitter's grammars
+    can handle
+  For the sake of pragmatism, I think we should initially write a wrapper around tree-sitter for
+  parsing/reading files so that Sapling at least works whilst we decide if a custom grammar is
+  required (and if it is, how it should work).
