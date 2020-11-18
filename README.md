@@ -1,4 +1,5 @@
 # Sapling
+
 ![Sapling logo](https://raw.githubusercontent.com/kneasle/sapling/master/resources/sapling.gif)
 
 A highly experimental code editor where you edit code, not text.
@@ -22,6 +23,7 @@ implentation options before commiting to the best one and then aggressively refa
 unused code.
 
 ## Goals of Sapling
+
 - Sapling's main goal is to make an editor that allows power users to edit code as close to their
   thinking speed as possible.  Sapling is willing to sacrifice a potentially steep learning curve
   in favour of increased editing power.
@@ -32,6 +34,7 @@ unused code.
   safety.
   
 ## What's an AST?
+
 AST stands for ['Abstract Syntax Tree'](https://en.wikipedia.org/wiki/Abstract_syntax_tree), and in
 essence it is a tree-like representation of only the structure of a program, without any details
 about formatting.
@@ -47,8 +50,8 @@ would correspond to a syntax tree something like the following (simplified for d
 purposes):
 ![Example tree](/resources/example_tree.png)
 
-
 ## But why?
+
 When writing code with any text editor, you are usually only interested in a tiny subset of all the
 possible strings of text - those that correspond to valid programs in whatever language you're
 writing.  In a **text** editor, you will spend the overwhelming majority of your time with the text
@@ -73,6 +76,7 @@ typing `d3c` for `[d]elete 3 [c]hildren` when selecting a function definition wo
 3 function definitions, without having to select the exact text areas they correspond to).
 
 ## Pros of AST-based editing
+
 - Because the editor already knows the syntactic structure of your program, the following are
   **much** easier to implement for every language supported by Sapling:
   - Syntax highlighting
@@ -81,6 +85,7 @@ typing `d3c` for `[d]elete 3 [c]hildren` when selecting a function definition wo
 - It will hopefully be **FAST** to edit code
 
 ## Cons of AST-based editing (otherwise known as 'extra fun challenges')
+
 Because the editor *has* to hold a valid program, the following things that other editors take for
 granted are hard to implement:
 - Just opening a file - opening a syntactically correct file is essentially the same as writing a
