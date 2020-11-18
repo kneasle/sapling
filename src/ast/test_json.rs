@@ -5,6 +5,7 @@ use crate::arena::Arena;
 pub enum TestJSON {
     True,
     False,
+    Null,
     Array(Vec<TestJSON>),
     Object(Vec<(String, TestJSON)>),
 }
@@ -16,6 +17,7 @@ impl TestJSON {
         match self {
             TestJSON::True => arena.alloc(JSON::True),
             TestJSON::False => arena.alloc(JSON::False),
+            TestJSON::Null => arena.alloc(JSON::Null),
             TestJSON::Array(children) => {
                 let mut child_vec: Vec<&'arena JSON<'arena>> = Vec::with_capacity(children.len());
                 for c in children {
