@@ -14,6 +14,7 @@ pub enum JSONFormat {
 
 const CHAR_TRUE: char = 't';
 const CHAR_FALSE: char = 'f';
+const CHAR_NULL: char = 'n';
 const CHAR_ARRAY: char = 'a';
 const CHAR_OBJECT: char = 'o';
 const CHAR_FIELD: char = 'i';
@@ -54,6 +55,8 @@ pub enum JSON<'arena> {
     True,
     /// The JSON value 'false'.  Corresponds to the string `false`.
     False,
+    /// The JSON value 'null'.  Corresponds to the string `null`.
+    Null,
     /// A JSON array of multiple values.
     /// Corresponds to a string `[<v1>, <v2>, ...]` where `v1`, `v2`, ... are JSON values.
     Array(Vec<&'arena JSON<'arena>>),
@@ -73,9 +76,16 @@ impl JSON<'_> {
     /// Return an iterator over all the possible chars that could represent JSON nodes
     fn all_object_chars() -> Box<dyn Iterator<Item = char>> {
         Box::new(
-            [CHAR_TRUE, CHAR_FALSE, CHAR_ARRAY, CHAR_OBJECT, CHAR_STRING]
-                .iter()
-                .copied(),
+            [
+                CHAR_TRUE,
+                CHAR_FALSE,
+                CHAR_NULL,
+                CHAR_ARRAY,
+                CHAR_OBJECT,
+                CHAR_STRING,
+            ]
+            .iter()
+            .copied(),
         )
     }
 }
@@ -100,6 +110,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         match self {
             JSON::True => vec![RecTok::Tok(DisplayToken::Text("true".to_string()))],
             JSON::False => vec![RecTok::Tok(DisplayToken::Text("false".to_string()))],
+            JSON::Null => vec![RecTok::Tok(DisplayToken::Text("null".to_string()))],
             JSON::Str(string) => vec![RecTok::Tok(DisplayToken::Text(format!(r#""{}""#, string)))],
             JSON::Field([key, value]) => vec![
                 RecTok::Child(key),
@@ -191,6 +202,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
                 match self {
                     JSON::True => Size::new(0, 4),  // same as Size::from("true")
                     JSON::False => Size::new(0, 5), // same as Size::from("false")
+                    JSON::Null => Size::new(0, 4),  // same as Size::from("null")
                     JSON::Str(string) => {
                         Size::new(0, 1) + Size::from(string.as_str()) + Size::new(0, 1)
                     }
@@ -237,6 +249,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
                 match self {
                     JSON::True => Size::new(0, 4),  // same as Size::from("true")
                     JSON::False => Size::new(0, 5), // same as Size::from("false")
+                    JSON::Null => Size::new(0, 4),  // same as Size::from("false")
                     JSON::Str(string) => {
                         Size::new(0, 1) + Size::from(string.as_str()) + Size::new(0, 1)
                     }
@@ -284,7 +297,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     fn children<'s>(&'s self) -> &'s [&'arena JSON<'arena>] {
         match self {
-            JSON::True | JSON::False | JSON::Str(_) => &[],
+            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => &[],
             JSON::Array(children) => &children,
             JSON::Object(fields) => &fields,
             JSON::Field(key_value) => &key_value[..],
@@ -293,7 +306,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     fn children_mut<'s>(&'s mut self) -> &'s mut [&'arena JSON<'arena>] {
         match self {
-            JSON::True | JSON::False | JSON::Str(_) => &mut [],
+            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => &mut [],
             JSON::Array(children) => children,
             JSON::Object(fields) => fields,
             JSON::Field(key_value) => &mut key_value[..],
@@ -302,7 +315,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     fn insert_child(&mut self, new_node: &'arena Self, index: usize) -> Result<(), InsertError> {
         match self {
-            JSON::True | JSON::False | JSON::Str(_) => {
+            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => {
                 Err(InsertError::NoPossibleChildren(self.display_name()))
             }
             JSON::Field(_) => Err(InsertError::FixedChildCount(self.display_name(), 2)),
@@ -321,6 +334,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         match self {
             JSON::True => "true".to_string(),
             JSON::False => "false".to_string(),
+            JSON::Null => "null".to_string(),
             JSON::Array(_) => "array".to_string(),
             JSON::Object(_) => "object".to_string(),
             JSON::Field(_) => "field".to_string(),
@@ -338,6 +352,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         match c {
             CHAR_TRUE => Some(JSON::True),
             CHAR_FALSE => Some(JSON::False),
+            CHAR_NULL => Some(JSON::Null),
             CHAR_ARRAY => Some(JSON::Array(vec![])),
             CHAR_OBJECT => Some(JSON::Object(vec![])),
             CHAR_STRING => Some(JSON::Str("".to_string())),
@@ -347,7 +362,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     fn insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
         match self {
-            JSON::True | JSON::False | JSON::Field(_) | JSON::Str(_) => {
+            JSON::True | JSON::False | JSON::Null | JSON::Field(_) | JSON::Str(_) => {
                 Box::new(std::iter::empty())
             }
             JSON::Object(_) => Box::new(std::iter::once(CHAR_FIELD)),
