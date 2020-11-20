@@ -7,35 +7,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
 
-/// The possible log levels
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub enum LogLevel {
-    /// Logs that give lots of minute details.  Intended to be used only when debugging Sapling.
-    VerboseDebug = 0,
-    /// Less verbose debugging, intended to be used only when debugging Sapling.
-    Debug = 1,
-    /// Logs that just give information to the user
-    Info = 2,
-    /// Logs that represent warnings about an Error that is either going to happen or might have
-    /// already happened.
-    Warning = 3,
-    /// Logs that will always be logged.
-    Error = 4,
-}
-
-impl LogLevel {
-    /// Returns a [`Color`] with which to display this log entry
-    pub fn to_color(&self) -> Color {
-        match self {
-            LogLevel::VerboseDebug => Color::BLUE,
-            LogLevel::Debug => Color::LIGHT_BLUE,
-            LogLevel::Info => Color::GREEN,
-            LogLevel::Warning => Color::YELLOW,
-            LogLevel::Error => Color::RED,
-        }
-    }
-}
-
 /// The possible command typed by user without any parameters.
 /// It can be mapped to a single key.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -150,8 +121,6 @@ fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
 pub struct Editor<'arena, Node: Ast<'arena>, E: EditableTree<'arena, Node> + 'arena> {
     /// The [`EditableTree`] that the `Editor` is editing
     tree: &'arena mut E,
-    /// The log as a [`Vec`] of logged messages
-    log: Vec<(LogLevel, String)>,
     /// The style that the tree is being printed to the screen
     format_style: Node::FormatStyle,
     /// The `tuikit` terminal that the `Editor` is rendering to
@@ -174,17 +143,11 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         let term = Term::new().unwrap();
         Editor {
             tree,
-            log: Vec::new(),
             term,
             format_style,
             command: String::new(),
             keymap,
         }
-    }
-
-    /// Log a message to whatever console is appropriate
-    fn log(&mut self, level: LogLevel, message: String) {
-        self.log.push((level, message));
     }
 
     /* ===== COMMAND FUNCTIONS ===== */
@@ -194,23 +157,17 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         if self.tree.cursor().is_replace_char(c) {
             // We know that `c` corresponds to a valid node, so we can unwrap
             let new_node = self.tree.cursor().from_char(c).unwrap();
-            self.log(
-                LogLevel::Debug,
-                format!("Replacing with '{}'/{:?}", c, new_node),
-            );
+            log::debug!("Replacing with '{}'/{:?}", c, new_node);
             self.tree.replace_cursor(new_node);
         } else {
-            self.log(
-                LogLevel::Warning,
-                format!("Cannot replace node with '{}'", c),
-            );
+            log::warn!("Cannot replace node with '{}'", c);
         }
     }
 
     /// Move the cursor
     fn move_cursor(&mut self, direction: Direction) {
         if let Some(error_message) = self.tree.move_cursor(direction) {
-            self.log.push((LogLevel::Warning, error_message));
+            log::warn!("{}", error_message);
         }
     }
 
@@ -220,39 +177,33 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         if cursor.is_insert_char(c) {
             if let Some(node) = cursor.from_char(c) {
                 if let Err(e) = self.tree.insert_child(node) {
-                    self.log(LogLevel::Error, format!("{}", e));
+                    log::error!("{}", e);
                 } else {
-                    self.log(LogLevel::Debug, format!("Inserting with '{}'", c));
+                    log::debug!("Inserting with '{}'", c);
                 }
             } else {
-                self.log(
-                    LogLevel::Warning,
-                    format!("Char '{}' does not correspond to a valid node", c),
-                );
+                log::warn!("Char '{}' does not correspond to a valid node", c);
             }
         } else {
-            self.log(
-                LogLevel::Warning,
-                format!("Cannot insert node with '{}'", c),
-            );
+            log::warn!("Cannot insert node with '{}'", c);
         }
     }
 
     /// Undo the latest change
     fn undo(&mut self) {
         if self.tree.undo() {
-            self.log(LogLevel::Debug, "Undo successful".to_string());
+            log::debug!("Undo successful");
         } else {
-            self.log(LogLevel::Info, "No changes to undo".to_string());
+            log::warn!("No changes to undo");
         }
     }
 
     /// Move one change forward in the history
     fn redo(&mut self) {
         if self.tree.redo() {
-            self.log(LogLevel::Debug, "Redo successful".to_string());
+            log::debug!("Redo successful");
         } else {
-            self.log(LogLevel::Info, "No changes to redo".to_string());
+            log::warn!("No changes to redo");
         }
     }
 
@@ -360,11 +311,9 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         self.render_tree(0, 0);
 
         /* RENDER LOG SECTION */
-        for (i, (level, message)) in self.log.iter().enumerate() {
-            self.term
-                .print_with_attr(i, width / 2, message, Attr::default().fg(level.to_color()))
-                .unwrap();
-        }
+        self.term
+            .print(0, width / 2, "Some stuff will go here...")
+            .unwrap();
 
         /* RENDER BOTTOM BAR */
         self.term
@@ -383,6 +332,7 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
     }
 
     fn mainloop(&mut self) {
+        log::trace!("Starting mainloop");
         // Sit in the infinte mainloop
         while let Ok(event) = self.term.poll_event() {
             /* RESPOND TO THE USER'S INPUT */
@@ -397,13 +347,11 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
                             // Respond to the action
                             match action {
                                 Action::Undefined => {
-                                    self.log(
-                                        LogLevel::Warning,
-                                        format!("'{}' not a command.", self.command),
-                                    );
+                                    log::warn!("'{}' is not a command.", self.command);
                                 }
                                 Action::Quit => {
                                     // Break the mainloop to quit
+                                    log::trace!("Recieved command 'Quit', so exiting mainloop");
                                     break;
                                 }
                                 Action::MoveCursor(direction) => {
@@ -442,16 +390,13 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
 
     /// Start the editor and enter the mainloop
     pub fn run(mut self) {
-        // Log the startup of the code
-        self.log(LogLevel::Info, "Starting Up...".to_string());
         // Start the mainloop
         self.mainloop();
+        log::trace!("Making the cursor reappear.");
         // Show the cursor before closing so that the cursor isn't permanently disabled
         // (see issue https://github.com/lotabout/tuikit/issues/28)
         self.term.show_cursor(true).unwrap();
         self.term.present().unwrap();
-        // Log that the editor is closing
-        self.log(LogLevel::Info, "Closing...".to_string());
     }
 }
 
