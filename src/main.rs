@@ -10,7 +10,12 @@ use crate::editable_tree::{dag::DAG, EditableTree};
 use crate::editor::Editor;
 
 fn main() {
+    // Initialise the logging and startup
+    pretty_env_logger::init();
+    log::info!("Starting up...");
+
     // Create an empty arena for Sapling to use
+    log::trace!("Creating arena");
     let arena = Arena::new();
     // For the time being, start the editor with some pre-made JSON
     let root = TestJSON::Array(vec![
