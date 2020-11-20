@@ -331,6 +331,48 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         self.term.present().unwrap();
     }
 
+    /// Consumes a [`char`] and adds it to the command buffer.  If the command buffer contains a
+    /// valid command, then execute that command.  This returns `true` if the command 'Quit' was
+    /// executed, otherwise `false` is returned.
+    fn consume_command_char(&mut self, c: char) -> bool {
+        let mut should_quit = false;
+        // Add the new keypress to the command
+        self.command.push(c);
+        // Attempt to parse the command, and take action if the command is
+        // complete
+        if let Some(action) = parse_command(&self.keymap, &self.command) {
+            // Respond to the action
+            match action {
+                Action::Undefined => {
+                    log::warn!("'{}' is not a command.", self.command);
+                }
+                Action::Quit => {
+                    // Break the mainloop to quit
+                    log::trace!("Recieved command 'Quit', so exiting mainloop");
+                    should_quit = true;
+                }
+                Action::MoveCursor(direction) => {
+                    self.move_cursor(direction);
+                }
+                Action::Replace(c) => {
+                    self.replace_cursor(c);
+                }
+                Action::InsertChild(c) => {
+                    self.insert_child(c);
+                }
+                Action::Undo => {
+                    self.undo();
+                }
+                Action::Redo => {
+                    self.redo();
+                }
+            }
+            // Clear the command box
+            self.command.clear();
+        }
+        should_quit
+    }
+
     fn mainloop(&mut self) {
         log::trace!("Starting mainloop");
         // Sit in the infinte mainloop
@@ -339,39 +381,9 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             if let Event::Key(key) = event {
                 match key {
                     Key::Char(c) => {
-                        // Add the new keypress to the command
-                        self.command.push(c);
-                        // Attempt to parse the command, and take action if the command is
-                        // complete
-                        if let Some(action) = parse_command(&self.keymap, &self.command) {
-                            // Respond to the action
-                            match action {
-                                Action::Undefined => {
-                                    log::warn!("'{}' is not a command.", self.command);
-                                }
-                                Action::Quit => {
-                                    // Break the mainloop to quit
-                                    log::trace!("Recieved command 'Quit', so exiting mainloop");
-                                    break;
-                                }
-                                Action::MoveCursor(direction) => {
-                                    self.move_cursor(direction);
-                                }
-                                Action::Replace(c) => {
-                                    self.replace_cursor(c);
-                                }
-                                Action::InsertChild(c) => {
-                                    self.insert_child(c);
-                                }
-                                Action::Undo => {
-                                    self.undo();
-                                }
-                                Action::Redo => {
-                                    self.redo();
-                                }
-                            }
-                            // Clear the command box
-                            self.command.clear();
+                        // `self.add_char_to_command` returns `true` if the editor should quit
+                        if self.consume_command_char(c) {
+                            break;
                         }
                     }
                     Key::ESC => {
