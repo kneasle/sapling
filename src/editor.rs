@@ -27,6 +27,23 @@ pub enum Command {
     Redo,
 }
 
+impl Command {
+    /// Returns a lower-case summary string of the given command
+    pub fn summary_string(&self) -> &'static str {
+        match self {
+            Command::Quit => "quit",
+            Command::Replace => "replace",
+            Command::InsertChild => "insert child",
+            Command::MoveCursor(Direction::Down) => "move to first child",
+            Command::MoveCursor(Direction::Up) => "move to parent",
+            Command::MoveCursor(Direction::Prev) => "move to previous sibling",
+            Command::MoveCursor(Direction::Next) => "move to next sibling",
+            Command::Undo => "undo",
+            Command::Redo => "redo",
+        }
+    }
+}
+
 /// Mapping of keys to commands.
 /// Shortcut definition, also allows us to change the type if needed.
 pub type KeyMap = std::collections::HashMap<char, Command>;
@@ -62,6 +79,31 @@ enum Action {
     Undo,
     /// Redo a change
     Redo,
+}
+
+impl Action {
+    /// Returns a lower-case summary string of the given command, along with the color it should be
+    /// displayed as
+    pub fn meaning_and_color(&self) -> (String, Color) {
+        const COL_MOVE: Color = Color::LIGHT_BLUE; // Color of the commands that move the cursor
+        const COL_HISTORY: Color = Color::LIGHT_YELLOW; // Color of undo/redo
+        const COL_INSERT: Color = Color::LIGHT_GREEN; // Colour of any insert command
+
+        match self {
+            Action::Undefined => ("undefined command".to_string(), Color::LIGHT_RED),
+            Action::Quit => ("quit Sapling".to_string(), Color::LIGHT_RED),
+            Action::Replace(c) => (format!("replace cursor with '{}'", c), Color::CYAN),
+            Action::InsertChild(c) => (format!("insert '{}' as last child", c), COL_INSERT),
+            Action::MoveCursor(Direction::Down) => ("move to first child".to_string(), COL_MOVE),
+            Action::MoveCursor(Direction::Up) => ("move to parent".to_string(), COL_MOVE),
+            Action::MoveCursor(Direction::Prev) => {
+                ("move to previous sibling".to_string(), COL_MOVE)
+            }
+            Action::MoveCursor(Direction::Next) => ("move to next sibling".to_string(), COL_MOVE),
+            Action::Undo => ("undo a change".to_string(), COL_HISTORY),
+            Action::Redo => ("redo a change".to_string(), COL_HISTORY),
+        }
+    }
 }
 
 /// Attempt to convert a command as a `&`[`str`] into an [`Action`].
