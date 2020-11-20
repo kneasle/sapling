@@ -171,6 +171,8 @@ pub struct Editor<'arena, Node: Ast<'arena>, E: EditableTree<'arena, Node> + 'ar
     command: String,
     /// The configured key map
     keymap: KeyMap,
+    /// A list of the commands that have been executed, along with a summary of what they mean
+    command_log: Vec<(String, String, Color)>,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
@@ -189,6 +191,7 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             format_style,
             command: String::new(),
             keymap,
+            command_log: vec![],
         }
     }
 
@@ -339,6 +342,38 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         }
     }
 
+    /// Draw a log of recent commands executed
+    fn render_log(&self, row: usize, col: usize) {
+        // Calculate the max command length to make all the columns aligned.  We can unwrap,
+        // because we add '2' to the lengths, so the 'max()' function is guarunteed to be run over
+        // at least one element.
+        let cmd_col_width = self
+            .command_log
+            .iter()
+            .map(|(cmd, _, _)| cmd.len())
+            .chain(std::iter::once(2))
+            .max()
+            .unwrap();
+        // Render the commands
+        for (i, (cmd, meaning, color)) in self.command_log.iter().enumerate() {
+            // Print the commands in one column
+            self.term.print(row + i, col, cmd).unwrap();
+            // Print a `=>`
+            self.term
+                .print(row + i, col + cmd_col_width + 1, "=>")
+                .unwrap();
+            // Print the meanings in another column
+            self.term
+                .print_with_attr(
+                    row + i,
+                    col + cmd_col_width + 4,
+                    meaning,
+                    Attr::default().fg(*color),
+                )
+                .unwrap();
+        }
+    }
+
     /* ===== MAIN FUNCTIONS ===== */
 
     /// Update the terminal UI display
@@ -353,9 +388,8 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         self.render_tree(0, 0);
 
         /* RENDER LOG SECTION */
-        self.term
-            .print(0, width / 2, "Some stuff will go here...")
-            .unwrap();
+
+        self.render_log(0, width / 2);
 
         /* RENDER BOTTOM BAR */
         self.term
@@ -371,6 +405,25 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
 
         // Update the terminal screen
         self.term.present().unwrap();
+    }
+
+    /// Adds a command to a short history of executed commands.  This is used in the command log
+    /// that appears when I'm streaming so that the viewers can see what I'm typing.
+    fn log_command(&mut self, command: String) {
+        let (message, color) = {
+            if command.is_empty() {
+                log::error!("Empty command executed!");
+                ("<empty command>".to_string(), Color::RED)
+            } else {
+                if let Some(action) = parse_command(&self.keymap, &command) {
+                    action.meaning_and_color()
+                } else {
+                    log::error!("Incomplete command executed!");
+                    ("<incomplete command>".to_string(), Color::LIGHT_RED)
+                }
+            }
+        };
+        self.command_log.push((command, message, color));
     }
 
     /// Consumes a [`char`] and adds it to the command buffer.  If the command buffer contains a
@@ -409,6 +462,8 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
                     self.redo();
                 }
             }
+            // Add the command to the command log
+            self.log_command(self.command.clone());
             // Clear the command box
             self.command.clear();
         }
