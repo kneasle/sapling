@@ -380,11 +380,11 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
     fn update_display(&self) {
         // Put the terminal size into some convenient variables
         let (width, height) = self.term.term_size().unwrap();
-
         // Clear the terminal
         self.term.clear().unwrap();
 
         /* RENDER MAIN TEXT VIEW */
+
         self.render_tree(0, 0);
 
         /* RENDER LOG SECTION */
@@ -392,9 +392,12 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         self.render_log(0, width / 2);
 
         /* RENDER BOTTOM BAR */
+
+        // Add the `Press 'q' to exit.` message
         self.term
             .print(height - 1, 0, "Press 'q' to exit.")
             .unwrap();
+        // Draw the current command buffer
         self.term
             .print(
                 height - 1,
@@ -403,7 +406,8 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             )
             .unwrap();
 
-        // Update the terminal screen
+        /* UPDATE THE TERMINAL SCREEN */
+
         self.term.present().unwrap();
     }
 
