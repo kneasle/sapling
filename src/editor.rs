@@ -130,9 +130,8 @@ pub enum Command {
     Replace,
     /// Insert a new node, expects an argument
     InsertChild,
-    /// Move cursor in given direction
-    /// This is not considered a parameter as the direction is still specified by pressing specific
-    /// key.
+    /// Move cursor in given direction.  The direction is part of the command, since the directions
+    /// all correspond to single key presses.
     MoveCursor(Direction),
     /// Undo the last change
     Undo,
