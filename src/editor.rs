@@ -27,12 +27,22 @@ mod command_log {
     pub struct CommandLog {
         /// A list of commands that have been run
         commands: Vec<Entry>,
+        max_entries: usize,
     }
 
     impl CommandLog {
         /// Create a new (empty) command log
-        pub fn new() -> CommandLog {
-            CommandLog { commands: vec![] }
+        pub fn new(max_entries: usize) -> CommandLog {
+            CommandLog {
+                commands: vec![],
+                max_entries,
+            }
+        }
+
+        /// Sets and enforces the max entry limit
+        pub fn set_max_entries(&mut self, max_entries: usize) {
+            self.max_entries = max_entries;
+            self.enforce_entry_limit();
         }
 
         /// Draw a log of recent commands to a given terminal at a given location
@@ -81,6 +91,13 @@ mod command_log {
             }
         }
 
+        /// Repeatedly remove commands until the entry limit is satisfied
+        fn enforce_entry_limit(&mut self) {
+            while self.commands.len() > self.max_entries {
+                self.commands.remove(0);
+            }
+        }
+
         /// Pushes a new command to the log.
         pub fn push(&mut self, command: String, keymap: &super::KeyMap) {
             // If the command is identical to the last log entry, incrememnt that counter by one
@@ -110,6 +127,8 @@ mod command_log {
                 description,
                 color,
             });
+            // Since we added an item, we should enforce the entry limit
+            self.enforce_entry_limit();
         }
     }
 }
@@ -297,7 +316,7 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             format_style,
             command: String::new(),
             keymap,
-            command_log: command_log::CommandLog::new(),
+            command_log: command_log::CommandLog::new(10),
         }
     }
 
@@ -548,6 +567,10 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
                     _ => {}
                 }
             }
+
+            // Make sure that the logger isn't taller than the screen
+            self.command_log
+                .set_max_entries(self.term.term_size().unwrap().1.min(10));
 
             // Update the screen after every input (if this becomes a bottleneck then we can
             // optimise the number of calls to `update_display` but for now it's not worth the
