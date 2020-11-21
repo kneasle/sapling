@@ -1,5 +1,5 @@
 use super::cursor_path::CursorPath;
-use super::{Direction, EditableTree};
+use super::{Direction, EditableTree, Side};
 use crate::arena::Arena;
 use crate::ast::Ast;
 
@@ -26,11 +26,6 @@ pub struct DAG<'arena, Node: Ast<'arena>> {
 }
 
 impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
-    /// Returns the cursor node and its direct parent (if such a parent exists)
-    fn cursor_and_parent(&self) -> (&'arena Node, Option<&'arena Node>) {
-        self.current_cursor_path.cursor_and_parent(self.root())
-    }
-
     /// Utility function to finish an edit.  This handles removing any redo history, and cloning
     /// the nodes that are parents of the node that changed.
     fn finish_edit(&mut self, nodes_to_clone: &[&'arena Node], new_node: Node) {
@@ -114,6 +109,10 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
         self.root_history[self.history_index].0
     }
 
+    fn cursor_and_parent(&self) -> (&'arena Node, Option<&'arena Node>) {
+        self.current_cursor_path.cursor_and_parent(self.root())
+    }
+
     fn cursor(&self) -> &'arena Node {
         self.current_cursor_path.cursor(self.root())
     }
@@ -175,6 +174,42 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
         // clone, so we pop that reference.
         assert!(nodes_to_clone.pop().is_some());
         self.finish_edit(&nodes_to_clone, new_node);
+    }
+
+    fn insert_next_to_cursor(
+        &mut self,
+        new_node: Node,
+        side: Side,
+    ) -> Result<(), Self::InsertError> {
+        // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
+        // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
+        // yield values from the root downwards, whereas we need the nodes in the opposite order.
+        let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
+        // Pop the cursor, because it will be unchanged.  The only part of this that we need is
+        // the cursor's index.
+        assert!(nodes_to_clone.pop().is_some());
+        if nodes_to_clone.is_empty() {
+            // TODO: Return an error
+            log::warn!("Trying to add a sibling to the root!");
+            panic!();
+        }
+        // Find the index of the cursor, so that we know where to insert.  We can unwrap, because
+        // if we were at the root, then we'd early return from the if statement above
+        let cursor_sibling_index = *self.current_cursor_path.last_mut().unwrap();
+        let insert_index = cursor_sibling_index
+            + match side {
+                Side::Prev => 0,
+                Side::Next => 1,
+            };
+        let new_child_node = self.arena.alloc(new_node);
+        // Clone the node that currently is the cursor, and add the new child to the end of its
+        // children.  Unwrapping here is fine, because `cursor_path::NodeIter` will always
+        // return one value.
+        let mut cloned_parent = nodes_to_clone.pop().unwrap().clone();
+        // Add the new child to the children of the cloned cursor
+        cloned_parent.insert_child(new_child_node, insert_index)?;
+        self.finish_edit(&nodes_to_clone, cloned_parent);
+        Ok(())
     }
 
     fn insert_child(&mut self, new_node: Node) -> Result<(), Self::InsertError> {

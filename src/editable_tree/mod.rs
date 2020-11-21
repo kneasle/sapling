@@ -16,6 +16,13 @@ pub enum Direction {
     Next,
 }
 
+/// An enum to represent the two sides of a cursor
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum Side {
+    Prev,
+    Next,
+}
+
 /// A trait specifying an editable, undoable buffer of trees
 pub trait EditableTree<'arena, Node: Ast<'arena>>: Sized {
     type InsertError: Error;
@@ -39,6 +46,9 @@ pub trait EditableTree<'arena, Node: Ast<'arena>>: Sized {
     /// Returns a reference to the node that is currently the root of the AST.
     fn root(&self) -> &'arena Node;
 
+    /// Returns the cursor node and its direct parent (if such a parent exists)
+    fn cursor_and_parent(&self) -> (&'arena Node, Option<&'arena Node>);
+
     /// Returns a reference to the node that is currently under the cursor.
     fn cursor(&self) -> &'arena Node;
 
@@ -55,6 +65,14 @@ pub trait EditableTree<'arena, Node: Ast<'arena>>: Sized {
     /// Updates the internal state so that the tree now contains `new_node` inserted as the first
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
     fn insert_child(&mut self, new_node: Node) -> Result<(), Self::InsertError>;
+
+    /// Updates the internal state so that the tree now contains `new_node` inserted as the first
+    /// child of the selected node.  Also moves the cursor so that the new node is selected.
+    fn insert_next_to_cursor(
+        &mut self,
+        new_node: Node,
+        side: Side,
+    ) -> Result<(), Self::InsertError>;
 
     /* DISPLAY METHODS */
 
