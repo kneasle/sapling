@@ -7,6 +7,74 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
 
+mod command_log {
+    //! A utility datastructure to store and render a log of commands.  This is mostly used to give
+    //! the viewers of my streams feedback for what I'm typing.
+
+    use tuikit::prelude::*;
+
+    /// A utility struct to store and display a log of which commands have been executed recently.
+    /// This is mostly used to give the viewers of my streams feedback for what I'm typing.
+    pub struct CommandLog {
+        /// A list of commands that have been run
+        commands: Vec<(String, String, Color)>,
+    }
+
+    impl CommandLog {
+        /// Create a new (empty) command log
+        pub fn new() -> CommandLog {
+            CommandLog { commands: vec![] }
+        }
+
+        /// Draw a log of recent commands to a given terminal at a given location
+        pub fn render(&self, term: &Term, row: usize, col: usize) {
+            // Calculate the max command length to make all the columns aligned.  We can unwrap,
+            // because we add '2' to the lengths, so the 'max()' function is guarunteed to be run over
+            // at least one element.
+            let cmd_col_width = self
+                .commands
+                .iter()
+                .map(|(cmd, _, _)| cmd.len())
+                .chain(std::iter::once(2))
+                .max()
+                .unwrap();
+            // Render the commands
+            for (i, (cmd, meaning, color)) in self.commands.iter().enumerate() {
+                // Print the commands in one column
+                term.print(row + i, col, cmd).unwrap();
+                // Print a `=>`
+                term.print(row + i, col + cmd_col_width + 1, "=>").unwrap();
+                // Print the meanings in another column
+                term.print_with_attr(
+                    row + i,
+                    col + cmd_col_width + 4,
+                    meaning,
+                    Attr::default().fg(*color),
+                )
+                .unwrap();
+            }
+        }
+
+        /// Pushes a new command to the log.
+        pub fn push(&mut self, command: String, keymap: &super::KeyMap) {
+            let (message, color) = {
+                if command.is_empty() {
+                    log::error!("Empty command executed!");
+                    ("<empty command>".to_string(), Color::LIGHT_RED)
+                } else {
+                    if let Some(action) = super::parse_command(&keymap, &command) {
+                        action.meaning_and_color()
+                    } else {
+                        log::error!("Incomplete command executed!");
+                        ("<incomplete command>".to_string(), Color::LIGHT_RED)
+                    }
+                }
+            };
+            self.commands.push((command, message, color));
+        }
+    }
+}
+
 /// The possible command typed by user without any parameters.
 /// It can be mapped to a single key.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -172,7 +240,7 @@ pub struct Editor<'arena, Node: Ast<'arena>, E: EditableTree<'arena, Node> + 'ar
     /// The configured key map
     keymap: KeyMap,
     /// A list of the commands that have been executed, along with a summary of what they mean
-    command_log: Vec<(String, String, Color)>,
+    command_log: command_log::CommandLog,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
@@ -191,7 +259,7 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             format_style,
             command: String::new(),
             keymap,
-            command_log: vec![],
+            command_log: command_log::CommandLog::new(),
         }
     }
 
@@ -342,38 +410,6 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         }
     }
 
-    /// Draw a log of recent commands executed
-    fn render_log(&self, row: usize, col: usize) {
-        // Calculate the max command length to make all the columns aligned.  We can unwrap,
-        // because we add '2' to the lengths, so the 'max()' function is guarunteed to be run over
-        // at least one element.
-        let cmd_col_width = self
-            .command_log
-            .iter()
-            .map(|(cmd, _, _)| cmd.len())
-            .chain(std::iter::once(2))
-            .max()
-            .unwrap();
-        // Render the commands
-        for (i, (cmd, meaning, color)) in self.command_log.iter().enumerate() {
-            // Print the commands in one column
-            self.term.print(row + i, col, cmd).unwrap();
-            // Print a `=>`
-            self.term
-                .print(row + i, col + cmd_col_width + 1, "=>")
-                .unwrap();
-            // Print the meanings in another column
-            self.term
-                .print_with_attr(
-                    row + i,
-                    col + cmd_col_width + 4,
-                    meaning,
-                    Attr::default().fg(*color),
-                )
-                .unwrap();
-        }
-    }
-
     /* ===== MAIN FUNCTIONS ===== */
 
     /// Update the terminal UI display
@@ -389,7 +425,7 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
 
         /* RENDER LOG SECTION */
 
-        self.render_log(0, width / 2);
+        self.command_log.render(&self.term, 0, width / 2);
 
         /* RENDER BOTTOM BAR */
 
@@ -409,25 +445,6 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
         /* UPDATE THE TERMINAL SCREEN */
 
         self.term.present().unwrap();
-    }
-
-    /// Adds a command to a short history of executed commands.  This is used in the command log
-    /// that appears when I'm streaming so that the viewers can see what I'm typing.
-    fn log_command(&mut self, command: String) {
-        let (message, color) = {
-            if command.is_empty() {
-                log::error!("Empty command executed!");
-                ("<empty command>".to_string(), Color::RED)
-            } else {
-                if let Some(action) = parse_command(&self.keymap, &command) {
-                    action.meaning_and_color()
-                } else {
-                    log::error!("Incomplete command executed!");
-                    ("<incomplete command>".to_string(), Color::LIGHT_RED)
-                }
-            }
-        };
-        self.command_log.push((command, message, color));
     }
 
     /// Consumes a [`char`] and adds it to the command buffer.  If the command buffer contains a
@@ -467,7 +484,7 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
                 }
             }
             // Add the command to the command log
-            self.log_command(self.command.clone());
+            self.command_log.push(self.command.clone(), &self.keymap);
             // Clear the command box
             self.command.clear();
         }
