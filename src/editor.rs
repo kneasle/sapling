@@ -75,8 +75,13 @@ mod command_log {
                     term.print(row + i, col, &format!("{}x", e.count)).unwrap();
                 }
                 // Print the commands in one column
-                term.print(row + i, col + count_col_width + 1, &e.command)
-                    .unwrap();
+                term.print_with_attr(
+                    row + i,
+                    col + count_col_width + 1,
+                    &e.command,
+                    Attr::default().fg(Color::WHITE),
+                )
+                .unwrap();
                 // Print a `=>`
                 term.print(row + i, col + count_col_width + 1 + cmd_col_width + 1, "=>")
                     .unwrap();
