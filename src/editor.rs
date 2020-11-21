@@ -2,7 +2,7 @@
 
 use crate::ast::display_token::DisplayToken;
 use crate::ast::{size, Ast};
-use crate::editable_tree::{Direction, EditableTree};
+use crate::editable_tree::{Direction, EditableTree, Side};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
@@ -146,8 +146,12 @@ pub enum Command {
     Quit,
     /// Replace the selected node, expects an argument
     Replace,
-    /// Insert a new node, expects an argument
+    /// Insert a new node as the last child of the cursor, expects an argument
     InsertChild,
+    /// Insert a new node before the cursor, expects an argument
+    InsertBefore,
+    /// Insert a new node after the cursor, expects an argument
+    InsertAfter,
     /// Move cursor in given direction.  The direction is part of the command, since the directions
     /// all correspond to single key presses.
     MoveCursor(Direction),
@@ -164,6 +168,8 @@ impl Command {
             Command::Quit => "quit",
             Command::Replace => "replace",
             Command::InsertChild => "insert child",
+            Command::InsertBefore => "insert before",
+            Command::InsertAfter => "insert after",
             Command::MoveCursor(Direction::Down) => "move to first child",
             Command::MoveCursor(Direction::Up) => "move to parent",
             Command::MoveCursor(Direction::Prev) => "move to previous sibling",
@@ -181,6 +187,8 @@ pub type KeyMap = std::collections::HashMap<char, Command>;
 pub fn default_keymap() -> KeyMap {
     hmap::hmap! {
         'q' => Command::Quit,
+        'i' => Command::InsertBefore,
+        'a' => Command::InsertAfter,
         'o' => Command::InsertChild,
         'r' => Command::Replace,
         'c' => Command::MoveCursor(Direction::Down),
@@ -203,6 +211,10 @@ enum Action {
     Replace(char),
     /// Insert a new node (given by some [`char`]) as the first child of the selected node
     InsertChild(char),
+    /// Insert a new node (given by some [`char`]) as the first child of the selected node
+    InsertBefore(char),
+    /// Insert a new node (given by some [`char`]) as the first child of the selected node
+    InsertAfter(char),
     /// Move the node in a given direction
     MoveCursor(Direction),
     /// Undo the last change
@@ -224,6 +236,8 @@ impl Action {
             Action::Quit => ("quit Sapling".to_string(), Color::LIGHT_RED),
             Action::Replace(c) => (format!("replace cursor with '{}'", c), Color::CYAN),
             Action::InsertChild(c) => (format!("insert '{}' as last child", c), COL_INSERT),
+            Action::InsertBefore(c) => (format!("insert '{}' before cursor", c), COL_INSERT),
+            Action::InsertAfter(c) => (format!("insert '{}' after cursor", c), COL_INSERT),
             Action::MoveCursor(Direction::Down) => ("move to first child".to_string(), COL_MOVE),
             Action::MoveCursor(Direction::Up) => ("move to parent".to_string(), COL_MOVE),
             Action::MoveCursor(Direction::Prev) => {
@@ -263,6 +277,18 @@ fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
                 // Consume the second char of the iterator
                 if let Some(insert_char) = command_char_iter.next() {
                     return Some(Action::InsertChild(insert_char));
+                }
+            }
+            Some(Command::InsertBefore) => {
+                // Consume the second char of the iterator
+                if let Some(insert_char) = command_char_iter.next() {
+                    return Some(Action::InsertBefore(insert_char));
+                }
+            }
+            Some(Command::InsertAfter) => {
+                // Consume the second char of the iterator
+                if let Some(insert_char) = command_char_iter.next() {
+                    return Some(Action::InsertAfter(insert_char));
                 }
             }
             Some(Command::Replace) => {
@@ -361,6 +387,28 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             }
         } else {
             log::warn!("Cannot insert node with '{}'", c);
+        }
+    }
+
+    /// Insert new child as the first child of the selected node
+    fn insert_next_to_cursor(&mut self, c: char, side: Side) {
+        let (_cursor, parent) = self.tree.cursor_and_parent();
+        if let Some(p) = parent {
+            if p.is_insert_char(c) {
+                if let Some(node) = p.from_char(c) {
+                    if let Err(e) = self.tree.insert_next_to_cursor(node, side) {
+                        log::error!("{}", e);
+                    } else {
+                        log::debug!("Inserting with '{}'", c);
+                    }
+                } else {
+                    log::warn!("Char '{}' does not correspond to a valid node", c);
+                }
+            } else {
+                log::warn!("Cannot insert node with '{}'", c);
+            }
+        } else {
+            log::warn!("Cannot add siblings of the root.");
         }
     }
 
@@ -537,6 +585,12 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
                 }
                 Action::InsertChild(c) => {
                     self.insert_child(c);
+                }
+                Action::InsertBefore(c) => {
+                    self.insert_next_to_cursor(c, Side::Prev);
+                }
+                Action::InsertAfter(c) => {
+                    self.insert_next_to_cursor(c, Side::Next);
                 }
                 Action::Undo => {
                     self.undo();
