@@ -13,11 +13,20 @@ mod command_log {
 
     use tuikit::prelude::*;
 
+    /// One entry in the log.  This usually represts a single command, but could represent an
+    /// accumulation of many identical commands that are executed consecutively.
+    struct Entry {
+        count: usize,
+        command: String,
+        description: String,
+        color: Color,
+    }
+
     /// A utility struct to store and display a log of which commands have been executed recently.
     /// This is mostly used to give the viewers of my streams feedback for what I'm typing.
     pub struct CommandLog {
         /// A list of commands that have been run
-        commands: Vec<(String, String, Color)>,
+        commands: Vec<Entry>,
     }
 
     impl CommandLog {
@@ -28,28 +37,51 @@ mod command_log {
 
         /// Draw a log of recent commands to a given terminal at a given location
         pub fn render(&self, term: &Term, row: usize, col: usize) {
-            // Calculate the max command length to make all the columns aligned.  We can unwrap,
-            // because we add '2' to the lengths, so the 'max()' function is guarunteed to be run over
-            // at least one element.
+            // Calculate how wide the numbers column should be, enforcing that it is at least two
+            // chars wide.
+            //
+            // We can safely unwrap, because we add '2' to the lengths, so the 'max()' function is
+            // guarunteed to be run over at least one element.
+            let count_col_width = self
+                .commands
+                .iter()
+                .map(|e| match e.count {
+                    1 => 0,
+                    c => format!("{}", c).len(),
+                })
+                .chain(std::iter::once(2))
+                .max()
+                .unwrap();
+            // Calculate the width of the command column, and make sure that it is at least two
+            // chars wide.
+            //
+            // We can safely unwrap, because we add '2' to the lengths, so the 'max()' function is
+            // guarunteed to be run over at least one element.
             let cmd_col_width = self
                 .commands
                 .iter()
-                .map(|(cmd, _, _)| cmd.len())
+                .map(|e| e.command.len())
                 .chain(std::iter::once(2))
                 .max()
                 .unwrap();
             // Render the commands
-            for (i, (cmd, meaning, color)) in self.commands.iter().enumerate() {
+            for (i, e) in self.commands.iter().enumerate() {
+                // Print the count if greater than 1
+                if e.count > 1 {
+                    term.print(row + i, col, &format!("{}x", e.count)).unwrap();
+                }
                 // Print the commands in one column
-                term.print(row + i, col, cmd).unwrap();
+                term.print(row + i, col + count_col_width + 1, &e.command)
+                    .unwrap();
                 // Print a `=>`
-                term.print(row + i, col + cmd_col_width + 1, "=>").unwrap();
+                term.print(row + i, col + count_col_width + 1 + cmd_col_width + 1, "=>")
+                    .unwrap();
                 // Print the meanings in another column
                 term.print_with_attr(
                     row + i,
                     col + cmd_col_width + 4,
-                    meaning,
-                    Attr::default().fg(*color),
+                    &e.description,
+                    Attr::default().fg(e.color),
                 )
                 .unwrap();
             }
@@ -57,20 +89,33 @@ mod command_log {
 
         /// Pushes a new command to the log.
         pub fn push(&mut self, command: String, keymap: &super::KeyMap) {
-            let (message, color) = {
+            // If the command is identical to the last log entry, incrememnt that counter by one
+            if Some(&command) == self.commands.last().map(|e| &e.command) {
+                // We can safely unwrap here, because the guard of the `if` statement guaruntees
+                // that `self.command.last()` is `Some(_)`
+                self.commands.last_mut().unwrap().count += 1;
+                return;
+            }
+            // If the command is different, then we should add a new entry for it
+            let (description, color) = {
                 if command.is_empty() {
                     log::error!("Empty command executed!");
                     ("<empty command>".to_string(), Color::LIGHT_RED)
                 } else {
                     if let Some(action) = super::parse_command(&keymap, &command) {
-                        action.meaning_and_color()
+                        action.description_and_color()
                     } else {
                         log::error!("Incomplete command executed!");
                         ("<incomplete command>".to_string(), Color::LIGHT_RED)
                     }
                 }
             };
-            self.commands.push((command, message, color));
+            self.commands.push(Entry {
+                count: 1,
+                command,
+                description,
+                color,
+            });
         }
     }
 }
@@ -150,9 +195,9 @@ enum Action {
 }
 
 impl Action {
-    /// Returns a lower-case summary string of the given command, along with the color it should be
-    /// displayed as
-    pub fn meaning_and_color(&self) -> (String, Color) {
+    /// Returns a lower-case summary of the given command, along with the color with which it
+    /// should be displayed in the log.
+    pub fn description_and_color(&self) -> (String, Color) {
         const COL_MOVE: Color = Color::LIGHT_BLUE; // Color of the commands that move the cursor
         const COL_HISTORY: Color = Color::LIGHT_YELLOW; // Color of undo/redo
         const COL_INSERT: Color = Color::LIGHT_GREEN; // Colour of any insert command
