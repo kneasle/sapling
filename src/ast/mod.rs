@@ -8,10 +8,6 @@ pub mod test_json;
 use display_token::{write_tokens, DisplayToken, RecTok};
 use size::Size;
 
-// Import used only for doc comments
-#[allow(unused_imports)]
-use crate::editable_tree::EditableTree;
-
 /// The specification of an AST that sapling can edit
 pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash {
     /// A type parameter that will represent the different ways this AST can be rendered

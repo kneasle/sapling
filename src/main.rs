@@ -6,7 +6,7 @@ pub mod editor;
 use crate::arena::Arena;
 use crate::ast::json::JSONFormat;
 use crate::ast::test_json::TestJSON;
-use crate::editable_tree::{dag::DAG, EditableTree};
+use crate::editable_tree::dag::DAG;
 use crate::editor::Editor;
 
 fn main() {

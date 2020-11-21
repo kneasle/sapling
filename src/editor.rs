@@ -2,7 +2,7 @@
 
 use crate::ast::display_token::DisplayToken;
 use crate::ast::{size, Ast};
-use crate::editable_tree::{Direction, EditableTree, Side};
+use crate::editable_tree::{dag::DAG, Direction, Side};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
@@ -316,9 +316,9 @@ fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
 }
 
 /// A struct to hold the top-level components of the editor.
-pub struct Editor<'arena, Node: Ast<'arena>, E: EditableTree<'arena, Node> + 'arena> {
+pub struct Editor<'arena, Node: Ast<'arena>> {
     /// The [`EditableTree`] that the `Editor` is editing
-    tree: &'arena mut E,
+    tree: &'arena mut DAG<'arena, Node>,
     /// The style that the tree is being printed to the screen
     format_style: Node::FormatStyle,
     /// The `tuikit` terminal that the `Editor` is rendering to
@@ -331,15 +331,13 @@ pub struct Editor<'arena, Node: Ast<'arena>, E: EditableTree<'arena, Node> + 'ar
     command_log: command_log::CommandLog,
 }
 
-impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
-    Editor<'arena, Node, E>
-{
+impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /// Create a new [`Editor`] with a given tree
     pub fn new(
-        tree: &'arena mut E,
+        tree: &'arena mut DAG<'arena, Node>,
         format_style: Node::FormatStyle,
         keymap: KeyMap,
-    ) -> Editor<'arena, Node, E> {
+    ) -> Editor<'arena, Node> {
         let term = Term::new().unwrap();
         Editor {
             tree,

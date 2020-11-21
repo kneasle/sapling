@@ -1,5 +1,5 @@
 use super::cursor_path::CursorPath;
-use super::{Direction, EditableTree, Side};
+use super::{Direction, Side};
 use crate::arena::Arena;
 use crate::ast::Ast;
 
@@ -26,45 +26,7 @@ pub struct DAG<'arena, Node: Ast<'arena>> {
 }
 
 impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
-    /// Utility function to finish an edit.  This handles removing any redo history, and cloning
-    /// the nodes that are parents of the node that changed.
-    fn finish_edit(&mut self, nodes_to_clone: &[&'arena Node], new_node: Node) {
-        // Remove future trees from the history vector so that the currently 'checked-out' tree is
-        // the most recent tree in the history.
-        while self.history_index < self.root_history.len() - 1 {
-            // TODO: Deallocate the tree so that we don't get a 'memory leak'
-            self.root_history.pop();
-        }
-        /* Because AST nodes are immutable, we make changes to nodes by entirely cloning the path
-         * down to the node under the cursor.  We do this starting at the node under the cursor and
-         * work our way up parent by parent until we reach the root of the tree.  At that point,
-         * this node becomes the root of the new tree.
-         */
-        let mut node = self.arena.alloc(new_node);
-        // Iterate backwards over the child indices and the nodes, whilst cloning the tree and
-        // replacing the correct child reference to point to the newly created node.
-        for (n, child_index) in nodes_to_clone
-            .iter()
-            .rev()
-            .zip(self.current_cursor_path.iter().rev())
-        {
-            let mut cloned_node = (*n).clone();
-            cloned_node.children_mut()[*child_index] = node;
-            node = self.arena.alloc(cloned_node);
-        }
-        // At this point, `node` contains a reference to the root of the new tree, so we just add
-        // this to the history, along with the cursor path.
-        self.root_history
-            .push((node, self.current_cursor_path.clone()));
-        // Move the history index on by one so that we are pointing at the latest change
-        self.history_index = self.root_history.len() - 1;
-    }
-}
-
-impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node> {
-    type InsertError = Node::InsertError;
-
-    fn new(arena: &'arena Arena<Node>, root: &'arena Node) -> Self {
+    pub fn new(arena: &'arena Arena<Node>, root: &'arena Node) -> Self {
         DAG {
             arena,
             root_history: vec![(root, CursorPath::root())],
@@ -75,7 +37,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
 
     /* HISTORY METHODS */
 
-    fn undo(&mut self) -> bool {
+    pub fn undo(&mut self) -> bool {
         if self.history_index > 0 {
             self.history_index -= 1;
             // Follow the behaviour of other text editors and update the location of the cursor
@@ -88,7 +50,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
         }
     }
 
-    fn redo(&mut self) -> bool {
+    pub fn redo(&mut self) -> bool {
         if self.history_index < self.root_history.len() - 1 {
             self.history_index += 1;
             // Follow the behaviour of other text editors and update the location of the cursor
@@ -103,21 +65,21 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
 
     /* NAVIGATION METHODS */
 
-    fn root(&self) -> &'arena Node {
+    pub fn root(&self) -> &'arena Node {
         // This indexing shouldn't panic because we require that `self.history_index` is a valid index
         // into `self.root_history`, and `self.root_history` has at least one element
         self.root_history[self.history_index].0
     }
 
-    fn cursor_and_parent(&self) -> (&'arena Node, Option<&'arena Node>) {
+    pub fn cursor_and_parent(&self) -> (&'arena Node, Option<&'arena Node>) {
         self.current_cursor_path.cursor_and_parent(self.root())
     }
 
-    fn cursor(&self) -> &'arena Node {
+    pub fn cursor(&self) -> &'arena Node {
         self.current_cursor_path.cursor(self.root())
     }
 
-    fn move_cursor(&mut self, direction: Direction) -> Option<String> {
+    pub fn move_cursor(&mut self, direction: Direction) -> Option<String> {
         let (current_cursor, cursor_parent) = self.cursor_and_parent();
         match direction {
             Direction::Down => {
@@ -165,7 +127,43 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
         }
     }
 
-    fn replace_cursor(&mut self, new_node: Node) {
+    /* EDITING FUNCTIONS */
+
+    /// Utility function to finish an edit.  This handles removing any redo history, and cloning
+    /// the nodes that are parents of the node that changed.
+    pub fn finish_edit(&mut self, nodes_to_clone: &[&'arena Node], new_node: Node) {
+        // Remove future trees from the history vector so that the currently 'checked-out' tree is
+        // the most recent tree in the history.
+        while self.history_index < self.root_history.len() - 1 {
+            // TODO: Deallocate the tree so that we don't get a 'memory leak'
+            self.root_history.pop();
+        }
+        /* Because AST nodes are immutable, we make changes to nodes by entirely cloning the path
+         * down to the node under the cursor.  We do this starting at the node under the cursor and
+         * work our way up parent by parent until we reach the root of the tree.  At that point,
+         * this node becomes the root of the new tree.
+         */
+        let mut node = self.arena.alloc(new_node);
+        // Iterate backwards over the child indices and the nodes, whilst cloning the tree and
+        // replacing the correct child reference to point to the newly created node.
+        for (n, child_index) in nodes_to_clone
+            .iter()
+            .rev()
+            .zip(self.current_cursor_path.iter().rev())
+        {
+            let mut cloned_node = (*n).clone();
+            cloned_node.children_mut()[*child_index] = node;
+            node = self.arena.alloc(cloned_node);
+        }
+        // At this point, `node` contains a reference to the root of the new tree, so we just add
+        // this to the history, along with the cursor path.
+        self.root_history
+            .push((node, self.current_cursor_path.clone()));
+        // Move the history index on by one so that we are pointing at the latest change
+        self.history_index = self.root_history.len() - 1;
+    }
+
+    pub fn replace_cursor(&mut self, new_node: Node) {
         // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
         // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
         // yield values from the root downwards, whereas we need the nodes in the opposite order.
@@ -176,11 +174,11 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
         self.finish_edit(&nodes_to_clone, new_node);
     }
 
-    fn insert_next_to_cursor(
+    pub fn insert_next_to_cursor(
         &mut self,
         new_node: Node,
         side: Side,
-    ) -> Result<(), Self::InsertError> {
+    ) -> Result<(), Node::InsertError> {
         // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
         // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
         // yield values from the root downwards, whereas we need the nodes in the opposite order.
@@ -212,7 +210,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
         Ok(())
     }
 
-    fn insert_child(&mut self, new_node: Node) -> Result<(), Self::InsertError> {
+    pub fn insert_child(&mut self, new_node: Node) -> Result<(), Node::InsertError> {
         // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
         // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
         // yield values from the root downwards, whereas we need the nodes in the opposite order.
@@ -228,7 +226,7 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
         Ok(())
     }
 
-    fn write_text(&self, string: &mut String, format: &Node::FormatStyle) {
+    pub fn write_text(&self, string: &mut String, format: &Node::FormatStyle) {
         self.root().write_text(string, format);
     }
 }
