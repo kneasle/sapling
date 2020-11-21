@@ -83,7 +83,7 @@ mod command_log {
                 // Print the meanings in another column
                 term.print_with_attr(
                     row + i,
-                    col + cmd_col_width + 4,
+                    col + count_col_width + 1 + cmd_col_width + 4,
                     &e.description,
                     Attr::default().fg(e.color),
                 )
