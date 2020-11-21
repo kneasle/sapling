@@ -2,7 +2,7 @@
 
 use crate::ast::display_token::DisplayToken;
 use crate::ast::{size, Ast};
-use crate::editable_tree::{dag::DAG, Direction, Side};
+use crate::editable_tree::{Direction, Side, DAG};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
