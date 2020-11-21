@@ -26,11 +26,6 @@ pub struct DAG<'arena, Node: Ast<'arena>> {
 }
 
 impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
-    /// Returns the cursor node and its direct parent (if such a parent exists)
-    fn cursor_and_parent(&self) -> (&'arena Node, Option<&'arena Node>) {
-        self.current_cursor_path.cursor_and_parent(self.root())
-    }
-
     /// Utility function to finish an edit.  This handles removing any redo history, and cloning
     /// the nodes that are parents of the node that changed.
     fn finish_edit(&mut self, nodes_to_clone: &[&'arena Node], new_node: Node) {
@@ -112,6 +107,10 @@ impl<'arena, Node: Ast<'arena>> EditableTree<'arena, Node> for DAG<'arena, Node>
         // This indexing shouldn't panic because we require that `self.history_index` is a valid index
         // into `self.root_history`, and `self.root_history` has at least one element
         self.root_history[self.history_index].0
+    }
+
+    fn cursor_and_parent(&self) -> (&'arena Node, Option<&'arena Node>) {
+        self.current_cursor_path.cursor_and_parent(self.root())
     }
 
     fn cursor(&self) -> &'arena Node {

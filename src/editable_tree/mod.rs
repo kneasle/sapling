@@ -39,6 +39,9 @@ pub trait EditableTree<'arena, Node: Ast<'arena>>: Sized {
     /// Returns a reference to the node that is currently the root of the AST.
     fn root(&self) -> &'arena Node;
 
+    /// Returns the cursor node and its direct parent (if such a parent exists)
+    fn cursor_and_parent(&self) -> (&'arena Node, Option<&'arena Node>);
+
     /// Returns a reference to the node that is currently under the cursor.
     fn cursor(&self) -> &'arena Node;
 
