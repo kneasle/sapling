@@ -7,6 +7,137 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
 
+mod command_log {
+    //! A utility datastructure to store and render a log of commands.  This is mostly used to give
+    //! the viewers of my streams feedback for what I'm typing.
+
+    use tuikit::prelude::*;
+
+    /// One entry in the log.  This usually represts a single command, but could represent an
+    /// accumulation of many identical commands that are executed consecutively.
+    struct Entry {
+        count: usize,
+        command: String,
+        description: String,
+        color: Color,
+    }
+
+    /// A utility struct to store and display a log of which commands have been executed recently.
+    /// This is mostly used to give the viewers of my streams feedback for what I'm typing.
+    pub struct CommandLog {
+        /// A list of commands that have been run
+        commands: Vec<Entry>,
+        max_entries: usize,
+    }
+
+    impl CommandLog {
+        /// Create a new (empty) command log
+        pub fn new(max_entries: usize) -> CommandLog {
+            CommandLog {
+                commands: vec![],
+                max_entries,
+            }
+        }
+
+        /// Sets and enforces the max entry limit
+        pub fn set_max_entries(&mut self, max_entries: usize) {
+            self.max_entries = max_entries;
+            self.enforce_entry_limit();
+        }
+
+        /// Draw a log of recent commands to a given terminal at a given location
+        pub fn render(&self, term: &Term, row: usize, col: usize) {
+            // Calculate how wide the numbers column should be, enforcing that it is at least two
+            // chars wide.
+            let count_col_width = self
+                .commands
+                .iter()
+                .map(|e| match e.count {
+                    1 => 0,
+                    c => format!("{}", c).len(),
+                })
+                .max()
+                .unwrap_or(0)
+                .max(2);
+            // Calculate the width of the command column, and make sure that it is at least two
+            // chars wide.
+            let cmd_col_width = self
+                .commands
+                .iter()
+                .map(|e| e.command.len())
+                .max()
+                .unwrap_or(0)
+                .max(2);
+            // Render the commands
+            for (i, e) in self.commands.iter().enumerate() {
+                // Print the count if greater than 1
+                if e.count > 1 {
+                    term.print(row + i, col, &format!("{}x", e.count)).unwrap();
+                }
+                // Print the commands in one column
+                term.print_with_attr(
+                    row + i,
+                    col + count_col_width + 1,
+                    &e.command,
+                    Attr::default().fg(Color::WHITE),
+                )
+                .unwrap();
+                // Print a `=>`
+                term.print(row + i, col + count_col_width + 1 + cmd_col_width + 1, "=>")
+                    .unwrap();
+                // Print the meanings in another column
+                term.print_with_attr(
+                    row + i,
+                    col + count_col_width + 1 + cmd_col_width + 4,
+                    &e.description,
+                    Attr::default().fg(e.color),
+                )
+                .unwrap();
+            }
+        }
+
+        /// Repeatedly remove commands until the entry limit is satisfied
+        fn enforce_entry_limit(&mut self) {
+            while self.commands.len() > self.max_entries {
+                self.commands.remove(0);
+            }
+        }
+
+        /// Pushes a new command to the log.
+        pub fn push(&mut self, command: String, keymap: &super::KeyMap) {
+            // If the command is identical to the last log entry, incrememnt that counter by one
+            if Some(&command) == self.commands.last().map(|e| &e.command) {
+                // We can safely unwrap here, because the guard of the `if` statement guaruntees
+                // that `self.command.last()` is `Some(_)`
+                self.commands.last_mut().unwrap().count += 1;
+                return;
+            }
+            // If the command is different, then we should add a new entry for it
+            let (description, color) = {
+                if command.is_empty() {
+                    log::error!("Empty command executed!");
+                    ("<empty command>".to_string(), Color::LIGHT_RED)
+                } else {
+                    if let Some(action) = super::parse_command(&keymap, &command) {
+                        action.description_and_color()
+                    } else {
+                        log::error!("Incomplete command executed!");
+                        ("<incomplete command>".to_string(), Color::LIGHT_RED)
+                    }
+                }
+            };
+            self.commands.push(Entry {
+                count: 1,
+                command,
+                description,
+                color,
+            });
+            // Since we added an item, we should enforce the entry limit
+            self.enforce_entry_limit();
+        }
+    }
+}
+
 /// The possible command typed by user without any parameters.
 /// It can be mapped to a single key.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -17,14 +148,30 @@ pub enum Command {
     Replace,
     /// Insert a new node, expects an argument
     InsertChild,
-    /// Move cursor in given direction
-    /// This is not considered a parameter as the direction is still specified by pressing specific
-    /// key.
+    /// Move cursor in given direction.  The direction is part of the command, since the directions
+    /// all correspond to single key presses.
     MoveCursor(Direction),
     /// Undo the last change
     Undo,
     /// Redo a change
     Redo,
+}
+
+impl Command {
+    /// Returns a lower-case summary string of the given command
+    pub fn summary_string(&self) -> &'static str {
+        match self {
+            Command::Quit => "quit",
+            Command::Replace => "replace",
+            Command::InsertChild => "insert child",
+            Command::MoveCursor(Direction::Down) => "move to first child",
+            Command::MoveCursor(Direction::Up) => "move to parent",
+            Command::MoveCursor(Direction::Prev) => "move to previous sibling",
+            Command::MoveCursor(Direction::Next) => "move to next sibling",
+            Command::Undo => "undo",
+            Command::Redo => "redo",
+        }
+    }
 }
 
 /// Mapping of keys to commands.
@@ -62,6 +209,31 @@ enum Action {
     Undo,
     /// Redo a change
     Redo,
+}
+
+impl Action {
+    /// Returns a lower-case summary of the given command, along with the color with which it
+    /// should be displayed in the log.
+    pub fn description_and_color(&self) -> (String, Color) {
+        const COL_MOVE: Color = Color::LIGHT_BLUE; // Color of the commands that move the cursor
+        const COL_HISTORY: Color = Color::LIGHT_YELLOW; // Color of undo/redo
+        const COL_INSERT: Color = Color::LIGHT_GREEN; // Colour of any insert command
+
+        match self {
+            Action::Undefined => ("undefined command".to_string(), Color::LIGHT_RED),
+            Action::Quit => ("quit Sapling".to_string(), Color::LIGHT_RED),
+            Action::Replace(c) => (format!("replace cursor with '{}'", c), Color::CYAN),
+            Action::InsertChild(c) => (format!("insert '{}' as last child", c), COL_INSERT),
+            Action::MoveCursor(Direction::Down) => ("move to first child".to_string(), COL_MOVE),
+            Action::MoveCursor(Direction::Up) => ("move to parent".to_string(), COL_MOVE),
+            Action::MoveCursor(Direction::Prev) => {
+                ("move to previous sibling".to_string(), COL_MOVE)
+            }
+            Action::MoveCursor(Direction::Next) => ("move to next sibling".to_string(), COL_MOVE),
+            Action::Undo => ("undo a change".to_string(), COL_HISTORY),
+            Action::Redo => ("redo a change".to_string(), COL_HISTORY),
+        }
+    }
 }
 
 /// Attempt to convert a command as a `&`[`str`] into an [`Action`].
@@ -129,6 +301,8 @@ pub struct Editor<'arena, Node: Ast<'arena>, E: EditableTree<'arena, Node> + 'ar
     command: String,
     /// The configured key map
     keymap: KeyMap,
+    /// A list of the commands that have been executed, along with a summary of what they mean
+    command_log: command_log::CommandLog,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
@@ -147,6 +321,7 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             format_style,
             command: String::new(),
             keymap,
+            command_log: command_log::CommandLog::new(10),
         }
     }
 
@@ -303,22 +478,24 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
     fn update_display(&self) {
         // Put the terminal size into some convenient variables
         let (width, height) = self.term.term_size().unwrap();
-
         // Clear the terminal
         self.term.clear().unwrap();
 
         /* RENDER MAIN TEXT VIEW */
+
         self.render_tree(0, 0);
 
         /* RENDER LOG SECTION */
-        self.term
-            .print(0, width / 2, "Some stuff will go here...")
-            .unwrap();
+
+        self.command_log.render(&self.term, 0, width / 2);
 
         /* RENDER BOTTOM BAR */
+
+        // Add the `Press 'q' to exit.` message
         self.term
             .print(height - 1, 0, "Press 'q' to exit.")
             .unwrap();
+        // Draw the current command buffer
         self.term
             .print(
                 height - 1,
@@ -327,8 +504,53 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             )
             .unwrap();
 
-        // Update the terminal screen
+        /* UPDATE THE TERMINAL SCREEN */
+
         self.term.present().unwrap();
+    }
+
+    /// Consumes a [`char`] and adds it to the command buffer.  If the command buffer contains a
+    /// valid command, then execute that command.  This returns `true` if the command 'Quit' was
+    /// executed, otherwise `false` is returned.
+    fn consume_command_char(&mut self, c: char) -> bool {
+        let mut should_quit = false;
+        // Add the new keypress to the command
+        self.command.push(c);
+        // Attempt to parse the command, and take action if the command is
+        // complete
+        if let Some(action) = parse_command(&self.keymap, &self.command) {
+            // Respond to the action
+            match action {
+                Action::Undefined => {
+                    log::warn!("'{}' is not a command.", self.command);
+                }
+                Action::Quit => {
+                    // Break the mainloop to quit
+                    log::trace!("Recieved command 'Quit', so exiting mainloop");
+                    should_quit = true;
+                }
+                Action::MoveCursor(direction) => {
+                    self.move_cursor(direction);
+                }
+                Action::Replace(c) => {
+                    self.replace_cursor(c);
+                }
+                Action::InsertChild(c) => {
+                    self.insert_child(c);
+                }
+                Action::Undo => {
+                    self.undo();
+                }
+                Action::Redo => {
+                    self.redo();
+                }
+            }
+            // Add the command to the command log
+            self.command_log.push(self.command.clone(), &self.keymap);
+            // Clear the command box
+            self.command.clear();
+        }
+        should_quit
     }
 
     fn mainloop(&mut self) {
@@ -339,39 +561,9 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
             if let Event::Key(key) = event {
                 match key {
                     Key::Char(c) => {
-                        // Add the new keypress to the command
-                        self.command.push(c);
-                        // Attempt to parse the command, and take action if the command is
-                        // complete
-                        if let Some(action) = parse_command(&self.keymap, &self.command) {
-                            // Respond to the action
-                            match action {
-                                Action::Undefined => {
-                                    log::warn!("'{}' is not a command.", self.command);
-                                }
-                                Action::Quit => {
-                                    // Break the mainloop to quit
-                                    log::trace!("Recieved command 'Quit', so exiting mainloop");
-                                    break;
-                                }
-                                Action::MoveCursor(direction) => {
-                                    self.move_cursor(direction);
-                                }
-                                Action::Replace(c) => {
-                                    self.replace_cursor(c);
-                                }
-                                Action::InsertChild(c) => {
-                                    self.insert_child(c);
-                                }
-                                Action::Undo => {
-                                    self.undo();
-                                }
-                                Action::Redo => {
-                                    self.redo();
-                                }
-                            }
-                            // Clear the command box
-                            self.command.clear();
+                        // `self.add_char_to_command` returns `true` if the editor should quit
+                        if self.consume_command_char(c) {
+                            break;
                         }
                     }
                     Key::ESC => {
@@ -380,6 +572,10 @@ impl<'arena, Node: Ast<'arena> + 'arena, E: EditableTree<'arena, Node> + 'arena>
                     _ => {}
                 }
             }
+
+            // Make sure that the logger isn't taller than the screen
+            self.command_log
+                .set_max_entries(self.term.term_size().unwrap().1.min(10));
 
             // Update the screen after every input (if this becomes a bottleneck then we can
             // optimise the number of calls to `update_display` but for now it's not worth the
