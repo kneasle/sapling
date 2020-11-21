@@ -39,9 +39,6 @@ mod command_log {
         pub fn render(&self, term: &Term, row: usize, col: usize) {
             // Calculate how wide the numbers column should be, enforcing that it is at least two
             // chars wide.
-            //
-            // We can safely unwrap, because we add '2' to the lengths, so the 'max()' function is
-            // guarunteed to be run over at least one element.
             let count_col_width = self
                 .commands
                 .iter()
@@ -49,21 +46,18 @@ mod command_log {
                     1 => 0,
                     c => format!("{}", c).len(),
                 })
-                .chain(std::iter::once(2))
                 .max()
-                .unwrap();
+                .unwrap_or(0)
+                .max(2);
             // Calculate the width of the command column, and make sure that it is at least two
             // chars wide.
-            //
-            // We can safely unwrap, because we add '2' to the lengths, so the 'max()' function is
-            // guarunteed to be run over at least one element.
             let cmd_col_width = self
                 .commands
                 .iter()
                 .map(|e| e.command.len())
-                .chain(std::iter::once(2))
                 .max()
-                .unwrap();
+                .unwrap_or(0)
+                .max(2);
             // Render the commands
             for (i, e) in self.commands.iter().enumerate() {
                 // Print the count if greater than 1
