@@ -267,7 +267,7 @@ fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
     let mut command_char_iter = command.chars();
 
     // Consume the first char of the command
-    if let Some(command) = command_char_iter.next().map(|c| keymap.get(&c)).flatten() {
+    return if let Some(command) = command_char_iter.next().and_then(|c| keymap.get(&c)) {
         match command {
             // "q" quits Sapling
             Command::Quit => Some(Action::Quit),
@@ -281,7 +281,7 @@ fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
         }
     } else {
         None
-    }
+    };
 }
 
 /// A struct to hold the top-level components of the editor.
