@@ -267,52 +267,21 @@ fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
     let mut command_char_iter = command.chars();
 
     // Consume the first char of the command
-    if let Some(c) = command_char_iter.next() {
-        match keymap.get(&c) {
+    if let Some(command) = command_char_iter.next().map(|c| keymap.get(&c)).flatten() {
+        match command {
             // "q" quits Sapling
-            Some(Command::Quit) => {
-                return Some(Action::Quit);
-            }
-            Some(Command::InsertChild) => {
-                // Consume the second char of the iterator
-                if let Some(insert_char) = command_char_iter.next() {
-                    return Some(Action::InsertChild(insert_char));
-                }
-            }
-            Some(Command::InsertBefore) => {
-                // Consume the second char of the iterator
-                if let Some(insert_char) = command_char_iter.next() {
-                    return Some(Action::InsertBefore(insert_char));
-                }
-            }
-            Some(Command::InsertAfter) => {
-                // Consume the second char of the iterator
-                if let Some(insert_char) = command_char_iter.next() {
-                    return Some(Action::InsertAfter(insert_char));
-                }
-            }
-            Some(Command::Replace) => {
-                // Consume the second char of the iterator
-                if let Some(replace_char) = command_char_iter.next() {
-                    return Some(Action::Replace(replace_char));
-                }
-            }
-            Some(Command::MoveCursor(direction)) => {
-                return Some(Action::MoveCursor(*direction));
-            }
-            Some(Command::Undo) => {
-                return Some(Action::Undo);
-            }
-            Some(Command::Redo) => {
-                return Some(Action::Redo);
-            }
-            None => {
-                return Some(Action::Undefined);
-            }
+            Command::Quit => Some(Action::Quit),
+            Command::InsertChild => command_char_iter.next().map(Action::InsertChild),
+            Command::InsertBefore => command_char_iter.next().map(Action::InsertBefore),
+            Command::InsertAfter => command_char_iter.next().map(Action::InsertAfter),
+            Command::Replace => command_char_iter.next().map(Action::Replace),
+            Command::MoveCursor(direction) => Some(Action::MoveCursor(*direction)),
+            Command::Undo => Some(Action::Undo),
+            Command::Redo => Some(Action::Redo),
         }
+    } else {
+        None
     }
-
-    None
 }
 
 /// A struct to hold the top-level components of the editor.
