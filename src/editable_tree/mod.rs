@@ -259,6 +259,40 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         Ok(())
     }
 
+    pub fn delete_cursor(&mut self) -> Result<(), Node::DeleteError> {
+        // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
+        // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
+        // yield values from the root downwards, whereas we need the nodes in the opposite order.
+        let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
+        // Pop the cursor, because it will be unchanged.  The only part of this that we need is
+        // the cursor's index.
+        assert!(nodes_to_clone.pop().is_some());
+        if nodes_to_clone.is_empty() {
+            // TODO: Return an error
+            log::warn!("Trying to remove the root!");
+            panic!();
+        }
+        // Find the index of the cursor, so that we know where to insert.  We can unwrap, because
+        // if we were at the root, then we'd early return from the if statement above
+        let cursor_sibling_index = *self.current_cursor_path.last_mut().unwrap();
+        let mut cloned_parent = nodes_to_clone.pop().unwrap().clone();
+        cloned_parent.delete_child(cursor_sibling_index)?;
+        // If we remove the only child of a node then we move the cursor up
+        if cloned_parent.children().len() == 0 {
+            self.current_cursor_path.pop();
+        } else {
+            // If we deleted the last child of a node (and this isn't the last child), we move
+            // the cursor back by one
+            if cursor_sibling_index == cloned_parent.children().len() {
+                // We can unwrap here because we know we aren't removing the root
+                *self.current_cursor_path.last_mut().unwrap() -= 1;
+            }
+        }
+        // Finish the edit and commit the new tree to the arena
+        self.finish_edit(&nodes_to_clone, cloned_parent);
+        Ok(())
+    }
+
     /* DISPLAY METHODS */
 
     /// Build the text representation of the current tree into the given [`String`]

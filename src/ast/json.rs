@@ -47,6 +47,50 @@ impl std::fmt::Display for InsertError {
 
 impl std::error::Error for InsertError {}
 
+/// Error produced when trying to delete a child from this node
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum DeleteError {
+    /// We attempted to delete a child who's index was outside the bounds of the child array
+    IndexOutOfRange(usize, usize),
+    /// We attempted to delete a child from a node which must contain a fixed number of children
+    FixedChildCount(String, usize),
+}
+
+impl std::fmt::Display for DeleteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeleteError::IndexOutOfRange(num_children, index) => write!(
+                f,
+                "Tried to remove child #{} from a node that only has {} children.",
+                index, num_children
+            ),
+            DeleteError::FixedChildCount(node, num_children) => {
+                if *num_children == 0 {
+                    write!(
+                        f,
+                        "Node {} cannot have children, but we tried to delete a child.",
+                        node
+                    )
+                } else if *num_children == 1 {
+                    write!(
+                        f,
+                        "Cannot delete from a node {} that can only have 1 child.",
+                        node
+                    )
+                } else {
+                    write!(
+                        f,
+                        "Cannot delete from a node {} that can only have {} children.",
+                        node, num_children
+                    )
+                }
+            }
+        }
+    }
+}
+
+impl std::error::Error for DeleteError {}
+
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
@@ -99,6 +143,7 @@ impl Default for JSON<'_> {
 impl<'arena> Ast<'arena> for JSON<'arena> {
     type FormatStyle = JSONFormat;
     type InsertError = InsertError;
+    type DeleteError = DeleteError;
 
     /* FORMATTING FUNCTIONS */
 
@@ -326,6 +371,31 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
             JSON::Array(children) => {
                 children.insert(index, new_node);
                 Ok(())
+            }
+        }
+    }
+
+    fn delete_child(&mut self, index: usize) -> Result<(), Self::DeleteError> {
+        match self {
+            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => {
+                Err(DeleteError::FixedChildCount(self.display_name(), 0))
+            }
+            JSON::Field(_) => Err(DeleteError::FixedChildCount(self.display_name(), 2)),
+            JSON::Object(fields) => {
+                if index < fields.len() {
+                    fields.remove(index);
+                    Ok(())
+                } else {
+                    Err(DeleteError::IndexOutOfRange(fields.len(), index))
+                }
+            }
+            JSON::Array(children) => {
+                if index < children.len() {
+                    children.remove(index);
+                    Ok(())
+                } else {
+                    Err(DeleteError::IndexOutOfRange(children.len(), index))
+                }
             }
         }
     }
