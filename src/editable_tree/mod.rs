@@ -159,7 +159,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 
     /// Utility function to finish an edit.  This handles removing any redo history, and cloning
     /// the nodes that are parents of the node that changed.
-    pub fn finish_edit(&mut self, nodes_to_clone: &[&'arena Node], new_node: Node) {
+    fn finish_edit(&mut self, nodes_to_clone: &[&'arena Node], new_node: Node) {
         // Remove future trees from the history vector so that the currently 'checked-out' tree is
         // the most recent tree in the history.
         while self.history_index < self.root_history.len() - 1 {
