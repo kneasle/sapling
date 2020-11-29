@@ -361,7 +361,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
     /// Insert new child as the first child of the selected node
     fn insert_next_to_cursor(&mut self, c: char, side: Side) {
-        let (_cursor, parent) = self.tree.cursor_and_parent();
+        let (_, parent) = self.tree.cursor_and_parent();
         if let Some(p) = parent {
             if p.is_insert_char(c) {
                 if let Some(node) = p.from_char(c) {
