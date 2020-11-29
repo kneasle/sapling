@@ -543,7 +543,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 }
                 Action::Quit => {
                     // Break the mainloop to quit
-                    log::trace!("Recieved command 'Quit', so exiting mainloop");
+                    log::trace!("Received command 'Quit', so exiting mainloop");
                     should_quit = true;
                 }
                 Action::MoveCursor(direction) => {
