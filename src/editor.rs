@@ -366,22 +366,34 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /// Insert new child as the first child of the selected node
     fn insert_next_to_cursor(&mut self, c: char, side: Side) {
         let (_, parent) = self.tree.cursor_and_parent();
-        if let Some(p) = parent {
-            if p.is_insert_char(c) {
-                if let Some(node) = p.from_char(c) {
-                    if let Err(e) = self.tree.insert_next_to_cursor(node, side) {
-                        log::error!("{}", e);
-                    } else {
-                        log::debug!("Inserting with '{}'", c);
-                    }
-                } else {
-                    log::warn!("Char '{}' does not correspond to a valid node", c);
-                }
-            } else {
-                log::warn!("Cannot insert node with '{}'", c);
+
+        //Short circuit if at root
+        let parent = match parent {
+            Some(parent) => parent,
+            None => {
+                log::warn!("Cannot add siblings of the root.");
+                return;
             }
+        };
+
+        //short circuit if invalid char
+        if !parent.is_insert_char(c) {
+            log::warn!("Cannot insert node with '{}'", c);
+            return;
+        }
+
+        let node = match parent.from_char(c) {
+            Some(node) => node,
+            None => {
+                log::warn!("Char '{}' does not correspond to a valid node", c);
+                return;
+            }
+        };
+
+        if let Err(e) = self.tree.insert_next_to_cursor(node, side) {
+            log::error!("{}", e);
         } else {
-            log::warn!("Cannot add siblings of the root.");
+            log::debug!("Inserting with '{}'", c);
         }
     }
 
