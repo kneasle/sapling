@@ -272,22 +272,13 @@ fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
     match keymap.get(&c) {
         // "q" quits Sapling
         Some(Command::Quit) => Some(Action::Quit),
-        Some(Command::InsertChild) => {
-            // Consume the second char of the iterator
-            command_char_iter.next().map(Action::InsertChild)
-        }
-        Some(Command::InsertBefore) => {
-            // Consume the second char of the iterator
-            command_char_iter.next().map(Action::InsertBefore)
-        }
-        Some(Command::InsertAfter) => {
-            // Consume the second char of the iterator
-            command_char_iter.next().map(Action::InsertAfter)
-        }
-        Some(Command::Replace) => {
-            // Consume the second char of the iterator
-            command_char_iter.next().map(Action::Replace)
-        }
+        // this pattern is used several times: `command_char_iter.next().map()
+        // This consumes the second char of the iterator and, if it exists, returns
+        // Some(Action::ThisAction(char))
+        Some(Command::InsertChild) => command_char_iter.next().map(Action::InsertChild),
+        Some(Command::InsertBefore) => command_char_iter.next().map(Action::InsertBefore),
+        Some(Command::InsertAfter) => command_char_iter.next().map(Action::InsertAfter),
+        Some(Command::Replace) => command_char_iter.next().map(Action::Replace),
         Some(Command::MoveCursor(direction)) => Some(Action::MoveCursor(*direction)),
         Some(Command::Undo) => Some(Action::Undo),
         Some(Command::Redo) => Some(Action::Redo),
