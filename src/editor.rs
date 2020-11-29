@@ -344,11 +344,13 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /// Insert new child as the first child of the selected node
     fn insert_child(&mut self, c: char) {
         let cursor = self.tree.cursor();
+        //short circuit if not an insertable char
         if !cursor.is_insert_char(c) {
             log::warn!("Cannot insert node with '{}'", c);
             return;
         }
 
+        //short circuit if char is invalid
         let node = match cursor.from_char(c) {
             Some(node) => node,
             None => {
@@ -376,12 +378,13 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             }
         };
 
-        //short circuit if invalid char
+        //short circuit if not an insertable char
         if !parent.is_insert_char(c) {
             log::warn!("Cannot insert node with '{}'", c);
             return;
         }
 
+        //short circuit if invalid char
         let node = match parent.from_char(c) {
             Some(node) => node,
             None => {
