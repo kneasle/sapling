@@ -402,19 +402,17 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
     /// Undo the latest change
     fn undo(&mut self) {
-        if self.tree.undo() {
-            log::debug!("Undo successful");
-        } else {
-            log::warn!("No changes to undo");
+        match self.tree.undo() {
+            true => log::debug!("Undo successful"),
+            false => log::warn!("No changes to undo"),
         }
     }
 
     /// Move one change forward in the history
     fn redo(&mut self) {
-        if self.tree.redo() {
-            log::debug!("Redo successful");
-        } else {
-            log::warn!("No changes to redo");
+        match self.tree.redo() {
+            true => log::debug!("Redo successful"),
+            false => log::warn!("No changes to redo"),
         }
     }
 
