@@ -249,7 +249,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
                 match self {
                     JSON::True => Size::new(0, 4),  // same as Size::from("true")
                     JSON::False => Size::new(0, 5), // same as Size::from("false")
-                    JSON::Null => Size::new(0, 4),  // same as Size::from("false")
+                    JSON::Null => Size::new(0, 4),  // same as Size::from("null")
                     JSON::Str(string) => {
                         Size::new(0, 1) + Size::from(string.as_str()) + Size::new(0, 1)
                     }
