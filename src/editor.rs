@@ -272,22 +272,13 @@ fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
     match keymap.get(&c) {
         // "q" quits Sapling
         Some(Command::Quit) => Some(Action::Quit),
-        Some(Command::InsertChild) => {
-            // Consume the second char of the iterator
-            command_char_iter.next().map(Action::InsertChild)
-        }
-        Some(Command::InsertBefore) => {
-            // Consume the second char of the iterator
-            command_char_iter.next().map(Action::InsertBefore)
-        }
-        Some(Command::InsertAfter) => {
-            // Consume the second char of the iterator
-            command_char_iter.next().map(Action::InsertAfter)
-        }
-        Some(Command::Replace) => {
-            // Consume the second char of the iterator
-            command_char_iter.next().map(Action::Replace)
-        }
+        // this pattern is used several times: `command_char_iter.next().map()
+        // This consumes the second char of the iterator and, if it exists, returns
+        // Some(Action::ThisAction(char))
+        Some(Command::InsertChild) => command_char_iter.next().map(Action::InsertChild),
+        Some(Command::InsertBefore) => command_char_iter.next().map(Action::InsertBefore),
+        Some(Command::InsertAfter) => command_char_iter.next().map(Action::InsertAfter),
+        Some(Command::Replace) => command_char_iter.next().map(Action::Replace),
         Some(Command::MoveCursor(direction)) => Some(Action::MoveCursor(*direction)),
         Some(Command::Undo) => Some(Action::Undo),
         Some(Command::Redo) => Some(Action::Redo),
@@ -353,58 +344,75 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /// Insert new child as the first child of the selected node
     fn insert_child(&mut self, c: char) {
         let cursor = self.tree.cursor();
-        if cursor.is_insert_char(c) {
-            if let Some(node) = cursor.from_char(c) {
-                if let Err(e) = self.tree.insert_child(node) {
-                    log::error!("{}", e);
-                } else {
-                    log::debug!("Inserting with '{}'", c);
-                }
-            } else {
-                log::warn!("Char '{}' does not correspond to a valid node", c);
-            }
-        } else {
+        // Short circuit if not an insertable char
+        if !cursor.is_insert_char(c) {
             log::warn!("Cannot insert node with '{}'", c);
+            return;
+        }
+
+        // Short circuit if char is invalid
+        let node = match cursor.from_char(c) {
+            Some(node) => node,
+            None => {
+                log::warn!("Char '{}' does not correspond to a valid node", c);
+                return;
+            }
+        };
+
+        match self.tree.insert_child(node) {
+            Ok(_) => log::debug!("Inserting with '{}'", c),
+            Err(e) => log::error!("{}", e),
         }
     }
 
     /// Insert new child as the first child of the selected node
     fn insert_next_to_cursor(&mut self, c: char, side: Side) {
-        let (_cursor, parent) = self.tree.cursor_and_parent();
-        if let Some(p) = parent {
-            if p.is_insert_char(c) {
-                if let Some(node) = p.from_char(c) {
-                    if let Err(e) = self.tree.insert_next_to_cursor(node, side) {
-                        log::error!("{}", e);
-                    } else {
-                        log::debug!("Inserting with '{}'", c);
-                    }
-                } else {
-                    log::warn!("Char '{}' does not correspond to a valid node", c);
-                }
-            } else {
-                log::warn!("Cannot insert node with '{}'", c);
+        let (_, parent) = self.tree.cursor_and_parent();
+
+        // Short circuit if at root
+        let parent = match parent {
+            Some(parent) => parent,
+            None => {
+                log::warn!("Cannot add siblings of the root.");
+                return;
             }
+        };
+
+        //short circuit if not an insertable char
+        if !parent.is_insert_char(c) {
+            log::warn!("Cannot insert node with '{}'", c);
+            return;
+        }
+
+        //short circuit if invalid char
+        let node = match parent.from_char(c) {
+            Some(node) => node,
+            None => {
+                log::warn!("Char '{}' does not correspond to a valid node", c);
+                return;
+            }
+        };
+
+        if let Err(e) = self.tree.insert_next_to_cursor(node, side) {
+            log::error!("{}", e);
         } else {
-            log::warn!("Cannot add siblings of the root.");
+            log::debug!("Inserting with '{}'", c);
         }
     }
 
     /// Undo the latest change
     fn undo(&mut self) {
-        if self.tree.undo() {
-            log::debug!("Undo successful");
-        } else {
-            log::warn!("No changes to undo");
+        match self.tree.undo() {
+            true => log::debug!("Undo successful"),
+            false => log::warn!("No changes to undo"),
         }
     }
 
     /// Move one change forward in the history
     fn redo(&mut self) {
-        if self.tree.redo() {
-            log::debug!("Redo successful");
-        } else {
-            log::warn!("No changes to redo");
+        match self.tree.redo() {
+            true => log::debug!("Redo successful"),
+            false => log::warn!("No changes to redo"),
         }
     }
 
@@ -552,7 +560,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 }
                 Action::Quit => {
                     // Break the mainloop to quit
-                    log::trace!("Recieved command 'Quit', so exiting mainloop");
+                    log::trace!("Received command 'Quit', so exiting mainloop");
                     should_quit = true;
                 }
                 Action::MoveCursor(direction) => {
