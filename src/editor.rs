@@ -152,6 +152,8 @@ pub enum Command {
     InsertBefore,
     /// Insert a new node after the cursor, expects an argument
     InsertAfter,
+    /// Delete the cursor
+    Delete,
     /// Move cursor in given direction.  The direction is part of the command, since the directions
     /// all correspond to single key presses.
     MoveCursor(Direction),
@@ -170,6 +172,7 @@ impl Command {
             Command::InsertChild => "insert child",
             Command::InsertBefore => "insert before",
             Command::InsertAfter => "insert after",
+            Command::Delete => "delete",
             Command::MoveCursor(Direction::Down) => "move to first child",
             Command::MoveCursor(Direction::Up) => "move to parent",
             Command::MoveCursor(Direction::Prev) => "move to previous sibling",
@@ -191,6 +194,7 @@ pub fn default_keymap() -> KeyMap {
         'a' => Command::InsertAfter,
         'o' => Command::InsertChild,
         'r' => Command::Replace,
+        'd' => Command::Delete,
         'c' => Command::MoveCursor(Direction::Down),
         'p' => Command::MoveCursor(Direction::Up),
         'k' => Command::MoveCursor(Direction::Prev),
@@ -211,10 +215,12 @@ enum Action {
     Replace(char),
     /// Insert a new node (given by some [`char`]) as the first child of the selected node
     InsertChild(char),
-    /// Insert a new node (given by some [`char`]) as the first child of the selected node
+    /// Insert a new node (given by some [`char`]) before the cursor
     InsertBefore(char),
-    /// Insert a new node (given by some [`char`]) as the first child of the selected node
+    /// Insert a new node (given by some [`char`]) after the cursor
     InsertAfter(char),
+    /// Remove the node under the cursor
+    Delete,
     /// Move the node in a given direction
     MoveCursor(Direction),
     /// Undo the last change
@@ -238,6 +244,7 @@ impl Action {
             Action::InsertChild(c) => (format!("insert '{}' as last child", c), COL_INSERT),
             Action::InsertBefore(c) => (format!("insert '{}' before cursor", c), COL_INSERT),
             Action::InsertAfter(c) => (format!("insert '{}' after cursor", c), COL_INSERT),
+            Action::Delete => ("delete cursor".to_string(), Color::RED),
             Action::MoveCursor(Direction::Down) => ("move to first child".to_string(), COL_MOVE),
             Action::MoveCursor(Direction::Up) => ("move to parent".to_string(), COL_MOVE),
             Action::MoveCursor(Direction::Prev) => {
@@ -278,6 +285,7 @@ fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
         Some(Command::InsertChild) => command_char_iter.next().map(Action::InsertChild),
         Some(Command::InsertBefore) => command_char_iter.next().map(Action::InsertBefore),
         Some(Command::InsertAfter) => command_char_iter.next().map(Action::InsertAfter),
+        Some(Command::Delete) => Some(Action::Delete),
         Some(Command::Replace) => command_char_iter.next().map(Action::Replace),
         Some(Command::MoveCursor(direction)) => Some(Action::MoveCursor(*direction)),
         Some(Command::Undo) => Some(Action::Undo),
@@ -397,6 +405,13 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             log::error!("{}", e);
         } else {
             log::debug!("Inserting with '{}'", c);
+        }
+    }
+
+    /// Remove the current cursor
+    fn delete_cursor(&mut self) {
+        if let Err(err) = self.tree.delete_cursor() {
+            log::warn!("{}", err);
         }
     }
 
@@ -577,6 +592,9 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 }
                 Action::InsertAfter(c) => {
                     self.insert_next_to_cursor(c, Side::Next);
+                }
+                Action::Delete => {
+                    self.delete_cursor();
                 }
                 Action::Undo => {
                     self.undo();

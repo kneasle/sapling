@@ -12,7 +12,10 @@ use size::Size;
 pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash {
     /// A type parameter that will represent the different ways this AST can be rendered
     type FormatStyle;
+    /// Error type returned by [Ast::insert_child].
     type InsertError: std::error::Error;
+    /// Error type returned by [Ast::delete_child].
+    type DeleteError: std::error::Error;
 
     /* FORMATTING FUNCTIONS */
 
@@ -67,6 +70,10 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
     /// [`children`](ASTSpec::children), this operation is expected to be
     /// cheap - it will be used a lot of times without caching the results.
     fn children_mut<'s>(&'s mut self) -> &'s mut [&'arena Self];
+
+    /// Removes the child at a given index from the children of this node, if possible.  If the
+    /// removal was not possible, then we return a custom error type.
+    fn delete_child(&mut self, index: usize) -> Result<(), Self::DeleteError>;
 
     /// Insert an extra child into the children of this node at a given index.
     fn insert_child(
