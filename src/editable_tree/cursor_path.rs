@@ -130,9 +130,19 @@ where
     /// - the child index has a value too big to represent a valid child of the current node
     /// - self.node = None; i.e. the iterator has already finished.  This condition means that this
     ///   iterator is **fused** (see [`std::iter::Fused`])
+    ///
+    /// # Panics
+    /// This will panic if the cursor path reaches a point where a node does not have enough
+    /// children for the path to continue.  This follows the garbage-in, immediately-panic strategy.
     #[inline]
     fn next_descendant(&mut self) -> Option<&'arena Node> {
-        Some(*self.node?.children().get(*self.iter.next()?)?)
+        Some(
+            *self
+                .node?
+                .children()
+                .get(*self.iter.next()?)
+                .expect("cursor path points to a non-existent node."),
+        )
     }
 }
 
