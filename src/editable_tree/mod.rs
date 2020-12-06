@@ -27,6 +27,7 @@ pub enum EditSuccess {
     Undo,
     Redo,
     Replace { c: char, name: String },
+    InsertChild { c: char, name: String },
 }
 
 impl EditSuccess {
@@ -36,6 +37,9 @@ impl EditSuccess {
             EditSuccess::Undo => log::info!("Undoing one change"),
             EditSuccess::Redo => log::info!("Redoing one change"),
             EditSuccess::Replace { c, name } => log::info!("Replacing with '{}'/{}", c, name),
+            EditSuccess::InsertChild { c, name } => {
+                log::info!("Inserting '{}'/{} as new child", c, name)
+            }
         }
     }
 }
@@ -50,6 +54,8 @@ pub enum EditErr {
     CharNotANode(char),
     /// Trying to replace a node with one that cannot be a child of its parent
     CannotReplace(char),
+    /// Trying to insert a node that cannot be a child of the cursor
+    CannotInsertInto { c: char, parent_name: String },
 }
 
 impl EditErr {
@@ -61,6 +67,9 @@ impl EditErr {
             EditErr::NoChangesToRedo => log::warn!("No changes to redo."),
             EditErr::CharNotANode(c) => log::warn!("'{}' doesn't correspond to any node type.", c),
             EditErr::CannotReplace(c) => log::warn!("Can't replace cursor with '{}'", c),
+            EditErr::CannotInsertInto { c, parent_name } => {
+                log::warn!("Can't insert '{}' into {}", c, parent_name)
+            }
         }
     }
 }
@@ -306,20 +315,45 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the last
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
-    pub fn insert_child(&mut self, new_node: Node) -> Result<(), Node::InsertError> {
+    pub fn insert_child(&mut self, c: char) -> EditResult {
+        /* CHECK THE VALIDITY OF ARGUMENTS */
+
+        // Cache the node under the cursor, since finding the cursor involves non-trivial amounts
+        // of work
+        let cursor = self.cursor();
+        // Short circuit if `c` couldn't be a valid child of the cursor
+        if !cursor.is_insert_char(c) {
+            return Err(EditErr::CannotInsertInto {
+                c,
+                parent_name: cursor.display_name(),
+            });
+        }
+
+        /* PERFORM THE ACTION */
+
+        let new_node = self
+            .arena
+            .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
         // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
         // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
         // yield values from the root downwards, whereas we need the nodes in the opposite order.
         let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
-        let new_child_node = self.arena.alloc(new_node);
         // Clone the node that currently is the cursor, and add the new child to the end of its
         // children.  Unwrapping here is fine, because `cursor_path::NodeIter` will always return
         // one value.
         let mut cloned_cursor = nodes_to_clone.pop().unwrap().clone();
+        // Store the new_node's display name before it's consumed by `finish_edit`
+        let new_node_name = new_node.display_name();
         // Add the new child to the children of the cloned cursor
-        cloned_cursor.insert_child(new_child_node, self.arena, cloned_cursor.children().len())?;
+        cloned_cursor.insert_child(new_node, self.arena, cloned_cursor.children().len());
+
+        /* FINISH THE EDIT AND RETURN SUCCESS */
+
         self.finish_edit(&nodes_to_clone, 0, cloned_cursor);
-        Ok(())
+        Ok(EditSuccess::InsertChild {
+            c,
+            name: new_node_name,
+        })
     }
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the first

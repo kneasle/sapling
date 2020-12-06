@@ -376,30 +376,6 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /* ===== COMMAND FUNCTIONS ===== */
 
     /// Insert new child as the first child of the selected node
-    fn insert_child(&mut self, c: char) {
-        let cursor = self.tree.cursor();
-        // Short circuit if not an insertable char
-        if !cursor.is_insert_char(c) {
-            log::warn!("Cannot insert node with '{}'", c);
-            return;
-        }
-
-        // Short circuit if char is invalid
-        let node = match cursor.from_char(c) {
-            Some(node) => node,
-            None => {
-                log::warn!("Char '{}' does not correspond to a valid node", c);
-                return;
-            }
-        };
-
-        match self.tree.insert_child(node) {
-            Ok(_) => log::debug!("Inserting with '{}'", c),
-            Err(e) => log::error!("{}", e),
-        }
-    }
-
-    /// Insert new child as the first child of the selected node
     fn insert_next_to_cursor(&mut self, c: char, side: Side) {
         let (_, parent) = self.tree.cursor_and_parent();
 
@@ -596,9 +572,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 Action::Replace(c) => {
                     self.tree.replace_cursor(c).log_message();
                 }
-                Action::InsertChild(c) => {
-                    self.insert_child(c);
-                }
+                Action::InsertChild(c) => self.tree.insert_child(c).log_message(),
                 Action::InsertBefore(c) => {
                     self.insert_next_to_cursor(c, Side::Prev);
                 }
