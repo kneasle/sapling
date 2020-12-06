@@ -387,13 +387,6 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         }
     }
 
-    /// Move the cursor
-    fn move_cursor(&mut self, direction: Direction) {
-        if let Some(error_message) = self.tree.move_cursor(direction) {
-            log::warn!("{}", error_message);
-        }
-    }
-
     /// Insert new child as the first child of the selected node
     fn insert_child(&mut self, c: char) {
         let cursor = self.tree.cursor();
@@ -624,7 +617,9 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                     should_quit = true;
                 }
                 Action::MoveCursor(direction) => {
-                    self.move_cursor(direction);
+                    if let Some(error_message) = self.tree.move_cursor(direction) {
+                        log::warn!("{}", error_message);
+                    }
                 }
                 Action::Replace(c) => {
                     self.replace_cursor(c);
