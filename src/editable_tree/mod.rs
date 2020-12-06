@@ -22,6 +22,61 @@ pub enum Side {
     Next,
 }
 
+/// An enum that's returned when any of the 'edit' methods in [`DAG`] are successful.
+pub enum EditSuccess {
+    Undo,
+    Redo,
+}
+
+impl EditSuccess {
+    /// Writes an info message of a successful action using `info!`
+    fn log_message(self) {
+        match self {
+            EditSuccess::Undo => log::info!("Undoing one change"),
+            EditSuccess::Redo => log::info!("Redoing one change"),
+        }
+    }
+}
+
+/// An error that represents an error in any of the 'edit' methods in [`DAG`].
+pub enum EditErr {
+    /// Trying to undo the earliest change
+    NoChangesToUndo,
+    /// Trying to redo the latest change
+    NoChangesToRedo,
+}
+
+impl EditErr {
+    /// Writes an warning message of the encountered error using either `warn!` or `error!`,
+    /// depending on the severity of the error
+    fn log_message(self) {
+        match self {
+            EditErr::NoChangesToUndo => log::warn!("No changes to undo."),
+            EditErr::NoChangesToRedo => log::warn!("No changes to redo."),
+        }
+    }
+}
+
+/// An alias for [`Result`] that is the return type of all of [`DAG`]'s edit methods.
+pub type EditResult = Result<EditSuccess, EditErr>;
+
+/// A trait-extension that provides a convenient way convert [`EditResult`]s into log messages.
+pub trait LogMessage {
+    /// Log the current result's message to the appropriate log channel.
+    fn log_message(self);
+}
+
+impl LogMessage for EditResult {
+    /// Consumes this `EditResult` and logs an appropriate summary report (using `info!` for
+    /// [`EditOk`]s and `warn!` or `error!` for [`EditErr`]s).
+    fn log_message(self) {
+        match self {
+            Ok(ok) => ok.log_message(),
+            Err(err) => err.log_message(),
+        }
+    }
+}
+
 /// An [`EditableTree`] that stores the history as a DAG (Directed Acyclic Graph) of **immutable**
 /// nodes.
 ///
@@ -52,37 +107,6 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
             root_history: vec![(root, CursorPath::root())],
             history_index: 0,
             current_cursor_path: CursorPath::root(),
-        }
-    }
-
-    /* HISTORY METHODS */
-
-    /// Move one step back in the tree history, returning `false` if there are no more changes
-    pub fn undo(&mut self) -> bool {
-        if self.history_index > 0 {
-            self.history_index -= 1;
-            // Follow the behaviour of other text editors and update the location of the cursor
-            // with its location in the snapshot we are going back to
-            self.current_cursor_path
-                .clone_from(&self.root_history[self.history_index].1);
-            true
-        } else {
-            false
-        }
-    }
-
-    /// Move one step forward in the tree history, return `false` if there was no change to be
-    /// redone
-    pub fn redo(&mut self) -> bool {
-        if self.history_index < self.root_history.len() - 1 {
-            self.history_index += 1;
-            // Follow the behaviour of other text editors and update the location of the cursor
-            // with its location in the snapshot we are going back to
-            self.current_cursor_path
-                .clone_from(&self.root_history[self.history_index].1);
-            true
-        } else {
-            false
         }
     }
 
@@ -155,7 +179,39 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         }
     }
 
-    /* EDITING FUNCTIONS */
+    /* HISTORY METHODS */
+
+    /// Move one step back in the tree history
+    pub fn undo(&mut self) -> EditResult {
+        // Early return if there are no changes to undo
+        if self.history_index == 0 {
+            return Err(EditErr::NoChangesToUndo);
+        }
+        // Move the history index back by one to perform the undo
+        self.history_index -= 1;
+        // Follow the behaviour of other text editors and update the location of the cursor
+        // with its location in the snapshot we are going back to
+        self.current_cursor_path
+            .clone_from(&self.root_history[self.history_index].1);
+        Ok(EditSuccess::Undo)
+    }
+
+    /// Move one step forward in the tree history
+    pub fn redo(&mut self) -> EditResult {
+        // Early return if there are no changes to redo
+        if self.history_index >= self.root_history.len() - 1 {
+            return Err(EditErr::NoChangesToRedo);
+        }
+        // Move the history index forward by one to perform the redo
+        self.history_index += 1;
+        // Follow the behaviour of other text editors and update the location of the cursor
+        // with its location in the snapshot we are going back to
+        self.current_cursor_path
+            .clone_from(&self.root_history[self.history_index].1);
+        Ok(EditSuccess::Redo)
+    }
+
+    /* EDITING METHODS */
 
     /// Utility function to finish an edit.  This handles removing any redo history, and cloning
     /// the nodes that are parents of the node that changed.

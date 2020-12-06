@@ -453,22 +453,6 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         }
     }
 
-    /// Undo the latest change
-    fn undo(&mut self) {
-        match self.tree.undo() {
-            true => log::debug!("Undo successful"),
-            false => log::warn!("No changes to undo"),
-        }
-    }
-
-    /// Move one change forward in the history
-    fn redo(&mut self) {
-        match self.tree.redo() {
-            true => log::debug!("Redo successful"),
-            false => log::warn!("No changes to redo"),
-        }
-    }
-
     /// Render the tree to the screen
     fn render_tree(&self, row: usize, col: usize) {
         // Mutable variables to track where the terminal cursor should go
@@ -636,12 +620,8 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 Action::Delete => {
                     self.delete_cursor();
                 }
-                Action::Undo => {
-                    self.undo();
-                }
-                Action::Redo => {
-                    self.redo();
-                }
+                Action::Undo => self.tree.undo().log_message(),
+                Action::Redo => self.tree.redo().log_message(),
             }
             // Add the command to the command log
             self.command_log.push(self.command.clone(), &self.keymap);
