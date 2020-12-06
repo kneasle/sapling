@@ -216,7 +216,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // one value.
         let mut cloned_cursor = nodes_to_clone.pop().unwrap().clone();
         // Add the new child to the children of the cloned cursor
-        cloned_cursor.insert_child(new_child_node, cloned_cursor.children().len())?;
+        cloned_cursor.insert_child(new_child_node, self.arena, cloned_cursor.children().len())?;
         self.finish_edit(&nodes_to_clone, cloned_cursor);
         Ok(())
     }
@@ -254,7 +254,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // return one value.
         let mut cloned_parent = nodes_to_clone.pop().unwrap().clone();
         // Add the new child to the children of the cloned cursor
-        cloned_parent.insert_child(new_child_node, insert_index)?;
+        cloned_parent.insert_child(new_child_node, self.arena, insert_index)?;
         self.finish_edit(&nodes_to_clone, cloned_parent);
         Ok(())
     }

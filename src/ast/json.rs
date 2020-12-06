@@ -1,6 +1,7 @@
 use super::display_token::{DisplayToken, RecTok};
 use super::size::Size;
 use super::Ast;
+use crate::arena::Arena;
 
 /// An enum to hold the different ways that a JSON AST can be formatted
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -17,7 +18,6 @@ const CHAR_FALSE: char = 'f';
 const CHAR_NULL: char = 'n';
 const CHAR_ARRAY: char = 'a';
 const CHAR_OBJECT: char = 'o';
-const CHAR_FIELD: char = 'i';
 const CHAR_STRING: char = 's';
 
 /// Error produced when inserting a child into a JSON node fails
@@ -358,14 +358,26 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         }
     }
 
-    fn insert_child(&mut self, new_node: &'arena Self, index: usize) -> Result<(), InsertError> {
+    fn insert_child(
+        &mut self,
+        new_node: &'arena Self,
+        arena: &'arena Arena<Self>,
+        index: usize,
+    ) -> Result<(), Self::InsertError> {
         match self {
             JSON::True | JSON::False | JSON::Null | JSON::Str(_) => {
                 Err(InsertError::FixedChildCount(self.display_name(), 0))
             }
             JSON::Field(_) => Err(InsertError::FixedChildCount(self.display_name(), 2)),
             JSON::Object(fields) => {
-                fields.insert(index, new_node);
+                /* Inserting into an object is a special case, since we need to allocate more
+                 * objects in order to preserve the validity of the tree. */
+                // Allocate an empty string to act as the key
+                let key = arena.alloc(JSON::Str("".to_string()));
+                // Allocate a field as the parent of the key and new_node
+                let field = arena.alloc(JSON::Field([key, new_node]));
+                // Add the new field as a child of `self`
+                fields.insert(index, field);
                 Ok(())
             }
             JSON::Array(children) => {
@@ -435,8 +447,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
             JSON::True | JSON::False | JSON::Null | JSON::Field(_) | JSON::Str(_) => {
                 Box::new(std::iter::empty())
             }
-            JSON::Object(_) => Box::new(std::iter::once(CHAR_FIELD)),
-            JSON::Array(_) => Self::all_object_chars(),
+            JSON::Object(_) | JSON::Array(_) => Self::all_object_chars(),
         }
     }
 }

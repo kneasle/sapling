@@ -5,6 +5,7 @@ pub mod json;
 pub mod size;
 pub mod test_json;
 
+use crate::arena::Arena;
 use display_token::{write_tokens, DisplayToken, RecTok};
 use size::Size;
 
@@ -75,10 +76,15 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
     /// removal was not possible, then we return a custom error type.
     fn delete_child(&mut self, index: usize) -> Result<(), Self::DeleteError>;
 
-    /// Insert an extra child into the children of this node at a given index.
+    /// Insert a given pre-allocated node as a new child of this node.  This can involve allocating
+    /// extra nodes (usually as ancestors of `new_node` but descendants of `self`).  This is
+    /// required for cases like inserting into JSON objects (e.g. inserting true into the empty
+    /// object will correspond to two extra nodes being allocated (an empty string and a field):
+    /// `{}` -> `{"": true}`).
     fn insert_child(
         &mut self,
         new_node: &'arena Self,
+        arena: &'arena Arena<Self>,
         index: usize,
     ) -> Result<(), Self::InsertError>;
 
