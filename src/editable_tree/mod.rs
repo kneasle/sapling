@@ -1,4 +1,4 @@
-//! Specification of an editable, undoable buffer of trees and some implementations thereof.
+//! Code for an editable, undoable forest of syntax trees.
 
 pub mod cursor_path;
 
@@ -15,7 +15,7 @@ pub enum Direction {
     Next,
 }
 
-/// An enum to represent the two sides of a cursor
+/// An enum to represent the two sides of a node
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Side {
     Prev,
@@ -203,7 +203,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         self.finish_edit(&nodes_to_clone, new_node);
     }
 
-    /// Updates the internal state so that the tree now contains `new_node` inserted as the first
+    /// Updates the internal state so that the tree now contains `new_node` inserted as the last
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
     pub fn insert_child(&mut self, new_node: Node) -> Result<(), Node::InsertError> {
         // Generate a vec of pointers to the nodes that we will have to clone.  We have to store

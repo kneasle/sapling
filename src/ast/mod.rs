@@ -141,8 +141,8 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
         self.replace_chars().any(|x| x == c)
     }
 
-    /// Generate a new node from a [`char`] that a user typed as part of the `r` command.  If `c` is
-    /// an element of [`get_replace_chars`](ASTSpec::replace_chars), this must return [`Some`] node,
+    /// Generate a new node from a [`char`] that a user typed.  If `c` is an element of
+    /// [`get_replace_chars`](ASTSpec::replace_chars), this must return [`Some`] node,
     /// if it isn't, then this should return [`None`].
     fn from_char(&self, c: char) -> Option<Self>;
 

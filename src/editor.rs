@@ -605,7 +605,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
     /// Consumes a [`char`] and adds it to the command buffer.  If the command buffer contains a
     /// valid command, then execute that command.  This returns `true` if the command 'Quit' was
-    /// executed, otherwise `false` is returned.
+    /// executed, otherwise `false`.
     fn consume_command_char(&mut self, c: char) -> bool {
         let mut should_quit = false;
         // Add the new keypress to the command
