@@ -26,6 +26,7 @@ pub enum Side {
 pub enum EditSuccess {
     Undo,
     Redo,
+    Replace { c: char, name: String },
 }
 
 impl EditSuccess {
@@ -34,6 +35,7 @@ impl EditSuccess {
         match self {
             EditSuccess::Undo => log::info!("Undoing one change"),
             EditSuccess::Redo => log::info!("Redoing one change"),
+            EditSuccess::Replace { c, name } => log::info!("Replacing with '{}'/{}", c, name),
         }
     }
 }
@@ -44,6 +46,10 @@ pub enum EditErr {
     NoChangesToUndo,
     /// Trying to redo the latest change
     NoChangesToRedo,
+    /// The user typed a char that doesn't correspond to any node
+    CharNotANode(char),
+    /// Trying to replace a node with one that cannot be a child of its parent
+    CannotReplace(char),
 }
 
 impl EditErr {
@@ -53,6 +59,8 @@ impl EditErr {
         match self {
             EditErr::NoChangesToUndo => log::warn!("No changes to undo."),
             EditErr::NoChangesToRedo => log::warn!("No changes to redo."),
+            EditErr::CharNotANode(c) => log::warn!("'{}' doesn't correspond to any node type.", c),
+            EditErr::CannotReplace(c) => log::warn!("Can't replace cursor with '{}'", c),
         }
     }
 }
@@ -262,9 +270,21 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         self.history_index = self.root_history.len() - 1;
     }
 
-    /// Updates the internal state so that the tree now contains `new_node` in the position of the
-    /// `cursor`.
-    pub fn replace_cursor(&mut self, new_node: Node) {
+    /// Replaces the current cursor with a node represented by `c`
+    pub fn replace_cursor(&mut self, c: char) -> EditResult {
+        /* CHECK THE VALIDITY OF ARGUMENTS */
+
+        // Cache the node under the cursor, since finding the cursor involves non-trivial amounts
+        // of work
+        let cursor = self.cursor();
+        // Short circuit if the char to insert couldn't correspond to a valid child
+        if !cursor.is_replace_char(c) {
+            return Err(EditErr::CannotReplace(c));
+        }
+
+        /* PERFORM THE ACTION */
+
+        let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
         // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
         // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
         // yield values from the root downwards, whereas we need the nodes in the opposite order.
@@ -272,7 +292,16 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // The last value of nodes_to_clone is the node under the cursor, which we do not need to
         // clone, so we pop that reference.
         assert!(nodes_to_clone.pop().is_some());
+
+        /* FINISH THE EDIT AND RETURN SUCCESS */
+
+        // Store the new_node's display name before it's consumed by `finish_edit`
+        let new_node_name = new_node.display_name();
         self.finish_edit(&nodes_to_clone, 0, new_node);
+        Ok(EditSuccess::Replace {
+            c,
+            name: new_node_name,
+        })
     }
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the last

@@ -375,18 +375,6 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
     /* ===== COMMAND FUNCTIONS ===== */
 
-    /// Replace the node under the cursor with the node represented by a given [`char`]
-    fn replace_cursor(&mut self, c: char) {
-        if self.tree.cursor().is_replace_char(c) {
-            // We know that `c` corresponds to a valid node, so we can unwrap
-            let new_node = self.tree.cursor().from_char(c).unwrap();
-            log::debug!("Replacing with '{}'/{:?}", c, new_node);
-            self.tree.replace_cursor(new_node);
-        } else {
-            log::warn!("Cannot replace node with '{}'", c);
-        }
-    }
-
     /// Insert new child as the first child of the selected node
     fn insert_child(&mut self, c: char) {
         let cursor = self.tree.cursor();
@@ -606,7 +594,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                     }
                 }
                 Action::Replace(c) => {
-                    self.replace_cursor(c);
+                    self.tree.replace_cursor(c).log_message();
                 }
                 Action::InsertChild(c) => {
                     self.insert_child(c);
