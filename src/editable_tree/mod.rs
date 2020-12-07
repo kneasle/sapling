@@ -159,7 +159,12 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 
     /// Utility function to finish an edit.  This handles removing any redo history, and cloning
     /// the nodes that are parents of the node that changed.
-    fn finish_edit(&mut self, nodes_to_clone: &[&'arena Node], new_node: Node) {
+    fn finish_edit(
+        &mut self,
+        nodes_to_clone: &[&'arena Node],
+        steps_above_cursor: usize,
+        new_node: Node,
+    ) {
         // Remove future trees from the history vector so that the currently 'checked-out' tree is
         // the most recent tree in the history.
         while self.history_index < self.root_history.len() - 1 {
@@ -171,13 +176,24 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // work our way up parent by parent until we reach the root of the tree.  At that point,
         // this node becomes the root of the new tree.
         let mut node = self.arena.alloc(new_node);
+        // SANITY CHECK: Assert that items_to_clone and self.cursor_path have the same length once
+        // steps_above_cursor have been taken off - i.e. that we aren't losing any information by
+        // zipping the two things together
+        if nodes_to_clone.len() != self.current_cursor_path.depth() - steps_above_cursor {
+            panic!(
+                "`nodes_to_clone` ({:?}) has a different length to `self.cursor_path` ({:?}) with \
+{} items popped.",
+                nodes_to_clone, self.current_cursor_path, steps_above_cursor
+            );
+        }
         // Iterate backwards over the child indices and the nodes, whilst cloning the tree and
         // replacing the correct child reference to point to the newly created node.
-        for (n, child_index) in nodes_to_clone
-            .iter()
-            .rev()
-            .zip(self.current_cursor_path.iter().rev())
-        {
+        for (n, child_index) in nodes_to_clone.iter().rev().zip(
+            self.current_cursor_path
+                .iter()
+                .rev()
+                .skip(steps_above_cursor),
+        ) {
             let mut cloned_node = (*n).clone();
             cloned_node.children_mut()[*child_index] = node;
             node = self.arena.alloc(cloned_node);
@@ -200,7 +216,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // The last value of nodes_to_clone is the node under the cursor, which we do not need to
         // clone, so we pop that reference.
         assert!(nodes_to_clone.pop().is_some());
-        self.finish_edit(&nodes_to_clone, new_node);
+        self.finish_edit(&nodes_to_clone, 0, new_node);
     }
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the last
@@ -217,7 +233,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         let mut cloned_cursor = nodes_to_clone.pop().unwrap().clone();
         // Add the new child to the children of the cloned cursor
         cloned_cursor.insert_child(new_child_node, self.arena, cloned_cursor.children().len())?;
-        self.finish_edit(&nodes_to_clone, cloned_cursor);
+        self.finish_edit(&nodes_to_clone, 0, cloned_cursor);
         Ok(())
     }
 
@@ -255,7 +271,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         let mut cloned_parent = nodes_to_clone.pop().unwrap().clone();
         // Add the new child to the children of the cloned cursor
         cloned_parent.insert_child(new_child_node, self.arena, insert_index)?;
-        self.finish_edit(&nodes_to_clone, cloned_parent);
+        self.finish_edit(&nodes_to_clone, 1, cloned_parent);
         Ok(())
     }
 
@@ -289,7 +305,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
             }
         }
         // Finish the edit and commit the new tree to the arena
-        self.finish_edit(&nodes_to_clone, cloned_parent);
+        self.finish_edit(&nodes_to_clone, 0, cloned_parent);
         Ok(())
     }
 
