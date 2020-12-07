@@ -64,27 +64,23 @@ impl std::fmt::Display for DeleteError {
                 "Tried to remove child #{} from a node that only has {} children.",
                 index, num_children
             ),
-            DeleteError::FixedChildCount(node, num_children) => {
-                if *num_children == 0 {
-                    write!(
-                        f,
-                        "Node {} cannot have children, but we tried to delete a child.",
-                        node
-                    )
-                } else if *num_children == 1 {
-                    write!(
-                        f,
-                        "Cannot delete from a node {} that can only have 1 child.",
-                        node
-                    )
-                } else {
-                    write!(
-                        f,
-                        "Cannot delete from a node {} that can only have {} children.",
-                        node, num_children
-                    )
-                }
-            }
+            DeleteError::FixedChildCount(node, num_children) => match *num_children {
+                0 => write!(
+                    f,
+                    "Node {} cannot have children, but we tried to delete a child.",
+                    node
+                ),
+                1 => write!(
+                    f,
+                    "Cannot delete from a node {} that can only have 1 child.",
+                    node
+                ),
+                _ => write!(
+                    f,
+                    "Cannot delete from a node {} that can only have {} children.",
+                    node, num_children
+                ),
+            },
         }
     }
 }
