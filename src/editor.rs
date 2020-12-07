@@ -2,7 +2,7 @@
 
 use crate::ast::display_token::DisplayToken;
 use crate::ast::{size, Ast};
-use crate::editable_tree::{Direction, EditErr, EditResult, EditSuccess, Side, DAG};
+use crate::editable_tree::{Direction, EditErr, EditResult, EditSuccess, LogMessage, Side, DAG};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
@@ -501,44 +501,48 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     }
 
     /// Consumes a [`char`] and adds it to the command buffer.  If the command buffer contains a
-    /// valid command, then execute that command.  This returns `true` if the command 'Quit' was
-    /// executed, otherwise `false`.
-    fn consume_command_char(&mut self, c: char) -> bool {
+    /// valid command, then execute that command.
+    ///
+    /// This returns a tuple of:
+    /// 1. A [`bool`] value that determines whether or not Sapling should quit
+    /// 2. The [`EditResult`] of the edit, or `None` if the command is incomplete
+    fn consume_command_char(&mut self, c: char) -> (bool, Option<EditResult>) {
         // Add the new keypress to the command
         self.command.push(c);
         // Attempt to parse the command, and take action if the command is
         // complete
-        if let Some(action) = parse_command(&self.keymap, &self.command) {
-            // Respond to the action
-            match action {
-                Action::Undefined => {
-                    EditResult::Err(EditErr::Invalid(self.command.clone())).log_message()
-                }
-                Action::Quit => {
-                    EditResult::Ok(EditSuccess::Quit).log_message();
-                    return true;
-                }
-                Action::MoveCursor(direction) => self.tree.move_cursor(direction).log_message(),
-                Action::Replace(c) => {
-                    self.tree.replace_cursor(c).log_message();
-                }
-                Action::InsertChild(c) => self.tree.insert_child(c).log_message(),
-                Action::InsertBefore(c) => {
-                    self.tree.insert_next_to_cursor(c, Side::Prev).log_message()
-                }
-                Action::InsertAfter(c) => {
-                    self.tree.insert_next_to_cursor(c, Side::Next).log_message()
-                }
-                Action::Delete => self.tree.delete_cursor().log_message(),
-                Action::Undo => self.tree.undo().log_message(),
-                Action::Redo => self.tree.redo().log_message(),
+        match parse_command(&self.keymap, &self.command) {
+            Some(action) => {
+                let mut should_quit = false;
+                // Respond to the action
+                let result = match action {
+                    // Undefined command
+                    Action::Undefined => EditResult::Err(EditErr::Invalid(self.command.clone())),
+                    // History commands
+                    Action::Undo => self.tree.undo(),
+                    Action::Redo => self.tree.redo(),
+                    // Move command
+                    Action::MoveCursor(direction) => self.tree.move_cursor(direction),
+                    // Edit commands
+                    Action::Replace(c) => self.tree.replace_cursor(c),
+                    Action::InsertChild(c) => self.tree.insert_child(c),
+                    Action::InsertBefore(c) => self.tree.insert_next_to_cursor(c, Side::Prev),
+                    Action::InsertAfter(c) => self.tree.insert_next_to_cursor(c, Side::Next),
+                    Action::Delete => self.tree.delete_cursor(),
+                    // Quit Sapling
+                    Action::Quit => {
+                        should_quit = true;
+                        EditResult::Ok(EditSuccess::Quit)
+                    }
+                };
+                // Add the command to the command log and clear the command buffer
+                self.command_log.push(self.command.clone(), &self.keymap);
+                self.command.clear();
+                // Return the result of the action
+                (should_quit, Some(result))
             }
-            // Add the command to the command log
-            self.command_log.push(self.command.clone(), &self.keymap);
-            // Clear the command box
-            self.command.clear();
+            None => (false, None),
         }
-        false
     }
 
     fn mainloop(&mut self) {
@@ -549,8 +553,14 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             if let Event::Key(key) = event {
                 match key {
                     Key::Char(c) => {
+                        // Consume the new keystroke
+                        let (should_quit, result) = self.consume_command_char(c);
+                        // Write the result's message to the log if the command was complete
+                        if let Some(res) = result {
+                            res.log_message();
+                        }
                         // `self.add_char_to_command` returns `true` if the editor should quit
-                        if self.consume_command_char(c) {
+                        if should_quit {
                             break;
                         }
                     }
