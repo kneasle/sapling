@@ -39,6 +39,7 @@ pub enum EditSuccess {
     Replace { c: char, name: String },
     InsertChild { c: char, name: String },
     InsertNextToCursor { side: Side, c: char, name: String },
+    Delete { name: String },
 }
 
 impl EditSuccess {
@@ -57,6 +58,7 @@ impl EditSuccess {
                 name,
                 side.relational_word()
             ),
+            EditSuccess::Delete { name } => log::info!("Deleting {}", name),
         }
     }
 }
@@ -75,6 +77,8 @@ pub enum EditErr {
     CannotInsertInto { c: char, parent_name: String },
     /// Trying to add a sibling to the root
     AddSiblingToRoot,
+    /// Trying to delete the root
+    DeletingRoot,
 }
 
 impl EditErr {
@@ -90,6 +94,7 @@ impl EditErr {
                 log::warn!("Can't insert '{}' into {}", c, parent_name)
             }
             EditErr::AddSiblingToRoot => log::warn!("Can't add siblings to the root."),
+            EditErr::DeletingRoot => log::warn!("Can't delete the root."),
         }
     }
 }
@@ -437,38 +442,55 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         })
     }
 
-    pub fn delete_cursor(&mut self) -> Result<(), Node::DeleteError> {
+    pub fn delete_cursor(&mut self) -> EditResult {
+        /* CHECK VALIDITY OF ARGUMENTS */
+
         // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
         // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
         // yield values from the root downwards, whereas we need the nodes in the opposite order.
         let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
-        // Pop the cursor, because it will be unchanged.  The only part of this that we need is
-        // the cursor's index.
-        assert!(nodes_to_clone.pop().is_some());
+        // Pop the cursor, because it will be unchanged.  We can unwrap here, because
+        // `CursorPath::node_iter` will always yield at least one node (the first value returned is
+        // a reference to the root).
+        let deleted_node_name = nodes_to_clone.pop().unwrap().display_name();
+        // Short circuit if we're trying to delete the root
         if nodes_to_clone.is_empty() {
-            // TODO: Return an error
-            log::warn!("Trying to remove the root!");
-            panic!();
+            return Err(EditErr::DeletingRoot);
         }
-        // Find the index of the cursor, so that we know where to insert.  We can unwrap, because
-        // if we were at the root, then we'd early return from the if statement above
+
+        /* PERFORM THE INSERTION */
+
+        // Find the index of the cursor, so that we know where to delete.  We can unwrap, because
+        // if we were at the root, then we'd early return from the if statement above.
         let cursor_sibling_index = *self.current_cursor_path.last_mut().unwrap();
         let mut cloned_parent = nodes_to_clone.pop().unwrap().clone();
-        cloned_parent.delete_child(cursor_sibling_index)?;
+        cloned_parent.delete_child(cursor_sibling_index);
+        // Cache this so that we can
+        let new_parents_child_count = cloned_parent.children().len();
+
+        /* FINISH THE EDIT AND RETURN SUCCESS */
+
+        self.finish_edit(&nodes_to_clone, 1, cloned_parent);
+
+        /* MOVE THE CURSOR TO THE NEAREST VALID NODE */
+
+        // IMPORTANTLY, we move the cursor **AFTER** calling `self.finish_edit`, because
+        // `self.finish_edit` reads the cursor path
+
         // If we remove the only child of a node then we move the cursor up
-        if cloned_parent.children().len() == 0 {
+        if new_parents_child_count == 0 {
             self.current_cursor_path.pop();
         } else {
             // If we deleted the last child of a node (and this isn't the last child), we move
             // the cursor back by one
-            if cursor_sibling_index == cloned_parent.children().len() {
+            if cursor_sibling_index == new_parents_child_count {
                 // We can unwrap here because we know we aren't removing the root
                 *self.current_cursor_path.last_mut().unwrap() -= 1;
             }
         }
-        // Finish the edit and commit the new tree to the arena
-        self.finish_edit(&nodes_to_clone, 0, cloned_parent);
-        Ok(())
+        Ok(EditSuccess::Delete {
+            name: deleted_node_name,
+        })
     }
 
     /* DISPLAY METHODS */

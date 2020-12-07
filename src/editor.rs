@@ -373,15 +373,6 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         }
     }
 
-    /* ===== COMMAND FUNCTIONS ===== */
-
-    /// Remove the current cursor
-    fn delete_cursor(&mut self) {
-        if let Err(err) = self.tree.delete_cursor() {
-            log::warn!("{}", err);
-        }
-    }
-
     /// Render the tree to the screen
     fn render_tree(&self, row: usize, col: usize) {
         // Mutable variables to track where the terminal cursor should go
@@ -544,9 +535,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 Action::InsertAfter(c) => {
                     self.tree.insert_next_to_cursor(c, Side::Next).log_message()
                 }
-                Action::Delete => {
-                    self.delete_cursor();
-                }
+                Action::Delete => self.tree.delete_cursor().log_message(),
                 Action::Undo => self.tree.undo().log_message(),
                 Action::Redo => self.tree.redo().log_message(),
             }
