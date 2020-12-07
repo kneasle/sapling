@@ -520,11 +520,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                     log::trace!("Received command 'Quit', so exiting mainloop");
                     should_quit = true;
                 }
-                Action::MoveCursor(direction) => {
-                    if let Some(error_message) = self.tree.move_cursor(direction) {
-                        log::warn!("{}", error_message);
-                    }
-                }
+                Action::MoveCursor(direction) => self.tree.move_cursor(direction).log_message(),
                 Action::Replace(c) => {
                     self.tree.replace_cursor(c).log_message();
                 }

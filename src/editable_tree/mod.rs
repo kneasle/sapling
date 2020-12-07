@@ -36,6 +36,7 @@ impl Side {
 pub enum EditSuccess {
     Undo,
     Redo,
+    Move(Direction),
     Replace { c: char, name: String },
     InsertChild { c: char, name: String },
     InsertNextToCursor { side: Side, c: char, name: String },
@@ -48,6 +49,10 @@ impl EditSuccess {
         match self {
             EditSuccess::Undo => log::info!("Undoing one change"),
             EditSuccess::Redo => log::info!("Redoing one change"),
+            EditSuccess::Move(Direction::Up) => log::info!("Moving up the tree"),
+            EditSuccess::Move(Direction::Down) => log::info!("Moving down the tree"),
+            EditSuccess::Move(Direction::Prev) => log::info!("Moving to previous child"),
+            EditSuccess::Move(Direction::Next) => log::info!("Moving to next child"),
             EditSuccess::Replace { c, name } => log::info!("Replacing with '{}'/{}", c, name),
             EditSuccess::InsertChild { c, name } => {
                 log::info!("Inserting '{}'/{} as new child", c, name)
@@ -65,6 +70,17 @@ impl EditSuccess {
 
 /// An error that represents an error in any of the 'edit' methods in [`DAG`].
 pub enum EditErr {
+    /* MOVEMENT ERRORS */
+    /// Trying to move to the child of a node with no children
+    MoveToNonexistentChild,
+    /// Trying to move to the parent of the root
+    MoveToParentOfRoot,
+    /// Trying to move to a sibling that doesn't exist
+    MoveToNonexistentSibling,
+    /// Trying to move to a sibling of the root
+    MoveToSiblingOfRoot,
+
+    /* EDITING ERRORS */
     /// Trying to undo the earliest change
     NoChangesToUndo,
     /// Trying to redo the latest change
@@ -86,6 +102,14 @@ impl EditErr {
     /// depending on the severity of the error
     fn log_message(self) {
         match self {
+            EditErr::MoveToNonexistentChild => {
+                log::warn!("Can't move down if the cursor has no children.")
+            }
+            EditErr::MoveToNonexistentSibling => {
+                log::warn!("Can't move to a non-existent sibling.")
+            }
+            EditErr::MoveToParentOfRoot => log::warn!("Can't move to the parent of the root."),
+            EditErr::MoveToSiblingOfRoot => log::warn!("Can't move to a sibling of the root."),
             EditErr::NoChangesToUndo => log::warn!("No changes to undo."),
             EditErr::NoChangesToRedo => log::warn!("No changes to redo."),
             EditErr::CharNotANode(c) => log::warn!("'{}' doesn't correspond to any node type.", c),
@@ -173,52 +197,46 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 
     /// Move the cursor in a given direction across the tree.  Returns [`Some`] error string if an
     /// error is found, or [`None`] if the movement was possible.
-    pub fn move_cursor(&mut self, direction: Direction) -> Option<String> {
+    pub fn move_cursor(&mut self, direction: Direction) -> EditResult {
         let (current_cursor, cursor_parent) = self.cursor_and_parent();
         match direction {
             Direction::Down => {
                 if current_cursor.children().is_empty() {
-                    Some("Cannot move down the tree if the cursor has no children.".to_string())
-                } else {
-                    self.current_cursor_path.push(0);
-                    None
+                    return Err(EditErr::MoveToNonexistentChild);
                 }
+                self.current_cursor_path.push(0);
             }
             Direction::Up => {
                 if self.current_cursor_path.is_root() {
-                    return Some("Cannot move to the parent of the root.".to_string());
+                    return Err(EditErr::MoveToParentOfRoot);
                 }
                 self.current_cursor_path.pop();
-                None
             }
             Direction::Prev => {
-                if let Some(index) = self.current_cursor_path.last_mut() {
-                    if *index == 0 {
-                        Some("Cannot move before the first child of a node.".to_string())
-                    } else {
-                        *index -= 1;
-                        None
-                    }
-                } else {
-                    Some("Cannot move to a sibling of the root.".to_string())
+                let index = self
+                    .current_cursor_path
+                    .last_mut()
+                    .ok_or(EditErr::MoveToSiblingOfRoot)?;
+                if *index == 0 {
+                    return Err(EditErr::MoveToNonexistentSibling);
                 }
+                *index -= 1;
             }
             Direction::Next => {
-                if let Some(last_index) = self.current_cursor_path.last_mut() {
-                    // We can unwrap here, because the only way for a node to not have a parent is
-                    // if it's the root.  And if the cursor is at the root, then the `if let` would
-                    // have failed and this code would not be run.
-                    if *last_index + 1 < cursor_parent.unwrap().children().len() {
-                        *last_index += 1;
-                        None
-                    } else {
-                        Some("Cannot move past the last sibling of a node.".to_string())
-                    }
-                } else {
-                    Some("Cannot move to a sibling of the root.".to_string())
+                let last_index = self
+                    .current_cursor_path
+                    .last_mut()
+                    .ok_or(EditErr::MoveToSiblingOfRoot)?;
+                // We can unwrap here, because the only way for a node to not have a parent is
+                // if it's the root.  And if the cursor is at the root, then the `if let` would
+                // have failed and this code would not be run.
+                if *last_index + 1 >= cursor_parent.unwrap().children().len() {
+                    return Err(EditErr::MoveToNonexistentSibling);
                 }
+                *last_index += 1;
             }
         }
+        Ok(EditSuccess::Move(direction))
     }
 
     /* HISTORY METHODS */
