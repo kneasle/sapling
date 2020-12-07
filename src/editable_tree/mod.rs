@@ -34,6 +34,7 @@ impl Side {
 
 /// An enum that's returned when any of the 'edit' methods in [`DAG`] are successful.
 pub enum EditSuccess {
+    Quit,
     Undo,
     Redo,
     Move(Direction),
@@ -47,6 +48,7 @@ impl EditSuccess {
     /// Writes an info message of a successful action using `info!`
     fn log_message(self) {
         match self {
+            EditSuccess::Quit => log::info!("Quitting Sapling"),
             EditSuccess::Undo => log::info!("Undoing one change"),
             EditSuccess::Redo => log::info!("Redoing one change"),
             EditSuccess::Move(Direction::Up) => log::info!("Moving up the tree"),
@@ -70,6 +72,10 @@ impl EditSuccess {
 
 /// An error that represents an error in any of the 'edit' methods in [`DAG`].
 pub enum EditErr {
+    /* MISC ERRORS */
+    /// The keystrokes that were attempted to be executed where invalid
+    Invalid(String),
+
     /* MOVEMENT ERRORS */
     /// Trying to move to the child of a node with no children
     MoveToNonexistentChild,
@@ -102,6 +108,7 @@ impl EditErr {
     /// depending on the severity of the error
     fn log_message(self) {
         match self {
+            EditErr::Invalid(keys) => log::warn!("Invalid command '{}'", keys),
             EditErr::MoveToNonexistentChild => {
                 log::warn!("Can't move down if the cursor has no children.")
             }

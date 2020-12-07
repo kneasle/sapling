@@ -2,7 +2,7 @@
 
 use crate::ast::display_token::DisplayToken;
 use crate::ast::{size, Ast};
-use crate::editable_tree::{Direction, Side, DAG};
+use crate::editable_tree::{Direction, EditErr, EditResult, EditSuccess, Side, DAG};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
@@ -504,7 +504,6 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /// valid command, then execute that command.  This returns `true` if the command 'Quit' was
     /// executed, otherwise `false`.
     fn consume_command_char(&mut self, c: char) -> bool {
-        let mut should_quit = false;
         // Add the new keypress to the command
         self.command.push(c);
         // Attempt to parse the command, and take action if the command is
@@ -513,12 +512,11 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             // Respond to the action
             match action {
                 Action::Undefined => {
-                    log::warn!("'{}' is not a command.", self.command);
+                    EditResult::Err(EditErr::Invalid(self.command.clone())).log_message()
                 }
                 Action::Quit => {
-                    // Break the mainloop to quit
-                    log::trace!("Received command 'Quit', so exiting mainloop");
-                    should_quit = true;
+                    EditResult::Ok(EditSuccess::Quit).log_message();
+                    return true;
                 }
                 Action::MoveCursor(direction) => self.tree.move_cursor(direction).log_message(),
                 Action::Replace(c) => {
@@ -540,7 +538,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             // Clear the command box
             self.command.clear();
         }
-        should_quit
+        false
     }
 
     fn mainloop(&mut self) {
