@@ -375,41 +375,6 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
     /* ===== COMMAND FUNCTIONS ===== */
 
-    /// Insert new child as the first child of the selected node
-    fn insert_next_to_cursor(&mut self, c: char, side: Side) {
-        let (_, parent) = self.tree.cursor_and_parent();
-
-        // Short circuit if at root
-        let parent = match parent {
-            Some(parent) => parent,
-            None => {
-                log::warn!("Cannot add siblings of the root.");
-                return;
-            }
-        };
-
-        //short circuit if not an insertable char
-        if !parent.is_insert_char(c) {
-            log::warn!("Cannot insert node with '{}'", c);
-            return;
-        }
-
-        //short circuit if invalid char
-        let node = match parent.from_char(c) {
-            Some(node) => node,
-            None => {
-                log::warn!("Char '{}' does not correspond to a valid node", c);
-                return;
-            }
-        };
-
-        if let Err(e) = self.tree.insert_next_to_cursor(node, side) {
-            log::error!("{}", e);
-        } else {
-            log::debug!("Inserting with '{}'", c);
-        }
-    }
-
     /// Remove the current cursor
     fn delete_cursor(&mut self) {
         if let Err(err) = self.tree.delete_cursor() {
@@ -574,10 +539,10 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 }
                 Action::InsertChild(c) => self.tree.insert_child(c).log_message(),
                 Action::InsertBefore(c) => {
-                    self.insert_next_to_cursor(c, Side::Prev);
+                    self.tree.insert_next_to_cursor(c, Side::Prev).log_message()
                 }
                 Action::InsertAfter(c) => {
-                    self.insert_next_to_cursor(c, Side::Next);
+                    self.tree.insert_next_to_cursor(c, Side::Next).log_message()
                 }
                 Action::Delete => {
                     self.delete_cursor();

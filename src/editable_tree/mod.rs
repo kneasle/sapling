@@ -22,12 +22,23 @@ pub enum Side {
     Next,
 }
 
+impl Side {
+    /// Converts this `Side` into either `"before"` or `"after"`
+    pub fn relational_word(&self) -> &'static str {
+        match self {
+            Side::Prev => "before",
+            Side::Next => "after",
+        }
+    }
+}
+
 /// An enum that's returned when any of the 'edit' methods in [`DAG`] are successful.
 pub enum EditSuccess {
     Undo,
     Redo,
     Replace { c: char, name: String },
     InsertChild { c: char, name: String },
+    InsertNextToCursor { side: Side, c: char, name: String },
 }
 
 impl EditSuccess {
@@ -40,6 +51,12 @@ impl EditSuccess {
             EditSuccess::InsertChild { c, name } => {
                 log::info!("Inserting '{}'/{} as new child", c, name)
             }
+            EditSuccess::InsertNextToCursor { side, c, name } => log::info!(
+                "Inserting '{}'/{} {} the cursor",
+                c,
+                name,
+                side.relational_word()
+            ),
         }
     }
 }
@@ -56,6 +73,8 @@ pub enum EditErr {
     CannotReplace(char),
     /// Trying to insert a node that cannot be a child of the cursor
     CannotInsertInto { c: char, parent_name: String },
+    /// Trying to add a sibling to the root
+    AddSiblingToRoot,
 }
 
 impl EditErr {
@@ -70,6 +89,7 @@ impl EditErr {
             EditErr::CannotInsertInto { c, parent_name } => {
                 log::warn!("Can't insert '{}' into {}", c, parent_name)
             }
+            EditErr::AddSiblingToRoot => log::warn!("Can't add siblings to the root."),
         }
     }
 }
@@ -358,11 +378,25 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the first
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
-    pub fn insert_next_to_cursor(
-        &mut self,
-        new_node: Node,
-        side: Side,
-    ) -> Result<(), Node::InsertError> {
+    pub fn insert_next_to_cursor(&mut self, c: char, side: Side) -> EditResult {
+        /* CHECK VALIDITY OF ARGUMENTS */
+
+        // Find (and cache) the parent of the cursor.  If the parent of the cursor doesn't exist,
+        // the cursor must be the root and we can't insert a node next to the root.
+        let parent = match self.cursor_and_parent().1 {
+            None => return Err(EditErr::AddSiblingToRoot),
+            Some(p) => p,
+        };
+        // Short circuit if not an insertable char
+        if !parent.is_insert_char(c) {
+            return Err(EditErr::CannotInsertInto {
+                c,
+                parent_name: parent.display_name(),
+            });
+        }
+
+        /* PERFORM THE INSERTION */
+
         // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
         // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
         // yield values from the root downwards, whereas we need the nodes in the opposite order.
@@ -370,11 +404,6 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // Pop the cursor, because it will be unchanged.  The only part of this that we need is
         // the cursor's index.
         assert!(nodes_to_clone.pop().is_some());
-        if nodes_to_clone.is_empty() {
-            // TODO: Return an error
-            log::warn!("Trying to add a sibling to the root!");
-            panic!();
-        }
         // Find the index of the cursor, so that we know where to insert.  We can unwrap, because
         // if we were at the root, then we'd early return from the if statement above
         let cursor_sibling_index = *self.current_cursor_path.last_mut().unwrap();
@@ -383,15 +412,29 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                 Side::Prev => 0,
                 Side::Next => 1,
             };
-        let new_child_node = self.arena.alloc(new_node);
         // Clone the node that currently is the cursor, and add the new child to the end of its
         // children.  Unwrapping here is fine, because `cursor_path::NodeIter` will always
         // return one value.
         let mut cloned_parent = nodes_to_clone.pop().unwrap().clone();
+        // Create the new child node according to the given char.
+        let new_child_node = self
+            .arena
+            .alloc(cloned_parent.from_char(c).ok_or(EditErr::CharNotANode(c))?);
+        // Store the new_node's display name before it's consumed by `insert_child`
+        let new_node_name = new_child_node.display_name();
         // Add the new child to the children of the cloned cursor
-        cloned_parent.insert_child(new_child_node, self.arena, insert_index)?;
+        cloned_parent.insert_child(new_child_node, self.arena, insert_index);
+
+        /* FINISH THE EDIT AND RETURN SUCCESS */
+
+        // Finish the edit and update the history
         self.finish_edit(&nodes_to_clone, 1, cloned_parent);
-        Ok(())
+        // Return the success
+        Ok(EditSuccess::InsertNextToCursor {
+            side,
+            c,
+            name: new_node_name,
+        })
     }
 
     pub fn delete_cursor(&mut self) -> Result<(), Node::DeleteError> {
