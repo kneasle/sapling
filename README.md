@@ -32,6 +32,8 @@ could be as useful as possible.
 - [**'Extra Fun Challenges'**](#cons-of-ast-based-editing-otherwise-known-as-extra-fun-challenges)
 - [**What's an AST?**](#whats-an-ast)
 
+---
+
 ## But why?
 
 When writing code with any text editor, you are usually only interested in a tiny subset of all the
