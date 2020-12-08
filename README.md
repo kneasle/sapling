@@ -110,13 +110,14 @@ cargo run
 
 #### Cursor Movement
 
-- `j`/`k`: Move the cursor up and down (respectively) by one child
+- `h`/`k`: Move the cursor to the previous sibling of the current node
+- `j`/`l`: Move the cursor to the next sibling of the current node
 - `c`: Move the cursor to the first child of the current node (if it exists)
 - `p`: Move the cursor to the parent of the node it's currently at
 
 #### Modify the tree
 - `r*`: Replace the node under the cursor with the node represented by the key `*`
-- `d`: Delete the node under the cursor (will probably be remapped to `x`)
+- `x`: Delete the node under the cursor (will probably be remapped to `x`)
 - `o*`: Insert a new node represented by `*` as a **child** of the cursor
 - `a*`/`i*`: Insert a new node represented by `*` before or after the cursor respectively
 
