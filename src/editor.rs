@@ -194,11 +194,13 @@ pub fn default_keymap() -> KeyMap {
         'a' => Command::InsertAfter,
         'o' => Command::InsertChild,
         'r' => Command::Replace,
-        'd' => Command::Delete,
+        'x' => Command::Delete,
         'c' => Command::MoveCursor(Direction::Down),
         'p' => Command::MoveCursor(Direction::Up),
-        'k' => Command::MoveCursor(Direction::Prev),
+        'h' => Command::MoveCursor(Direction::Prev),
         'j' => Command::MoveCursor(Direction::Next),
+        'k' => Command::MoveCursor(Direction::Prev),
+        'l' => Command::MoveCursor(Direction::Next),
         'u' => Command::Undo,
         'R' => Command::Redo
     }
@@ -664,7 +666,12 @@ mod tests {
         let keymap = super::default_keymap();
         for (command, expected_effect) in &[
             ("q", Action::Quit),
-            ("x", Action::Undefined),
+            ("x", Action::Delete),
+            ("d", Action::Undefined),
+            ("h", Action::MoveCursor(Direction::Prev)),
+            ("j", Action::MoveCursor(Direction::Next)),
+            ("k", Action::MoveCursor(Direction::Prev)),
+            ("l", Action::MoveCursor(Direction::Next)),
             ("pajlbsi", Action::MoveCursor(Direction::Up)),
             ("Pxx", Action::Undefined),
             ("Qsx", Action::Undefined),
