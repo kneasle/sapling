@@ -117,7 +117,7 @@ cargo run
 
 #### Modify the tree
 - `r*`: Replace the node under the cursor with the node represented by the key `*`
-- `x`: Delete the node under the cursor (will probably be remapped to `x`)
+- `x`: Delete the node under the cursor
 - `o*`: Insert a new node represented by `*` as a **child** of the cursor
 - `a*`/`i*`: Insert a new node represented by `*` before or after the cursor respectively
 
