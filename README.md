@@ -122,8 +122,7 @@ cargo run
 - `a*`/`i*`: Insert a new node represented by `*` before or after the cursor respectively
 
 Sapling can currently only edit JSON, with the following keys: `[a]rray`, `[o]bject`, `[t]rue`,
-`[f]alse`, `[n]ull`, `[s]tring`.  There is currently no way to insert text into a string, or to
-add children to a JSON object.
+`[f]alse`, `[n]ull`, `[s]tring`.  There is currently no way to insert text into a string.
 
 ## Pros of AST-based editing
 
