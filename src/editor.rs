@@ -71,7 +71,7 @@ mod command_log {
                 .iter()
                 .map(|e| match e.count {
                     1 => 0,
-                    c => format!("{}", c).len(),
+                    c => format!("{}x", c).len(),
                 })
                 .max()
                 .unwrap_or(0)
