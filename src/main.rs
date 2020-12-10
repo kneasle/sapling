@@ -11,7 +11,9 @@ use crate::editor::Editor;
 
 fn main() {
     // Initialise the logging and startup
-    pretty_env_logger::init();
+    pretty_env_logger::formatted_builder()
+        .filter_level(log::LevelFilter::Debug)
+        .init();
     log::info!("Starting up...");
 
     // Create an empty arena for Sapling to use

@@ -19,6 +19,11 @@ impl CursorPath {
         Self::from_vec(vec![])
     }
 
+    /// Return the depth of the cursor in the tree.  The root has depth `0`.
+    pub fn depth(&self) -> usize {
+        self.child_indices.len()
+    }
+
     /// Walks this path down from the given root, and returns the node that lies underneath the
     /// cursor.
     #[inline]
@@ -125,9 +130,19 @@ where
     /// - the child index has a value too big to represent a valid child of the current node
     /// - self.node = None; i.e. the iterator has already finished.  This condition means that this
     ///   iterator is **fused** (see [`std::iter::Fused`])
+    ///
+    /// # Panics
+    /// This will panic if the cursor path reaches a point where a node does not have enough
+    /// children for the path to continue.  This follows the garbage-in, immediately-panic strategy.
     #[inline]
     fn next_descendant(&mut self) -> Option<&'arena Node> {
-        Some(*self.node?.children().get(*self.iter.next()?)?)
+        Some(
+            *self
+                .node?
+                .children()
+                .get(*self.iter.next()?)
+                .expect("cursor path points to a non-existent node."),
+        )
     }
 }
 
@@ -172,6 +187,25 @@ mod tests {
         // But if we pop the last child, we get back to the root
         assert_eq!(path.pop(), Some(0));
         assert!(path.is_root());
+    }
+
+    #[test]
+    fn depth() {
+        // A path that's created as a root is ... a root!
+        let mut path = CursorPath::root();
+        assert_eq!(path.depth(), 0);
+        // Moving to any child stops it being a root
+        path.push(0);
+        assert_eq!(path.depth(), 1);
+        // Pushing more children means it still isn't a root
+        path.push(4);
+        assert_eq!(path.depth(), 2);
+        // If we pop *one* child, we're still not back at the root
+        assert_eq!(path.pop(), Some(4));
+        assert_eq!(path.depth(), 1);
+        // But if we pop the last child, we get back to the root
+        assert_eq!(path.pop(), Some(0));
+        assert_eq!(path.depth(), 0);
     }
 
     #[test]
