@@ -5,18 +5,65 @@ pub mod json;
 pub mod size;
 pub mod test_json;
 
+use std::error::Error;
+
 use crate::arena::Arena;
 use display_token::{write_tokens, DisplayToken, RecTok};
 use size::Size;
+
+/// The possible ways an insertion could fail
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum InsertError {
+    /// Inserting the node would cause the child count to exceed the limit for that node type
+    TooManyChildren { name: String, max_children: usize },
+}
+
+impl std::fmt::Display for InsertError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InsertError::TooManyChildren { name, max_children } => write!(
+                f,
+                "Can't exceed child count limit of {} in {}",
+                max_children, name
+            ),
+        }
+    }
+}
+
+impl Error for InsertError {}
+
+/// The possible ways a deletion could fail
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum DeleteError {
+    /// Deleting the requested node(s) would cause the parent to have too few children
+    TooFewChildren { name: String, min_children: usize },
+    /// The requsted node doesn't exist.  This shouldn't be able to occur in practice, because it
+    /// would require selecting a non-existent node - but nevertheless I don't think Sapling should
+    /// panic in this situation.
+    IndexOutOfRange { len: usize, index: usize },
+}
+
+impl std::fmt::Display for DeleteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeleteError::TooFewChildren { name, min_children } => write!(
+                f,
+                "Node type {} can't have fewer than {} children.",
+                name, min_children
+            ),
+            DeleteError::IndexOutOfRange { len, index } => write!(
+                f,
+                "Deleting child index {} is out of range 0..{}",
+                index, len
+            ),
+        }
+    }
+}
 
 /// The specification of an AST that sapling can edit
 pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash {
     /// A type parameter that will represent the different ways this AST can be rendered
     type FormatStyle;
-    /// Error type returned by [Ast::insert_child].
-    type InsertError: std::error::Error;
-    /// Error type returned by [Ast::delete_child].
-    type DeleteError: std::error::Error;
 
     /* FORMATTING FUNCTIONS */
 
@@ -74,7 +121,7 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
 
     /// Removes the child at a given index from the children of this node, if possible.  If the
     /// removal was not possible, then we return a custom error type.
-    fn delete_child(&mut self, index: usize) -> Result<(), Self::DeleteError>;
+    fn delete_child(&mut self, index: usize) -> Result<(), DeleteError>;
 
     /// Insert a given pre-allocated node as a new child of this node.  This can involve allocating
     /// extra nodes (usually as ancestors of `new_node` but descendants of `self`).  This is
@@ -86,7 +133,7 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
         new_node: &'arena Self,
         arena: &'arena Arena<Self>,
         index: usize,
-    ) -> Result<(), Self::InsertError>;
+    ) -> Result<(), InsertError>;
 
     /// Get the display name of this node
     fn display_name(&self) -> String;

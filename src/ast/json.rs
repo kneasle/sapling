@@ -1,6 +1,6 @@
 use super::display_token::{DisplayToken, RecTok};
 use super::size::Size;
-use super::Ast;
+use super::{Ast, DeleteError, InsertError};
 use crate::arena::Arena;
 
 /// An enum to hold the different ways that a JSON AST can be formatted
@@ -19,73 +19,6 @@ const CHAR_NULL: char = 'n';
 const CHAR_ARRAY: char = 'a';
 const CHAR_OBJECT: char = 'o';
 const CHAR_STRING: char = 's';
-
-/// Error produced when inserting a child into a JSON node fails
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum InsertError {
-    /// A child was attempted to be inserted into a node that can only have a fixed number of
-    /// children.  The second argument is the number of children that this node has to have.  This
-    /// is used by nodes such as `field`, which is required to have 2 children.
-    FixedChildCount(String, usize),
-}
-
-impl std::fmt::Display for InsertError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            InsertError::FixedChildCount(node, num_children) => {
-                if *num_children == 0 {
-                    write!(f, "Node {} cannot contain other nodes.", node)
-                } else if *num_children == 1 {
-                    write!(f, "Node {} can only have 1 child.", node)
-                } else {
-                    write!(f, "Node {} can only have {} children.", node, num_children)
-                }
-            }
-        }
-    }
-}
-
-impl std::error::Error for InsertError {}
-
-/// Error produced when trying to delete a child from this node
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum DeleteError {
-    /// We attempted to delete a child who's index was outside the bounds of the child array
-    IndexOutOfRange(usize, usize),
-    /// We attempted to delete a child from a node which must contain a fixed number of children
-    FixedChildCount(String, usize),
-}
-
-impl std::fmt::Display for DeleteError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DeleteError::IndexOutOfRange(num_children, index) => write!(
-                f,
-                "Tried to remove child #{} from a node that only has {} children.",
-                index, num_children
-            ),
-            DeleteError::FixedChildCount(node, num_children) => match *num_children {
-                0 => write!(
-                    f,
-                    "Node {} cannot have children, but we tried to delete a child.",
-                    node
-                ),
-                1 => write!(
-                    f,
-                    "Cannot delete from a node {} that can only have 1 child.",
-                    node
-                ),
-                _ => write!(
-                    f,
-                    "Cannot delete from a node {} that can only have {} children.",
-                    node, num_children
-                ),
-            },
-        }
-    }
-}
-
-impl std::error::Error for DeleteError {}
 
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
@@ -138,8 +71,6 @@ impl Default for JSON<'_> {
 
 impl<'arena> Ast<'arena> for JSON<'arena> {
     type FormatStyle = JSONFormat;
-    type InsertError = InsertError;
-    type DeleteError = DeleteError;
 
     /* FORMATTING FUNCTIONS */
 
@@ -359,12 +290,18 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         new_node: &'arena Self,
         arena: &'arena Arena<Self>,
         index: usize,
-    ) -> Result<(), Self::InsertError> {
+    ) -> Result<(), InsertError> {
         match self {
             JSON::True | JSON::False | JSON::Null | JSON::Str(_) => {
-                Err(InsertError::FixedChildCount(self.display_name(), 0))
+                Err(InsertError::TooManyChildren {
+                    name: self.display_name(),
+                    max_children: 0,
+                })
             }
-            JSON::Field(_) => Err(InsertError::FixedChildCount(self.display_name(), 2)),
+            JSON::Field(_) => Err(InsertError::TooManyChildren {
+                name: self.display_name(),
+                max_children: 2,
+            }),
             JSON::Object(fields) => {
                 /* Inserting into an object is a special case, since we need to allocate more
                  * objects in order to preserve the validity of the tree. */
@@ -383,18 +320,27 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         }
     }
 
-    fn delete_child(&mut self, index: usize) -> Result<(), Self::DeleteError> {
+    fn delete_child(&mut self, index: usize) -> Result<(), DeleteError> {
         match self {
             JSON::True | JSON::False | JSON::Null | JSON::Str(_) => {
-                Err(DeleteError::FixedChildCount(self.display_name(), 0))
+                // We shouldn't be able to delete the child of a node with no children - this would
+                // require first selecting the non-existent child, which should be caught by the
+                // cursor path code.
+                unreachable!();
             }
-            JSON::Field(_) => Err(DeleteError::FixedChildCount(self.display_name(), 2)),
+            JSON::Field(_) => Err(DeleteError::TooFewChildren {
+                name: self.display_name(),
+                min_children: 2,
+            }),
             JSON::Object(fields) => {
                 if index < fields.len() {
                     fields.remove(index);
                     Ok(())
                 } else {
-                    Err(DeleteError::IndexOutOfRange(fields.len(), index))
+                    Err(DeleteError::IndexOutOfRange {
+                        len: fields.len(),
+                        index,
+                    })
                 }
             }
             JSON::Array(children) => {
@@ -402,7 +348,10 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
                     children.remove(index);
                     Ok(())
                 } else {
-                    Err(DeleteError::IndexOutOfRange(children.len(), index))
+                    Err(DeleteError::IndexOutOfRange {
+                        len: children.len(),
+                        index,
+                    })
                 }
             }
         }
