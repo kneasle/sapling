@@ -11,7 +11,24 @@ mod command_log {
     //! A utility datastructure to store and render a log of commands.  This is mostly used to give
     //! the viewers of my streams feedback for what I'm typing.
 
+    use super::ActionCategory;
     use tuikit::prelude::*;
+
+    /// Returns the [`Color`] that all [`Action`]s of a given [`ActionCategory`] should be
+    /// displayed.  This is not implemented as a method on [`ActionCategory`], because doing so
+    /// would require [`ActionCategory`] to rely on the specific terminal backend used.  This way,
+    /// we keep the terminal backend as encapsulated as possible.
+    pub fn term_color(category: ActionCategory) -> Color {
+        match category {
+            ActionCategory::Move => Color::LIGHT_BLUE,
+            ActionCategory::History => Color::LIGHT_YELLOW,
+            ActionCategory::Insert => Color::LIGHT_GREEN,
+            ActionCategory::Replace => Color::CYAN,
+            ActionCategory::Delete => Color::RED,
+            ActionCategory::Quit => Color::MAGENTA,
+            ActionCategory::Undefined => Color::LIGHT_RED,
+        }
+    }
 
     /// One entry in the log.  This usually represts a single command, but could represent an
     /// accumulation of many identical commands that are executed consecutively.
@@ -113,18 +130,14 @@ mod command_log {
                 return;
             }
             // If the command is different, then we should add a new entry for it
-            let (description, color) = {
-                if command.is_empty() {
-                    log::error!("Empty command executed!");
-                    ("<empty command>".to_string(), Color::LIGHT_RED)
-                } else {
-                    if let Some(action) = super::parse_command(&keymap, &command) {
-                        action.description_and_color()
-                    } else {
-                        log::error!("Incomplete command executed!");
-                        ("<incomplete command>".to_string(), Color::LIGHT_RED)
-                    }
-                }
+            let (description, color) = if command.is_empty() {
+                log::error!("Empty command executed!");
+                ("<empty command>".to_string(), Color::LIGHT_RED)
+            } else if let Some(action) = super::parse_command(&keymap, &command) {
+                (action.description(), term_color(action.category()))
+            } else {
+                log::error!("Incomplete command executed!");
+                ("<incomplete command>".to_string(), Color::LIGHT_RED)
             };
             self.commands.push(Entry {
                 count: 1,
@@ -183,6 +196,27 @@ impl Command {
     }
 }
 
+/// A category grouping similar actions
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum ActionCategory {
+    /// An [`Action`] that moves the cursor
+    Move,
+    /// Either [`Action::Undo`] or [`Action::Redo`]
+    History,
+    /// An [`Action`] that inserts extra nodes into the tree
+    Insert,
+    /// An [`Action`] that replaces some nodes in the tree
+    Replace,
+    /// An [`Action`] that causes nodes to be deleted from the tree
+    Delete,
+    /// The [`Action`] was to [`Quit`](Action::Quit)
+    Quit,
+    /// The [`Action`] was [`Undefined`](Action::Undefined)
+    Undefined,
+}
+
+impl ActionCategory {}
+
 /// Mapping of keys to commands.
 /// Shortcut definition, also allows us to change the type if needed.
 pub type KeyMap = std::collections::HashMap<char, Command>;
@@ -207,7 +241,7 @@ pub fn default_keymap() -> KeyMap {
 }
 
 /// The possible meanings of a user-typed command
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 enum Action {
     /// The user typed a command that isn't defined, but the command box should still be cleared
     Undefined,
@@ -234,27 +268,36 @@ enum Action {
 impl Action {
     /// Returns a lower-case summary of the given command, along with the color with which it
     /// should be displayed in the log.
-    pub fn description_and_color(&self) -> (String, Color) {
-        const COL_MOVE: Color = Color::LIGHT_BLUE; // Color of the commands that move the cursor
-        const COL_HISTORY: Color = Color::LIGHT_YELLOW; // Color of undo/redo
-        const COL_INSERT: Color = Color::LIGHT_GREEN; // Colour of any insert command
-
+    pub fn description(&self) -> String {
         match self {
-            Action::Undefined => ("undefined command".to_string(), Color::LIGHT_RED),
-            Action::Quit => ("quit Sapling".to_string(), Color::LIGHT_RED),
-            Action::Replace(c) => (format!("replace cursor with '{}'", c), Color::CYAN),
-            Action::InsertChild(c) => (format!("insert '{}' as last child", c), COL_INSERT),
-            Action::InsertBefore(c) => (format!("insert '{}' before cursor", c), COL_INSERT),
-            Action::InsertAfter(c) => (format!("insert '{}' after cursor", c), COL_INSERT),
-            Action::Delete => ("delete cursor".to_string(), Color::RED),
-            Action::MoveCursor(Direction::Down) => ("move to first child".to_string(), COL_MOVE),
-            Action::MoveCursor(Direction::Up) => ("move to parent".to_string(), COL_MOVE),
-            Action::MoveCursor(Direction::Prev) => {
-                ("move to previous sibling".to_string(), COL_MOVE)
+            Action::Undefined => "undefined command".to_string(),
+            Action::Quit => "quit Sapling".to_string(),
+            Action::Replace(c) => format!("replace cursor with '{}'", c),
+            Action::InsertChild(c) => format!("insert '{}' as last child", c),
+            Action::InsertBefore(c) => format!("insert '{}' before cursor", c),
+            Action::InsertAfter(c) => format!("insert '{}' after cursor", c),
+            Action::Delete => "delete cursor".to_string(),
+            Action::MoveCursor(Direction::Down) => "move to first child".to_string(),
+            Action::MoveCursor(Direction::Up) => "move to parent".to_string(),
+            Action::MoveCursor(Direction::Prev) => "move to previous sibling".to_string(),
+            Action::MoveCursor(Direction::Next) => "move to next sibling".to_string(),
+            Action::Undo => "undo a change".to_string(),
+            Action::Redo => "redo a change".to_string(),
+        }
+    }
+
+    /// Returns the [`ActionCategory`] of this `Action`
+    pub fn category(&self) -> ActionCategory {
+        match self {
+            Action::Undefined => ActionCategory::Undefined,
+            Action::Quit => ActionCategory::Quit,
+            Action::Replace(_) => ActionCategory::Replace,
+            Action::InsertChild(_) | Action::InsertBefore(_) | Action::InsertAfter(_) => {
+                ActionCategory::Insert
             }
-            Action::MoveCursor(Direction::Next) => ("move to next sibling".to_string(), COL_MOVE),
-            Action::Undo => ("undo a change".to_string(), COL_HISTORY),
-            Action::Redo => ("redo a change".to_string(), COL_HISTORY),
+            Action::Delete => ActionCategory::Delete,
+            Action::MoveCursor(_) => ActionCategory::Move,
+            Action::Undo | Action::Redo => ActionCategory::History,
         }
     }
 }
