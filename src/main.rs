@@ -1,3 +1,7 @@
+#![deny(missing_docs)]
+#![deny(broken_intra_doc_links)]
+#![allow(private_intra_doc_links)]
+
 pub mod arena;
 pub mod ast;
 pub mod config;
