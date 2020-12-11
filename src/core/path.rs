@@ -1,3 +1,5 @@
+//! A module containing a way of representing the **location** of a node within a tree.
+
 use crate::ast::Ast;
 
 /// A tree-independent struct for representing the locations of nodes within trees.
@@ -135,7 +137,7 @@ where
     /// - the path has finished (there are no more child indices to read)
     /// - the child index has a value too big to represent a valid child of the current node
     /// - self.node = None; i.e. the iterator has already finished.  This condition means that this
-    ///   iterator is **fused** (see [`std::iter::Fused`])
+    ///   iterator is **fused** (see [`std::iter::Fuse`])
     ///
     /// # Panics
     /// This will panic if the cursor path reaches a point where a node does not have enough

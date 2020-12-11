@@ -1,20 +1,30 @@
+//! Another representation of JSON trees (where nodes own their children), useful for unit tests
+//! and debugging.
+
 use super::json::JSON;
 use crate::arena::Arena;
 
 /// A copy of [`JSON`] where nodes own their children
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum TestJSON {
+    /// The constant literal `true`.  Converts to [`JSON::True`]
     True,
+    /// The constant literal `false`.  Converts to [`JSON::False`]
     False,
+    /// The constant literal `null`.  Converts to [`JSON::Null`]
     Null,
+    /// A JSON array `[child1, child2, ..., childN]`.  Converts to [`JSON::Array`]
     Array(Vec<TestJSON>),
+    /// A JSON object `{key1: child1, key2: child2, ..., keyN: childN}`.  Converts to a
+    /// [`JSON::Object`] with `N` [`JSON::Field`]s containing the key/value pairs.
     Object(Vec<(String, TestJSON)>),
+    /// A JSON 'String' literal
     Str(String),
 }
 
 impl TestJSON {
-    /// Convert this node into a standard [`JSON`], where all the nodes are stored in a given
-    /// [`Arena`]
+    /// Convert this node into a standard [`JSON`] tree, where all the nodes are allocated in a
+    /// given [`Arena`]
     pub fn add_to_arena<'arena>(&self, arena: &'arena Arena<JSON<'arena>>) -> &'arena JSON<'arena> {
         match self {
             TestJSON::True => arena.alloc(JSON::True),

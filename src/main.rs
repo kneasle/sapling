@@ -1,3 +1,6 @@
+//! # Sapling
+//! A highly experimental editor where you edit code, not text.
+
 #![deny(missing_docs)]
 #![deny(broken_intra_doc_links)]
 #![allow(private_intra_doc_links)]
@@ -14,6 +17,10 @@ use crate::ast::test_json::TestJSON;
 use crate::core::Path;
 use crate::editor::{dag::DAG, Editor};
 
+/// The entry point of Sapling.
+///
+/// The main function is tasked with initialising everything, then passing control to
+/// [`Editor::run`].
 fn main() {
     // Initialise the logging and startup
     pretty_env_logger::formatted_builder()

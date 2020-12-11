@@ -1,9 +1,12 @@
+//! Descriptions of the tokens that Sapling uses to render ASTs to the screen.
+
 use super::Ast;
 use std::borrow::Cow;
 
 /// How many spaces corespond to one indentation level
 const INDENT_WIDTH: usize = 4;
 
+/// A module of `const`s that represent the default [`SyntaxCategories`](SyntaxCategory)
 pub mod syntax_category {
     /// Text that shouldn't be highlighted a specific colour: used for things like punctuation.
     pub const DEFAULT: &'static str = "default";
@@ -56,7 +59,10 @@ pub enum DisplayToken {
 /// child references to be recursively expanded.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RecTok<'arena, Node> {
+    /// Display a [`DisplayToken`] that is part of the current node
     Tok(DisplayToken),
+    /// Display the tokens of a child in this position of the text (this will generate a recursive
+    /// call to [`Ast::display_tokens`]).
     Child(&'arena Node),
 }
 

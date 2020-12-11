@@ -1,3 +1,5 @@
+//! A hard-coded specification of JSON ASTs in a format editable by Sapling
+
 use super::display_token::{syntax_category, DisplayToken, RecTok};
 use super::{Ast, DeleteError, InsertError};
 use crate::arena::Arena;

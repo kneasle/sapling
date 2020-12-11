@@ -1,3 +1,5 @@
+//! The code for 'normal-mode', similar to that of Vim
+
 use crate::core::Direction;
 
 pub mod keystroke_log {
@@ -6,6 +8,10 @@ pub mod keystroke_log {
 
     use super::ActionCategory;
     use tuikit::prelude::*;
+
+    // Imports used solely for doc-comments
+    #[allow(unused_imports)]
+    use super::Action;
 
     /// Returns the [`Color`] that all [`Action`]s of a given [`ActionCategory`] should be
     /// displayed.  This is not implemented as a method on [`ActionCategory`], because doing so
@@ -214,6 +220,7 @@ impl ActionCategory {}
 /// Shortcut definition, also allows us to change the type if needed.
 pub type KeyMap = std::collections::HashMap<char, KeyStroke>;
 
+/// Generates a 'canonical' [`KeyMap`].  These keybindings will be very similar to those of Vim.
 pub fn default_keymap() -> KeyMap {
     hmap::hmap! {
         'q' => KeyStroke::Quit,
