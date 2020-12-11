@@ -1,3 +1,6 @@
+//! Module to hold all user-configurable parameters, until we find a better way to handle
+//! configuration
+
 use crate::ast::display_token::{syntax_category::*, SyntaxCategory};
 use tuikit::prelude::Color;
 
