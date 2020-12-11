@@ -8,7 +8,7 @@ use crate::editable_tree::{EditErr, EditResult, EditSuccess, LogMessage, Side, D
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
-use normal_mode::{KeyMap, command_log, Action, parse_command};
+use normal_mode::{KeyMap, keystroke_log, Action, parse_keystroke};
 
 /// A struct to hold the top-level components of the editor.
 pub struct Editor<'arena, Node: Ast<'arena>> {
@@ -18,12 +18,12 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     format_style: Node::FormatStyle,
     /// The `tuikit` terminal that the `Editor` is rendering to
     term: Term,
-    /// The current contents of the command buffer
-    command: String,
+    /// The current contents of the keystroke buffer
+    keystroke: String,
     /// The configured key map
     keymap: KeyMap,
-    /// A list of the commands that have been executed, along with a summary of what they mean
-    command_log: command_log::KeyStrokeLog,
+    /// A list of the keystrokes that have been executed, along with a summary of what they mean
+    keystroke_log: keystroke_log::KeyStrokeLog,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
@@ -38,9 +38,9 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             tree,
             term,
             format_style,
-            command: String::new(),
+            keystroke: String::new(),
             keymap,
-            command_log: command_log::KeyStrokeLog::new(10),
+            keystroke_log: keystroke_log::KeyStrokeLog::new(10),
         }
     }
 
@@ -149,7 +149,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
         /* RENDER LOG SECTION */
 
-        self.command_log.render(&self.term, 0, width / 2);
+        self.keystroke_log.render(&self.term, 0, width / 2);
 
         /* RENDER BOTTOM BAR */
 
@@ -157,12 +157,12 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         self.term
             .print(height - 1, 0, "Press 'q' to exit.")
             .unwrap();
-        // Draw the current command buffer
+        // Draw the current keystroke buffer
         self.term
             .print(
                 height - 1,
-                width - 5 - self.command.chars().count(),
-                &self.command,
+                width - 5 - self.keystroke.chars().count(),
+                &self.keystroke,
             )
             .unwrap();
 
@@ -177,14 +177,14 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         let mut should_quit = false;
         // Respond to the action
         let result = match action {
-            // Undefined command
-            Action::Undefined => Err(EditErr::Invalid(self.command.clone())),
-            // History commands
+            // Undefined keystroke
+            Action::Undefined => Err(EditErr::Invalid(self.keystroke.clone())),
+            // History keystrokes
             Action::Undo => self.tree.undo(),
             Action::Redo => self.tree.redo(),
-            // Move command
+            // Move keystroke
             Action::MoveCursor(direction) => self.tree.move_cursor(direction),
-            // Edit commands
+            // Edit keystrokes
             Action::Replace(c) => self.tree.replace_cursor(c),
             Action::InsertChild(c) => self.tree.insert_child(c),
             Action::InsertBefore(c) => self.tree.insert_next_to_cursor(c, Side::Prev),
@@ -199,23 +199,23 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         (should_quit, result)
     }
 
-    /// Consumes a [`char`] and adds it to the command buffer.  If the command buffer contains a
-    /// valid command, then execute that command.
+    /// Consumes a [`char`] and adds it to the keystroke buffer.  If the keystroke buffer contains a
+    /// valid keystroke, then execute that keystroke.
     ///
     /// This returns a tuple of:
     /// 1. A [`bool`] value that determines whether or not Sapling should quit
-    /// 2. The [`EditResult`] of the edit, or `None` if the command is incomplete
-    fn consume_command_char(&mut self, c: char) -> (bool, Option<EditResult>) {
-        // Add the new keypress to the command
-        self.command.push(c);
-        // Attempt to parse the command, and take action if the command is
+    /// 2. The [`EditResult`] of the edit, or `None` if the keystroke is incomplete
+    fn consume_keystroke_char(&mut self, c: char) -> (bool, Option<EditResult>) {
+        // Add the new keypress to the keystroke
+        self.keystroke.push(c);
+        // Attempt to parse the keystroke, and take action if the keystroke is
         // complete
-        match parse_command(&self.keymap, &self.command) {
+        match parse_keystroke(&self.keymap, &self.keystroke) {
             Some(action) => {
                 let (should_quit, result) = self.execute_action(action);
-                // Add the command to the command log and clear the command buffer
-                self.command_log.push(self.command.clone(), &self.keymap);
-                self.command.clear();
+                // Add the keystroke to the keystroke log and clear the keystroke buffer
+                self.keystroke_log.push(self.keystroke.clone(), &self.keymap);
+                self.keystroke.clear();
                 // Return the result of the action
                 (should_quit, Some(result))
             }
@@ -232,25 +232,25 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 match key {
                     Key::Char(c) => {
                         // Consume the new keystroke
-                        let (should_quit, result) = self.consume_command_char(c);
-                        // Write the result's message to the log if the command was complete
+                        let (should_quit, result) = self.consume_keystroke_char(c);
+                        // Write the result's message to the log if the keystroke was complete
                         if let Some(res) = result {
                             res.log_message();
                         }
-                        // `self.add_char_to_command` returns `true` if the editor should quit
+                        // `self.add_char_to_keystroke` returns `true` if the editor should quit
                         if should_quit {
                             break;
                         }
                     }
                     Key::ESC => {
-                        self.command.clear();
+                        self.keystroke.clear();
                     }
                     _ => {}
                 }
             }
 
             // Make sure that the logger isn't taller than the screen
-            self.command_log
+            self.keystroke_log
                 .set_max_entries(self.term.term_size().unwrap().1.min(10));
 
             // Update the screen after every input (if this becomes a bottleneck then we can
@@ -274,13 +274,13 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
 #[cfg(test)]
 mod tests {
-    use super::normal_mode::{default_keymap, Action, parse_command};
+    use super::normal_mode::{default_keymap, Action, parse_keystroke};
     use crate::editable_tree::Direction;
 
     #[test]
-    fn parse_command_complete() {
+    fn parse_keystroke_complete() {
         let keymap = default_keymap();
-        for (command, expected_effect) in &[
+        for (keystroke, expected_effect) in &[
             ("q", Action::Quit),
             ("x", Action::Delete),
             ("d", Action::Undefined),
@@ -297,17 +297,17 @@ mod tests {
             ("oP", Action::InsertChild('P')),
         ] {
             assert_eq!(
-                parse_command(&keymap, *command),
+                parse_keystroke(&keymap, *keystroke),
                 Some(expected_effect.clone())
             );
         }
     }
 
     #[test]
-    fn parse_command_incomplete() {
+    fn parse_keystroke_incomplete() {
         let keymap = super::normal_mode::default_keymap();
-        for command in &["", "r", "o"] {
-            assert_eq!(parse_command(&keymap, *command), None);
+        for keystroke in &["", "r", "o"] {
+            assert_eq!(parse_keystroke(&keymap, *keystroke), None);
         }
     }
 }

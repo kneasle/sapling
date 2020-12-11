@@ -1,7 +1,7 @@
 use crate::editable_tree::Direction;
 
-    pub mod command_log {
-        //! A utility datastructure to store and render a log of commands.  This is mostly used to give
+    pub mod keystroke_log {
+        //! A utility datastructure to store and render a log of keystrokes.  This is mostly used to give
         //! the viewers of my streams feedback for what I'm typing.
     
         use super::ActionCategory;
@@ -23,25 +23,25 @@ use crate::editable_tree::Direction;
             }
         }
     
-        /// One entry in the log.  This usually represts a single command, but could represent an
-        /// accumulation of many identical commands that are executed consecutively.
+        /// One entry in the log.  This usually represts a single keystroke, but could represent an
+        /// accumulation of many identical keystrokes that are executed consecutively.
         struct Entry {
             count: usize,
-            command: String,
+            keystroke: String,
             description: String,
             color: Color,
         }
     
-        /// A utility struct to store and display a log of which commands have been executed recently.
+        /// A utility struct to store and display a log of which keystrokes have been executed recently.
         /// This is mostly used to give the viewers of my streams feedback for what I'm typing.
         pub struct KeyStrokeLog {
-            /// A list of commands that have been run
+            /// A list of keystrokes that have been run
             keystrokes: Vec<Entry>,
             max_entries: usize,
         }
     
         impl KeyStrokeLog {
-            /// Create a new (empty) command log
+            /// Create a new (empty) keystroke log
             pub fn new(max_entries: usize) -> KeyStrokeLog {
                 KeyStrokeLog {
                     keystrokes: vec![],
@@ -55,7 +55,7 @@ use crate::editable_tree::Direction;
                 self.enforce_entry_limit();
             }
     
-            /// Draw a log of recent commands to a given terminal at a given location
+            /// Draw a log of recent keystrokes to a given terminal at a given location
             pub fn render(&self, term: &Term, row: usize, col: usize) {
                 // Calculate how wide the numbers column should be, enforcing that it is at least two
                 // chars wide.
@@ -69,26 +69,26 @@ use crate::editable_tree::Direction;
                     .max()
                     .unwrap_or(0)
                     .max(2);
-                // Calculate the width of the command column, and make sure that it is at least two
+                // Calculate the width of the keystroke column, and make sure that it is at least two
                 // chars wide.
                 let cmd_col_width = self
                     .keystrokes
                     .iter()
-                    .map(|e| e.command.len())
+                    .map(|e| e.keystroke.len())
                     .max()
                     .unwrap_or(0)
                     .max(2);
-                // Render the commands
+                // Render the keystrokes
                 for (i, e) in self.keystrokes.iter().enumerate() {
                     // Print the count if greater than 1
                     if e.count > 1 {
                         term.print(row + i, col, &format!("{}x", e.count)).unwrap();
                     }
-                    // Print the commands in one column
+                    // Print the keystrokes in one column
                     term.print_with_attr(
                         row + i,
                         col + count_col_width + 1,
-                        &e.command,
+                        &e.keystroke,
                         Attr::default().fg(Color::WHITE),
                     )
                     .unwrap();
@@ -106,35 +106,35 @@ use crate::editable_tree::Direction;
                 }
             }
     
-            /// Repeatedly remove commands until the entry limit is satisfied
+            /// Repeatedly remove keystrokes until the entry limit is satisfied
             fn enforce_entry_limit(&mut self) {
                 while self.keystrokes.len() > self.max_entries {
                     self.keystrokes.remove(0);
                 }
             }
     
-            /// Pushes a new command to the log.
-            pub fn push(&mut self, command: String, keymap: &super::KeyMap) {
-                // If the command is identical to the last log entry, incrememnt that counter by one
-                if Some(&command) == self.keystrokes.last().map(|e| &e.command) {
+            /// Pushes a new keystroke to the log.
+            pub fn push(&mut self, keystroke: String, keymap: &super::KeyMap) {
+                // If the keystroke is identical to the last log entry, incrememnt that counter by one
+                if Some(&keystroke) == self.keystrokes.last().map(|e| &e.keystroke) {
                     // We can safely unwrap here, because the guard of the `if` statement guaruntees
-                    // that `self.command.last()` is `Some(_)`
+                    // that `self.keystroke.last()` is `Some(_)`
                     self.keystrokes.last_mut().unwrap().count += 1;
                     return;
                 }
-                // If the command is different, then we should add a new entry for it
-                let (description, color) = if command.is_empty() {
-                    log::error!("Empty command executed!");
-                    ("<empty command>".to_string(), Color::LIGHT_RED)
-                } else if let Some(action) = super::parse_command(&keymap, &command) {
+                // If the keystroke is different, then we should add a new entry for it
+                let (description, color) = if keystroke.is_empty() {
+                    log::error!("Empty keystroke executed!");
+                    ("<empty keystroke>".to_string(), Color::LIGHT_RED)
+                } else if let Some(action) = super::parse_keystroke(&keymap, &keystroke) {
                     (action.description(), term_color(action.category()))
                 } else {
-                    log::error!("Incomplete command executed!");
-                    ("<incomplete command>".to_string(), Color::LIGHT_RED)
+                    log::error!("Incomplete keystroke executed!");
+                    ("<incomplete keystroke>".to_string(), Color::LIGHT_RED)
                 };
                 self.keystrokes.push(Entry {
                     count: 1,
-                    command,
+                    keystroke,
                     description,
                     color,
                 });
@@ -144,7 +144,7 @@ use crate::editable_tree::Direction;
         }
     }
     
-    /// The possible command typed by user without any parameters.
+    /// The possible keystroke typed by user without any parameters.
     /// It can be mapped to a single key.
     #[derive(Debug, Clone, Eq, PartialEq, Hash)]
     pub enum KeyStroke {
@@ -160,7 +160,7 @@ use crate::editable_tree::Direction;
         InsertAfter,
         /// Delete the cursor
         Delete,
-        /// Move cursor in given direction.  The direction is part of the command, since the directions
+        /// Move cursor in given direction.  The direction is part of the keystroke, since the directions
         /// all correspond to single key presses.
         MoveCursor(Direction),
         /// Undo the last change
@@ -170,7 +170,7 @@ use crate::editable_tree::Direction;
     }
     
     impl KeyStroke {
-        /// Returns a lower-case summary string of the given command
+        /// Returns a lower-case summary string of the given keystroke
         pub fn summary_string(&self) -> &'static str {
             match self {
                 KeyStroke::Quit => "quit",
@@ -210,7 +210,7 @@ use crate::editable_tree::Direction;
     
     impl ActionCategory {}
     
-    /// Mapping of keys to commands.
+    /// Mapping of keys to keystrokes.
     /// Shortcut definition, also allows us to change the type if needed.
     pub type KeyMap = std::collections::HashMap<char, KeyStroke>;
     
@@ -233,10 +233,10 @@ use crate::editable_tree::Direction;
         }
     }
     
-    /// The possible meanings of a user-typed command
+    /// The possible meanings of a user-typed keystroke
     #[derive(Debug, Clone, Eq, PartialEq, Hash)]
     pub enum Action {
-        /// The user typed a command that isn't defined, but the command box should still be cleared
+        /// The user typed a keystroke that isn't defined, but the keystroke box should still be cleared
         Undefined,
         /// Quit Sapling
         Quit,
@@ -259,11 +259,11 @@ use crate::editable_tree::Direction;
     }
     
     impl Action {
-        /// Returns a lower-case summary of the given command, along with the color with which it
+        /// Returns a lower-case summary of the given keystroke, along with the color with which it
         /// should be displayed in the log.
         pub fn description(&self) -> String {
             match self {
-                Action::Undefined => "undefined command".to_string(),
+                Action::Undefined => "undefined keystroke".to_string(),
                 Action::Quit => "quit Sapling".to_string(),
                 Action::Replace(c) => format!("replace cursor with '{}'", c),
                 Action::InsertChild(c) => format!("insert '{}' as last child", c),
@@ -295,36 +295,36 @@ use crate::editable_tree::Direction;
         }
     }
     
-    /// Attempt to convert a command as a `&`[`str`] into an [`Action`].
-    /// This parses the string from the start, and returns when it finds a valid command.
+    /// Attempt to convert a keystroke as a `&`[`str`] into an [`Action`].
+    /// This parses the string from the start, and returns when it finds a valid keystroke.
     ///
     /// Therefore, `"q489flshb"` will be treated like `"q"`, and will return `Some(Action::Quit)` even
     /// though `"q489flshb"` is not technically valid.
-    /// This function is run every time the user types a command character, and so the user would not
+    /// This function is run every time the user types a keystroke character, and so the user would not
     /// be able to input `"q489flshb"` to this function because doing so would require them to first
     /// input every possible prefix of `"q489flshb"`, including `"q"`.
     ///
     /// This returns:
-    /// - [`None`] if the command is incomplete.
-    /// - [`Action::Undefined`] if the command is not defined (like the command "X").
+    /// - [`None`] if the keystroke is incomplete.
+    /// - [`Action::Undefined`] if the keystroke is not defined (like the keystroke "X").
     /// - The corresponding [`Action`], otherwise.
-    pub fn parse_command(keymap: &KeyMap, command: &str) -> Option<Action> {
-        let mut command_char_iter = command.chars();
+    pub fn parse_keystroke(keymap: &KeyMap, keystroke: &str) -> Option<Action> {
+        let mut keystroke_char_iter = keystroke.chars();
     
-        // Consume the first char of the command
-        let c = command_char_iter.next()?;
+        // Consume the first char of the keystroke
+        let c = keystroke_char_iter.next()?;
     
         match keymap.get(&c) {
             // "q" quits Sapling
             Some(KeyStroke::Quit) => Some(Action::Quit),
-            // this pattern is used several times: `command_char_iter.next().map()
+            // this pattern is used several times: `keystroke_char_iter.next().map()
             // This consumes the second char of the iterator and, if it exists, returns
             // Some(Action::ThisAction(char))
-            Some(KeyStroke::InsertChild) => command_char_iter.next().map(Action::InsertChild),
-            Some(KeyStroke::InsertBefore) => command_char_iter.next().map(Action::InsertBefore),
-            Some(KeyStroke::InsertAfter) => command_char_iter.next().map(Action::InsertAfter),
+            Some(KeyStroke::InsertChild) => keystroke_char_iter.next().map(Action::InsertChild),
+            Some(KeyStroke::InsertBefore) => keystroke_char_iter.next().map(Action::InsertBefore),
+            Some(KeyStroke::InsertAfter) => keystroke_char_iter.next().map(Action::InsertAfter),
             Some(KeyStroke::Delete) => Some(Action::Delete),
-            Some(KeyStroke::Replace) => command_char_iter.next().map(Action::Replace),
+            Some(KeyStroke::Replace) => keystroke_char_iter.next().map(Action::Replace),
             Some(KeyStroke::MoveCursor(direction)) => Some(Action::MoveCursor(*direction)),
             Some(KeyStroke::Undo) => Some(Action::Undo),
             Some(KeyStroke::Redo) => Some(Action::Redo),
