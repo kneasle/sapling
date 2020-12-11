@@ -7,7 +7,7 @@ use crate::arena::Arena;
 use crate::ast::json::JSONFormat;
 use crate::ast::test_json::TestJSON;
 use crate::editable_tree::DAG;
-use crate::editor::Editor;
+use crate::editor::{Editor, normal_mode};
 
 fn main() {
     // Initialise the logging and startup
@@ -28,6 +28,6 @@ fn main() {
     .add_to_arena(&arena);
 
     let mut tree = DAG::new(&arena, root);
-    let editor = Editor::new(&mut tree, JSONFormat::Pretty, editor::normal_mode::default_keymap());
+    let editor = Editor::new(&mut tree, JSONFormat::Pretty, normal_mode::default_keymap());
     editor.run();
 }
