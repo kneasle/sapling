@@ -5,10 +5,10 @@ pub mod normal_mode;
 use crate::ast::display_token::DisplayToken;
 use crate::ast::{size, Ast};
 use crate::editable_tree::{EditErr, EditResult, EditSuccess, LogMessage, Side, DAG};
+use normal_mode::{keystroke_log, parse_keystroke, Action, KeyMap};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use tuikit::prelude::*;
-use normal_mode::{KeyMap, keystroke_log, Action, parse_keystroke};
 
 /// A struct to hold the top-level components of the editor.
 pub struct Editor<'arena, Node: Ast<'arena>> {
@@ -214,7 +214,8 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             Some(action) => {
                 let (should_quit, result) = self.execute_action(action);
                 // Add the keystroke to the keystroke log and clear the keystroke buffer
-                self.keystroke_log.push(self.keystroke.clone(), &self.keymap);
+                self.keystroke_log
+                    .push(self.keystroke.clone(), &self.keymap);
                 self.keystroke.clear();
                 // Return the result of the action
                 (should_quit, Some(result))
@@ -274,7 +275,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
 #[cfg(test)]
 mod tests {
-    use super::normal_mode::{default_keymap, Action, parse_keystroke};
+    use super::normal_mode::{default_keymap, parse_keystroke, Action};
     use crate::editable_tree::Direction;
 
     #[test]
