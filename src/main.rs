@@ -1,5 +1,6 @@
 pub mod arena;
 pub mod ast;
+pub mod config;
 pub mod core;
 pub mod editor;
 
@@ -32,6 +33,7 @@ fn main() {
         &mut tree,
         JSONFormat::Pretty,
         editor::normal_mode::default_keymap(),
+        config::default_color_scheme(),
     );
     editor.run();
 }
