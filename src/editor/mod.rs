@@ -205,7 +205,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /// This returns a tuple of:
     /// 1. A [`bool`] value that determines whether or not Sapling should quit
     /// 2. The [`EditResult`] of the edit, or `None` if the keystroke is incomplete
-    fn consume_keystroke_char(&mut self, c: char) -> (bool, Option<EditResult>) {
+    fn consume_keystroke(&mut self, c: char) -> (bool, Option<EditResult>) {
         // Add the new keypress to the keystroke
         self.keystroke.push(c);
         // Attempt to parse the keystroke, and take action if the keystroke is
@@ -233,7 +233,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 match key {
                     Key::Char(c) => {
                         // Consume the new keystroke
-                        let (should_quit, result) = self.consume_keystroke_char(c);
+                        let (should_quit, result) = self.consume_keystroke(c);
                         // Write the result's message to the log if the keystroke was complete
                         if let Some(res) = result {
                             res.log_message();
