@@ -28,6 +28,10 @@ fn main() {
     .add_to_arena(&arena);
 
     let mut tree = DAG::new(&arena, root);
-    let editor = Editor::new(&mut tree, JSONFormat::Pretty, editor::default_keymap());
+    let editor = Editor::new(
+        &mut tree,
+        JSONFormat::Pretty,
+        editor::normal_mode::default_keymap(),
+    );
     editor.run();
 }
