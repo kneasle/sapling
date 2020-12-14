@@ -34,6 +34,7 @@ impl Side {
 }
 
 /// An enum that's returned when any of the 'edit' methods in [`DAG`] are successful.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum EditSuccess {
     Quit,
     Undo,
@@ -72,6 +73,7 @@ impl EditSuccess {
 }
 
 /// An error that represents an error in any of the 'edit' methods in [`DAG`].
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum EditErr {
     /* MISC ERRORS */
     /// The keystrokes that were attempted to be executed where invalid
@@ -578,5 +580,49 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         let mut s = String::new();
         self.write_text(&mut s, format);
         s
+    }
+}
+
+#[cfg(test)]
+mod integration {
+    use super::{cursor_path::CursorPath, EditSuccess, DAG};
+    use crate::arena::Arena;
+    use crate::ast::test_json::TestJSON as J;
+    use crate::editor::normal_mode::Action;
+
+    #[test]
+    fn example() {
+        // Inputs to the test
+        let start_tree = J::Array(vec![J::True, J::Array(vec![])]);
+        let start_cursor_location = CursorPath::from_vec(vec![1]);
+        let action = Action::InsertChild('t');
+        let expected_tree = J::Array(vec![J::True, J::Array(vec![J::True])]);
+        let expected_cursor_location = CursorPath::from_vec(vec![1]);
+
+        /* Run the test */
+
+        // Create a `DAG` that contains the starting tree and a given cursor location (we have to
+        // first create an arena for `DAG` to store its nodes).  This is very similar to Sapling's
+        // startup code in `main.rs`.
+        let arena = Arena::new();
+        let root = start_tree.add_to_arena(&arena);
+        let mut editable_tree = DAG::new(&arena, root, start_cursor_location);
+
+        // Perform the action - we expect `editable_tree.execute_action(action)` to return
+        // `(false, Ok(()))` because the action should be a success that doesn't quit Sapling.
+        assert_eq!(
+            editable_tree.execute_action(action),
+            (
+                false,
+                Ok(EditSuccess::InsertChild {
+                    c: 't',
+                    name: "true".to_string()
+                })
+            )
+        );
+
+        // Check that the tree is in the expected state
+        assert_eq!(expected_tree, editable_tree.root());
+        assert_eq!(expected_cursor_location, editable_tree.current_cursor_path);
     }
 }
