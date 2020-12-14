@@ -189,12 +189,12 @@ pub struct DAG<'arena, Node: Ast<'arena>> {
 
 impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
     /// Builds a new `DAG`, given the tree it should contain
-    pub fn new(arena: &'arena Arena<Node>, root: &'arena Node) -> Self {
+    pub fn new(arena: &'arena Arena<Node>, root: &'arena Node, cursor_path: CursorPath) -> Self {
         DAG {
             arena,
-            root_history: vec![(root, CursorPath::root())],
+            root_history: vec![(root, cursor_path.clone())],
             history_index: 0,
-            current_cursor_path: CursorPath::root(),
+            current_cursor_path: cursor_path,
         }
     }
 
