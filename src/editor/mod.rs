@@ -178,7 +178,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         // Respond to the action
         let result = match action {
             // Undefined keystroke
-            Action::Undefined => Err(EditErr::Invalid(self.keystroke.clone())),
+            Action::Undefined(keys) => Err(EditErr::Invalid(keys)),
             // History keystrokes
             Action::Undo => self.tree.undo(),
             Action::Redo => self.tree.redo(),
@@ -284,14 +284,14 @@ mod tests {
         for (keystroke, expected_effect) in &[
             ("q", Action::Quit),
             ("x", Action::Delete),
-            ("d", Action::Undefined),
+            ("d", Action::Undefined("d".to_string())),
             ("h", Action::MoveCursor(Direction::Prev)),
             ("j", Action::MoveCursor(Direction::Next)),
             ("k", Action::MoveCursor(Direction::Prev)),
             ("l", Action::MoveCursor(Direction::Next)),
             ("pajlbsi", Action::MoveCursor(Direction::Up)),
-            ("Pxx", Action::Undefined),
-            ("Qsx", Action::Undefined),
+            ("Pxx", Action::Undefined("Pxx".to_string())),
+            ("Qsx", Action::Undefined("Qsx".to_string())),
             ("ra", Action::Replace('a')),
             ("rg", Action::Replace('g')),
             ("oX", Action::InsertChild('X')),

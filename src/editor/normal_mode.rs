@@ -236,8 +236,9 @@ pub fn default_keymap() -> KeyMap {
 /// The possible meanings of a user-typed keystroke
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Action {
-    /// The user typed a keystroke that isn't defined, but the keystroke box should still be cleared
-    Undefined,
+    /// The user typed a keystroke combination that isn't defined and the keystroke buffer should
+    /// be cleared
+    Undefined(String),
     /// Quit Sapling
     Quit,
     /// Replace the selected node with a node represented by some [`char`]
@@ -263,7 +264,7 @@ impl Action {
     /// should be displayed in the log.
     pub fn description(&self) -> String {
         match self {
-            Action::Undefined => "undefined keystroke".to_string(),
+            Action::Undefined(keys) => format!("undefined keystrokes '{}'", keys),
             Action::Quit => "quit Sapling".to_string(),
             Action::Replace(c) => format!("replace cursor with '{}'", c),
             Action::InsertChild(c) => format!("insert '{}' as last child", c),
@@ -282,7 +283,7 @@ impl Action {
     /// Returns the [`ActionCategory`] of this `Action`
     pub fn category(&self) -> ActionCategory {
         match self {
-            Action::Undefined => ActionCategory::Undefined,
+            Action::Undefined(_) => ActionCategory::Undefined,
             Action::Quit => ActionCategory::Quit,
             Action::Replace(_) => ActionCategory::Replace,
             Action::InsertChild(_) | Action::InsertBefore(_) | Action::InsertAfter(_) => {
@@ -328,6 +329,6 @@ pub fn parse_keystroke(keymap: &KeyMap, keystroke: &str) -> Option<Action> {
         Some(KeyStroke::MoveCursor(direction)) => Some(Action::MoveCursor(*direction)),
         Some(KeyStroke::Undo) => Some(Action::Undo),
         Some(KeyStroke::Redo) => Some(Action::Redo),
-        None => Some(Action::Undefined),
+        None => Some(Action::Undefined(keystroke.to_string())),
     }
 }
