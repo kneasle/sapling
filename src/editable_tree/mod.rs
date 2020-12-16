@@ -588,7 +588,6 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 mod tests {
     use super::{cursor_path::CursorPath, Direction, EditErr, EditSuccess, Side, DAG};
     use crate::arena::Arena;
-    use crate::ast;
     use crate::ast::json::JSON;
     use crate::ast::test_json::TestJSON;
     use crate::editor::normal_mode::Action;
