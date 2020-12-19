@@ -25,7 +25,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     /// The `tuikit` terminal that the `Editor` is rendering to
     term: Term,
     /// The current contents of the keystroke buffer
-    keystroke: String,
+    keystroke_buffer: String,
     /// The configured key map
     keymap: KeyMap,
     /// The configured colour scheme
@@ -47,7 +47,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             tree,
             term,
             format_style,
-            keystroke: String::new(),
+            keystroke_buffer: String::new(),
             keymap,
             color_scheme,
             keystroke_log: keystroke_log::KeyStrokeLog::new(10),
@@ -183,8 +183,8 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         self.term
             .print(
                 height - 1,
-                width - 5 - self.keystroke.chars().count(),
-                &self.keystroke,
+                width - 5 - self.keystroke_buffer.chars().count(),
+                &self.keystroke_buffer,
             )
             .unwrap();
 
@@ -201,16 +201,16 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /// 2. The [`EditResult`] of the edit, or `None` if the keystroke is incomplete
     fn consume_keystroke(&mut self, c: char) -> (bool, Option<EditResult>) {
         // Add the new keypress to the keystroke
-        self.keystroke.push(c);
+        self.keystroke_buffer.push(c);
         // Attempt to parse the keystroke, and take action if the keystroke is
         // complete
-        match parse_keystroke(&self.keymap, &self.keystroke) {
+        match parse_keystroke(&self.keymap, &self.keystroke_buffer) {
             Some(action) => {
                 let (should_quit, result) = self.tree.execute_action(action);
                 // Add the keystroke to the keystroke log and clear the keystroke buffer
                 self.keystroke_log
-                    .push(self.keystroke.clone(), &self.keymap);
-                self.keystroke.clear();
+                    .push(self.keystroke_buffer.clone(), &self.keymap);
+                self.keystroke_buffer.clear();
                 // Return the result of the action
                 (should_quit, Some(result))
             }
@@ -238,7 +238,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                         }
                     }
                     Key::ESC => {
-                        self.keystroke.clear();
+                        self.keystroke_buffer.clear();
                     }
                     _ => {}
                 }
