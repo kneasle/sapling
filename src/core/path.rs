@@ -78,6 +78,12 @@ impl Path {
 
     /// Returns a mutable reference to the last child index in the path (if it exists).
     #[inline]
+    pub fn last(&self) -> Option<usize> {
+        self.child_indices.last().copied()
+    }
+
+    /// Returns a mutable reference to the last child index in the path (if it exists).
+    #[inline]
     pub fn last_mut(&mut self) -> Option<&mut usize> {
         self.child_indices.last_mut()
     }
@@ -187,6 +193,34 @@ mod tests {
         // But if we pop the last child, we get back to the root
         assert_eq!(path.pop(), Some(0));
         assert!(path.is_root());
+    }
+
+    #[test]
+    fn last_and_last_mut() {
+        // A path that's pointing to the root has no last
+        let mut path = Path::root();
+        assert_eq!(path.last(), None);
+        assert_eq!(path.last_mut(), None);
+        // If we push an index, then that should be that 'last'
+        path.push(0);
+        assert_eq!(path.last(), Some(0));
+        assert_eq!(path.last_mut().copied(), Some(0));
+        // If we change the last bit of the path, then `path.last()` should also change
+        *path.last_mut().unwrap() = 5;
+        assert_eq!(path.last(), Some(5));
+        assert_eq!(path.last_mut().copied(), Some(5));
+        // Push some more
+        path.push(3);
+        assert_eq!(path.last(), Some(3));
+        assert_eq!(path.last_mut().copied(), Some(3));
+        // Pop the last thing
+        assert_eq!(path.pop(), Some(3));
+        assert_eq!(path.last(), Some(5));
+        assert_eq!(path.last_mut().copied(), Some(5));
+        // Pop to the root
+        assert_eq!(path.pop(), Some(5));
+        assert_eq!(path.last(), None);
+        assert_eq!(path.last_mut(), None);
     }
 
     #[test]
