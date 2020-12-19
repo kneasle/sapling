@@ -16,7 +16,7 @@ use std::hash::Hasher;
 
 use tuikit::prelude::*;
 
-/// A struct to hold the top-level components of the editor.
+/// A singleton struct to hold the top-level components of Sapling.
 pub struct Editor<'arena, Node: Ast<'arena>> {
     /// The [`EditableTree`] that the `Editor` is editing
     tree: &'arena mut DAG<'arena, Node>,
