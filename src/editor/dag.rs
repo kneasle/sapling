@@ -1362,4 +1362,42 @@ mod tests {
             Path::from_vec(vec![0]),
         );
     }
+
+    /// This is a regression test for issue #51 (fixed in PR #53), where Sapling crashes if:
+    /// 1. The user deletes the cursor when the cursor is the last child of its parent
+    /// 2. The user undoes this edit
+    /// 3. The user redoes this edit
+    #[test]
+    fn delete_cursor_crash_bug() {
+        // Create and initialise DAG to test (start with JSON `[null]` with the cursor selecting
+        // the `null`)
+        let arena: Arena<JSON> = Arena::new();
+        let root = TestJSON::Array(vec![TestJSON::Null]).add_to_arena(&arena);
+        let mut editable_tree = DAG::new(&arena, root, Path::from_vec(vec![0]));
+
+        // Delete the node under the cursor, causing the cursor to move to the root
+        assert_eq!(
+            (
+                false,
+                Ok(EditSuccess::Delete {
+                    name: "null".to_string()
+                })
+            ),
+            editable_tree.execute_action(Action::Delete)
+        );
+        assert_eq!(editable_tree.current_cursor_path, Path::root());
+
+        // Undo this change, causing the cursor to move back to `null`
+        assert_eq!(
+            (false, Ok(EditSuccess::Undo)),
+            editable_tree.execute_action(Action::Undo)
+        );
+
+        // Redo the change.  It's not really important what the tree is here, so long as the DAG
+        // doesn't panic
+        assert_eq!(
+            (false, Ok(EditSuccess::Redo)),
+            editable_tree.execute_action(Action::Redo)
+        );
+    }
 }
