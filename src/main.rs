@@ -6,7 +6,7 @@ pub mod editor;
 use crate::arena::Arena;
 use crate::ast::json::JSONFormat;
 use crate::ast::test_json::TestJSON;
-use crate::editable_tree::{cursor_path::CursorPath, DAG};
+use crate::editable_tree::{cursor::Path, DAG};
 use crate::editor::Editor;
 
 fn main() {
@@ -27,11 +27,12 @@ fn main() {
     ])
     .add_to_arena(&arena);
 
-    let mut tree = DAG::new(&arena, root, CursorPath::root());
+    let mut tree = DAG::new(&arena, root, Path::root());
     let editor = Editor::new(
         &mut tree,
         JSONFormat::Pretty,
         editor::normal_mode::default_keymap(),
     );
+
     editor.run();
 }
