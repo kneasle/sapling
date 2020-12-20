@@ -612,7 +612,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_insertchild() {
+    fn root_insertchild() {
         run_test_ok(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -651,7 +651,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_insertbefore() {
+    fn root_insertbefore() {
         run_test_err(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -669,7 +669,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_insertafter() {
+    fn root_insertafter() {
         run_test_err(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -687,7 +687,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_repalce() {
+    fn root_replace() {
         run_test_ok(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -735,7 +735,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_undefined() {
+    fn root_undefined() {
         run_test_err(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -745,7 +745,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_delete() {
+    fn root_delete() {
         run_test_err(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -763,7 +763,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_movecursor() {
+    fn root_movecursor() {
         // move to previous sibling node of root
         run_test_err(
             TestJSON::Array(vec![]),
@@ -812,7 +812,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_quit() {
+    fn root_quit() {
         run_test_ok(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -824,7 +824,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_undo() {
+    fn root_undo() {
         let start_tree = TestJSON::Array(vec![]);
         let start_cursor_location_0 = Path::root();
 
@@ -931,7 +931,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_redo() {
+    fn root_redo() {
         let start_tree = TestJSON::Array(vec![]);
         let start_cursor_location_0 = Path::root();
 
@@ -1077,7 +1077,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_insertchild() {
+    fn level_1_insertchild() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
             Path::from_vec(vec![0]),
@@ -1095,7 +1095,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_insertafter() {
+    fn level_1_insertafter() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
             Path::from_vec(vec![0]),
@@ -1142,7 +1142,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_insertbefore() {
+    fn level_1_insertbefore() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
             Path::from_vec(vec![0]),
@@ -1189,7 +1189,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_delete() {
+    fn level_1_delete() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
             Path::from_vec(vec![1]),
@@ -1220,7 +1220,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_replace() {
+    fn level_1_replace() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
             Path::from_vec(vec![1]),
@@ -1238,7 +1238,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_undefined() {
+    fn level_1_undefined() {
         run_test_err(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
             Path::from_vec(vec![1]),
@@ -1248,7 +1248,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_movecursor() {
+    fn level_1_movecursor() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
             Path::root(),
@@ -1260,188 +1260,99 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_undo() {
+    fn level_1_undo_and_redo() {
+        // The original snapshot of the tree
         let start_tree = TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let start_cursor_location_0 = Path::root();
+        let end_tree = TestJSON::False;
 
-        let action_0 = Action::Replace('f');
-        let action_1 = Action::Undo;
-
-        let expected_edit_result_0: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::Replace {
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_edit_result_1: (bool, Result<EditSuccess, EditErr>) =
-            (false, Ok(EditSuccess::Undo));
-
-        let expected_tree_0 = TestJSON::False;
-        let expected_tree_1 =
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-
-        let expected_cursor_location_0 = Path::root();
-        let expected_cursor_location_1 = Path::root();
-
+        // Create and initialise DAG to test
         let arena: Arena<JSON> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location_0);
+        let mut editable_tree = DAG::new(&arena, root, Path::root());
 
+        // Step 1: Replace root with `false`
+        println!("Inserting `false`");
         assert_eq!(
-            expected_edit_result_0,
-            editable_tree.execute_action(action_0),
-            "Not equal in action result"
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            editable_tree.execute_action(Action::Replace('f')),
+            "Not equal in action result."
         );
-        assert_eq!(expected_tree_0, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
         assert_eq!(
-            expected_cursor_location_0, editable_tree.current_cursor_path,
+            Path::root(),
+            editable_tree.current_cursor_path,
             "Not equal in cursor location."
         );
 
-        // undo
+        // Perform one undo.  This be successful, because it's undoing the replace-with-false
+        println!("Performing first undo");
         assert_eq!(
-            expected_edit_result_1,
-            editable_tree.execute_action(action_1),
+            (false, Ok(EditSuccess::Undo)),
+            editable_tree.execute_action(Action::Undo),
             "Not equal in action result"
         );
-        assert_eq!(expected_tree_1, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(start_tree, editable_tree.root(), "Not equal in tree.");
         assert_eq!(
-            expected_cursor_location_1, editable_tree.current_cursor_path,
+            Path::root(),
+            editable_tree.current_cursor_path,
+            "Not equal in cursor location."
+        );
+
+        // Perform another undo.  This won't be successful, because there's nothing to undo
+        println!("Performing the 2nd undo");
+        assert_eq!(
+            (false, Err(EditErr::NoChangesToUndo)),
+            editable_tree.execute_action(Action::Undo),
+            "Not equal in action result"
+        );
+        assert_eq!(
+            start_tree,
+            editable_tree.root(),
+            "Failed undo modified the tree"
+        );
+        assert_eq!(
+            Path::root(),
+            editable_tree.current_cursor_path,
+            "Failed undo moved the cursor"
+        );
+
+        // Redo the change we undid (this should succeed)
+        println!("Performing the 1st redo");
+        assert_eq!(
+            (false, Ok(EditSuccess::Redo)),
+            editable_tree.execute_action(Action::Redo),
+            "Not equal in action result"
+        );
+        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(
+            Path::root(),
+            editable_tree.current_cursor_path,
+            "Not equal in cursor location."
+        );
+
+        // Redo another time, but there are no changes to redo
+        println!("Performing the 2nd redo");
+        assert_eq!(
+            (false, Err(EditErr::NoChangesToRedo)),
+            editable_tree.execute_action(Action::Redo),
+            "Not equal in action result"
+        );
+        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(
+            Path::root(),
+            editable_tree.current_cursor_path,
             "Not equal in cursor location."
         );
     }
 
     #[test]
-    fn dag_level_1_redo() {
-        let start_tree = TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let start_cursor_location_0 = Path::root();
-
-        let action_0 = Action::Replace('f');
-        let action_1 = Action::Undo;
-        let action_2 = Action::Undo;
-        let action_3 = Action::Redo;
-        let action_4 = Action::Redo;
-
-        let expected_edit_result_0: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::Replace {
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_edit_result_1: (bool, Result<EditSuccess, EditErr>) =
-            (false, Ok(EditSuccess::Undo));
-
-        let expected_edit_result_2: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::NoChangesToUndo));
-
-        let expected_edit_result_3: (bool, Result<EditSuccess, EditErr>) =
-            (false, Ok(EditSuccess::Redo));
-
-        let expected_edit_result_4: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::NoChangesToRedo));
-
-        let expected_tree_0 = TestJSON::False;
-        let expected_tree_1 =
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let expected_tree_2 =
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let expected_tree_3 = TestJSON::False;
-        let expected_tree_4 = TestJSON::False;
-
-        let expected_cursor_location_0 = Path::root();
-        let expected_cursor_location_1 = Path::root();
-        let expected_cursor_location_2 = Path::root();
-        let expected_cursor_location_3 = Path::root();
-        let expected_cursor_location_4 = Path::root();
-
-        let arena: Arena<JSON> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location_0);
-
-        assert_eq!(
-            expected_edit_result_0,
-            editable_tree.execute_action(action_0),
-            "Not equal in action result (move 0)."
-        );
-        assert_eq!(
-            expected_tree_0,
-            editable_tree.root(),
-            "Not equal in tree (move 0)."
-        );
-        assert_eq!(
-            expected_cursor_location_0, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 0)."
-        );
-
-        // undo 1
-        assert_eq!(
-            expected_edit_result_1,
-            editable_tree.execute_action(action_1),
-            "Not equal in action result (move 1)"
-        );
-        assert_eq!(
-            expected_tree_1,
-            editable_tree.root(),
-            "Not equal in tree (move 1)."
-        );
-        assert_eq!(
-            expected_cursor_location_1, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 1)."
-        );
-
-        // undo 2
-        assert_eq!(
-            expected_edit_result_2,
-            editable_tree.execute_action(action_2),
-            "Not equal in action result (move 2)"
-        );
-        assert_eq!(
-            expected_tree_2,
-            editable_tree.root(),
-            "Not equal in tree (move 2)."
-        );
-        assert_eq!(
-            expected_cursor_location_2, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 2)."
-        );
-
-        // redo 1
-        assert_eq!(
-            expected_edit_result_3,
-            editable_tree.execute_action(action_3),
-            "Not equal in action result (move 3)"
-        );
-        assert_eq!(
-            expected_tree_3,
-            editable_tree.root(),
-            "Not equal in tree (move 3)."
-        );
-        assert_eq!(
-            expected_cursor_location_3, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 3)."
-        );
-
-        // redo 2
-        assert_eq!(
-            expected_edit_result_4,
-            editable_tree.execute_action(action_4),
-            "Not equal in action result (move 4)"
-        );
-        assert_eq!(
-            expected_tree_4,
-            editable_tree.root(),
-            "Not equal in tree (move 4)."
-        );
-        assert_eq!(
-            expected_cursor_location_4, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 4)."
-        );
-    }
-
-    #[test]
-    fn dag_level_1_quit() {
+    fn level_1_quit() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
             Path::from_vec(vec![0]),
