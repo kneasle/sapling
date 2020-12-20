@@ -592,7 +592,31 @@ mod tests {
     use crate::ast::test_json::TestJSON;
     use crate::editor::normal_mode::Action;
 
-    fn run_test(
+    fn run_test_ok(
+        start_tree: TestJSON,
+        start_cursor_location: CursorPath,
+        action: Action,
+        expected_edit_result: (bool, Result<EditSuccess, EditErr>),
+        expected_tree: TestJSON,
+        expected_cursor_location: CursorPath,
+    ) {
+        let arena: Arena<JSON> = Arena::new();
+        let root = start_tree.add_to_arena(&arena);
+        let mut editable_tree = DAG::new(&arena, root, start_cursor_location);
+
+        assert_eq!(
+            expected_edit_result,
+            editable_tree.execute_action(action),
+            "Not equal in action result"
+        );
+        assert_eq!(expected_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(
+            expected_cursor_location, editable_tree.current_cursor_path,
+            "Not equal in cursor location."
+        );
+    }
+
+    fn run_test_err(
         start_tree: TestJSON,
         start_cursor_location: CursorPath,
         action: Action,
@@ -618,406 +642,239 @@ mod tests {
 
     #[test]
     fn dag_root_insertchild() {
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::from_vec(vec![]);
-        let action = Action::InsertChild('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::InsertChild {
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Array(vec![TestJSON::False]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::InsertChild('f'),
+            (
+                false,
+                Ok(EditSuccess::InsertChild {
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![TestJSON::False]),
+            CursorPath::root(),
         );
 
         //DAG level == 1
-        let start_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let start_cursor_location = CursorPath::from_vec(vec![]);
-        let action = Action::InsertChild('n');
 
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::InsertChild {
-                c: 'n',
-                name: "null".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Array(vec![
-            TestJSON::Array(vec![]),
-            TestJSON::True,
-            TestJSON::Null,
-        ]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
-        );
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::root(),
+            Action::InsertChild('n'),
+            (
+                false,
+                Ok(EditSuccess::InsertChild {
+                    c: 'n',
+                    name: "null".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![
+                TestJSON::Array(vec![]),
+                TestJSON::True,
+                TestJSON::Null,
+            ]),
+            CursorPath::root(),
+        )
     }
 
     #[test]
     fn dag_root_insertbefore() {
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::from_vec(vec![]);
-        let action = Action::InsertBefore('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::AddSiblingToRoot));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::InsertBefore('f'),
+            (false, Err(EditErr::AddSiblingToRoot)),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
 
         //  tree level == 1
-        let start_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let start_cursor_location = CursorPath::from_vec(vec![]);
-        let action = Action::InsertBefore('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::AddSiblingToRoot));
-        let expected_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::root(),
+            Action::InsertBefore('f'),
+            (false, Err(EditErr::AddSiblingToRoot)),
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::root(),
         );
     }
 
     #[test]
     fn dag_root_insertafter() {
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::InsertAfter('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::AddSiblingToRoot));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::InsertAfter('f'),
+            (false, Err(EditErr::AddSiblingToRoot)),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
 
         // tree level == 1
-        let start_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let start_cursor_location = CursorPath::from_vec(vec![]);
-        let action = Action::InsertAfter('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::AddSiblingToRoot));
-        let expected_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::root(),
+            Action::InsertAfter('f'),
+            (false, Err(EditErr::AddSiblingToRoot)),
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::root(),
         );
     }
 
     #[test]
     fn dag_root_repalce() {
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::Replace('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::Replace {
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::False;
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::Replace('f'),
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            TestJSON::False,
+            CursorPath::root(),
         );
 
         // Char not a node
-        let start_tree = TestJSON::False;
-        let start_cursor_location = CursorPath::root();
-        let action = Action::Replace('m');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Err(EditErr::CannotBeChild {
-                c: 'm',
-                parent_name: "<unknown>".to_string(),
-            }),
+        run_test_err(
+            TestJSON::False,
+            CursorPath::root(),
+            Action::Replace('m'),
+            (
+                false,
+                Err(EditErr::CannotBeChild {
+                    c: 'm',
+                    parent_name: "<unknown>".to_string(),
+                }),
+            ),
+            TestJSON::False,
+            CursorPath::root(),
         );
-        let expected_tree = TestJSON::False;
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
-        );
-
+        //
         // tree level == 1
-        let start_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]);
-        let start_cursor_location = CursorPath::from_vec(vec![]);
-        let action = Action::Replace('n');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::Replace {
-                c: 'n',
-                name: "null".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Null;
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
+            CursorPath::root(),
+            Action::Replace('n'),
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'n',
+                    name: "null".to_string(),
+                }),
+            ),
+            TestJSON::Null,
+            CursorPath::root(),
         );
     }
 
     #[test]
     fn dag_root_undefined() {
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::Undefined("c".to_string());
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::Invalid("c".to_string())));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::Undefined("c".to_string()),
+            (false, Err(EditErr::Invalid("c".to_string()))),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
     }
 
     #[test]
     fn dag_root_delete() {
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::Delete;
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::DeletingRoot));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::Delete,
+            (false, Err(EditErr::DeletingRoot)),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
 
-        let start_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let start_cursor_location = CursorPath::from_vec(vec![]);
-        let action = Action::Delete;
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::DeletingRoot));
-        let expected_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        // dag level==1
+        run_test_err(
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::root(),
+            Action::Delete,
+            (false, Err(EditErr::DeletingRoot)),
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::root(),
         );
     }
 
     #[test]
     fn dag_root_movecursor() {
         // move to previous sibling node of root
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::MoveCursor(Direction::Prev);
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::MoveToSiblingOfRoot));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::MoveCursor(Direction::Prev),
+            (false, Err(EditErr::MoveToSiblingOfRoot)),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
-
         // move to next sibling node of root
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::MoveCursor(Direction::Next);
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::MoveToSiblingOfRoot));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::MoveCursor(Direction::Next),
+            (false, Err(EditErr::MoveToSiblingOfRoot)),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
-
         // move to parent node of root
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::MoveCursor(Direction::Up);
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::MoveToParentOfRoot));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::MoveCursor(Direction::Up),
+            (false, Err(EditErr::MoveToParentOfRoot)),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+        );
+        // move to nonexistent child node of root
+        run_test_err(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::MoveCursor(Direction::Down),
+            (false, Err(EditErr::MoveToNonexistentChild)),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
 
         // move to nonexistent child node of root
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::MoveCursor(Direction::Down);
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::MoveToNonexistentChild));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
-        );
-
-        // move to nonexistent child node of root
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::MoveCursor(Direction::Down);
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::MoveToNonexistentChild));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::MoveCursor(Direction::Down),
+            (false, Err(EditErr::MoveToNonexistentChild)),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
         // move to root from child
-        let start_tree = TestJSON::Array(vec![TestJSON::False, TestJSON::True]);
-        let start_cursor_location = CursorPath::from_vec(vec![1]);
-        let action = Action::MoveCursor(Direction::Up);
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Ok(EditSuccess::Move(Direction::Up)));
-        let expected_tree = TestJSON::Array(vec![TestJSON::False, TestJSON::True]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::False, TestJSON::True]),
+            CursorPath::from_vec(vec![1]),
+            Action::MoveCursor(Direction::Up),
+            (false, Ok(EditSuccess::Move(Direction::Up))),
+            TestJSON::Array(vec![TestJSON::False, TestJSON::True]),
+            CursorPath::root(),
         );
     }
 
     #[test]
     fn dag_root_quit() {
-        let start_tree = TestJSON::Array(vec![]);
-        let start_cursor_location = CursorPath::root();
-        let action = Action::Quit;
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (true, Ok(EditSuccess::Quit));
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
+            Action::Quit,
+            (true, Ok(EditSuccess::Quit)),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
     }
 
@@ -1042,8 +899,8 @@ mod tests {
         let expected_tree_0 = TestJSON::False;
         let expected_tree_1 = TestJSON::Array(vec![]);
 
-        let expected_cursor_location_0 = CursorPath::from_vec(vec![]);
-        let expected_cursor_location_1 = CursorPath::from_vec(vec![]);
+        let expected_cursor_location_0 = CursorPath::root();
+        let expected_cursor_location_1 = CursorPath::root();
 
         let arena: Arena<JSON> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
@@ -1153,9 +1010,9 @@ mod tests {
         let expected_tree_1 = TestJSON::Array(vec![]);
         let expected_tree_2 = TestJSON::Object(vec![]);
 
-        let expected_cursor_location_0 = CursorPath::from_vec(vec![]);
-        let expected_cursor_location_1 = CursorPath::from_vec(vec![]);
-        let expected_cursor_location_2 = CursorPath::from_vec(vec![]);
+        let expected_cursor_location_0 = CursorPath::root();
+        let expected_cursor_location_1 = CursorPath::root();
+        let expected_cursor_location_2 = CursorPath::root();
 
         let arena: Arena<JSON> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
@@ -1276,278 +1133,193 @@ mod tests {
 
     #[test]
     fn dag_level_1_insertchild() {
-        let start_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let start_cursor_location = CursorPath::from_vec(vec![0]);
-        let action = Action::InsertChild('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::InsertChild {
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_tree =
-            TestJSON::Array(vec![TestJSON::Array(vec![TestJSON::False]), TestJSON::True]);
-        let expected_cursor_location = CursorPath::from_vec(vec![0]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::from_vec(vec![0]),
+            Action::InsertChild('f'),
+            (
+                false,
+                Ok(EditSuccess::InsertChild {
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![TestJSON::Array(vec![TestJSON::False]), TestJSON::True]),
+            CursorPath::from_vec(vec![0]),
         );
     }
 
     #[test]
     fn dag_level_1_insertafter() {
-        let start_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let start_cursor_location = CursorPath::from_vec(vec![0]);
-        let action = Action::InsertAfter('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::InsertNextToCursor {
-                side: Side::Next,
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Array(vec![
-            TestJSON::Array(vec![]),
-            TestJSON::False,
-            TestJSON::True,
-        ]);
-        let expected_cursor_location = CursorPath::from_vec(vec![0]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::from_vec(vec![0]),
+            Action::InsertAfter('f'),
+            (
+                false,
+                Ok(EditSuccess::InsertNextToCursor {
+                    side: Side::Next,
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![
+                TestJSON::Array(vec![]),
+                TestJSON::False,
+                TestJSON::True,
+            ]),
+            CursorPath::from_vec(vec![0]),
         );
 
         // DAG level == 2
-        let start_tree = TestJSON::Array(vec![
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
-            TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
-        ]);
-        let start_cursor_location = CursorPath::from_vec(vec![1]);
-        let action = Action::InsertAfter('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::InsertNextToCursor {
-                side: Side::Next,
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Array(vec![
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
-            TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
-            TestJSON::False,
-        ]);
-
-        let expected_cursor_location = CursorPath::from_vec(vec![1]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![
+                TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
+                TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+            ]),
+            CursorPath::from_vec(vec![1]),
+            Action::InsertAfter('f'),
+            (
+                false,
+                Ok(EditSuccess::InsertNextToCursor {
+                    side: Side::Next,
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![
+                TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
+                TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+                TestJSON::False,
+            ]),
+            CursorPath::from_vec(vec![1]),
         );
     }
 
     #[test]
     fn dag_level_1_insertbefore() {
-        let start_tree = TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]);
-        let start_cursor_location = CursorPath::from_vec(vec![0]);
-        let action = Action::InsertBefore('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::InsertNextToCursor {
-                side: Side::Prev,
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Array(vec![
-            TestJSON::False,
-            TestJSON::Array(vec![]),
-            TestJSON::True,
-        ]);
-        let expected_cursor_location = CursorPath::from_vec(vec![0]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            CursorPath::from_vec(vec![0]),
+            Action::InsertBefore('f'),
+            (
+                false,
+                Ok(EditSuccess::InsertNextToCursor {
+                    side: Side::Prev,
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![
+                TestJSON::False,
+                TestJSON::Array(vec![]),
+                TestJSON::True,
+            ]),
+            CursorPath::from_vec(vec![0]),
         );
 
         // DAG level == 2
-        let start_tree = TestJSON::Array(vec![
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
-            TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
-        ]);
-        let start_cursor_location = CursorPath::from_vec(vec![1]);
-        let action = Action::InsertBefore('f');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::InsertNextToCursor {
-                side: Side::Prev,
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Array(vec![
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
-            TestJSON::False,
-            TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
-        ]);
-
-        let expected_cursor_location = CursorPath::from_vec(vec![1]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![
+                TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
+                TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+            ]),
+            CursorPath::from_vec(vec![1]),
+            Action::InsertBefore('f'),
+            (
+                false,
+                Ok(EditSuccess::InsertNextToCursor {
+                    side: Side::Prev,
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![
+                TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
+                TestJSON::False,
+                TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+            ]),
+            CursorPath::from_vec(vec![1]),
         );
     }
 
     #[test]
     fn dag_level_1_delete() {
-        let start_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]);
-        let start_cursor_location = CursorPath::from_vec(vec![1]);
-        let action = Action::Delete;
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::Delete {
-                name: "array".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Array(vec![TestJSON::True]);
-        let expected_cursor_location = CursorPath::from_vec(vec![0]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
+            CursorPath::from_vec(vec![1]),
+            Action::Delete,
+            (
+                false,
+                Ok(EditSuccess::Delete {
+                    name: "array".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![TestJSON::True]),
+            CursorPath::from_vec(vec![0]),
         );
 
-        let start_tree = TestJSON::Array(vec![TestJSON::True]);
-        let start_cursor_location = CursorPath::from_vec(vec![0]);
-        let action = Action::Delete;
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::Delete {
-                name: "true".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Array(vec![]);
-        let expected_cursor_location = CursorPath::from_vec(vec![]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::True]),
+            CursorPath::from_vec(vec![0]),
+            Action::Delete,
+            (
+                false,
+                Ok(EditSuccess::Delete {
+                    name: "true".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![]),
+            CursorPath::root(),
         );
     }
 
     #[test]
     fn dag_level_1_replace() {
-        let start_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]);
-        let start_cursor_location = CursorPath::from_vec(vec![1]);
-        let action = Action::Replace('n');
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::Replace {
-                c: 'n',
-                name: "null".to_string(),
-            }),
-        );
-        let expected_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Null]);
-        let expected_cursor_location = CursorPath::from_vec(vec![1]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
+            CursorPath::from_vec(vec![1]),
+            Action::Replace('n'),
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'n',
+                    name: "null".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Null]),
+            CursorPath::from_vec(vec![1]),
         );
     }
 
     #[test]
     fn dag_level_1_undefined() {
-        let start_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]);
-        let start_cursor_location = CursorPath::from_vec(vec![1]);
-        let action = Action::Undefined("f".to_string());
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::Invalid("f".to_string())));
-        let expected_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]);
-        let expected_cursor_location = CursorPath::from_vec(vec![1]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_err(
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
+            CursorPath::from_vec(vec![1]),
+            Action::Undefined("f".to_string()),
+            (false, Err(EditErr::Invalid("f".to_string()))),
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
+            CursorPath::from_vec(vec![1]),
         );
     }
 
     #[test]
     fn dag_level_1_movecursor() {
-        let start_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]);
-        let start_cursor_location = CursorPath::from_vec(vec![]);
-        let action = Action::MoveCursor(Direction::Down);
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (false, Ok(EditSuccess::Move(Direction::Down)));
-        let expected_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]);
-        let expected_cursor_location = CursorPath::from_vec(vec![0]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
+            CursorPath::root(),
+            Action::MoveCursor(Direction::Down),
+            (false, Ok(EditSuccess::Move(Direction::Down))),
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
+            CursorPath::from_vec(vec![0]),
         );
     }
 
     #[test]
     fn dag_level_1_undo() {
         let start_tree = TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let start_cursor_location_0 = CursorPath::from_vec(vec![]);
+        let start_cursor_location_0 = CursorPath::root();
 
         let action_0 = Action::Replace('f');
         let action_1 = Action::Undo;
@@ -1566,8 +1338,8 @@ mod tests {
         let expected_tree_1 =
             TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
 
-        let expected_cursor_location_0 = CursorPath::from_vec(vec![]);
-        let expected_cursor_location_1 = CursorPath::from_vec(vec![]);
+        let expected_cursor_location_0 = CursorPath::root();
+        let expected_cursor_location_1 = CursorPath::root();
 
         let arena: Arena<JSON> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
@@ -1600,7 +1372,7 @@ mod tests {
     #[test]
     fn dag_level_1_redo() {
         let start_tree = TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let start_cursor_location_0 = CursorPath::from_vec(vec![]);
+        let start_cursor_location_0 = CursorPath::root();
 
         let action_0 = Action::Replace('f');
         let action_1 = Action::Undo;
@@ -1635,11 +1407,11 @@ mod tests {
         let expected_tree_3 = TestJSON::False;
         let expected_tree_4 = TestJSON::False;
 
-        let expected_cursor_location_0 = CursorPath::from_vec(vec![]);
-        let expected_cursor_location_1 = CursorPath::from_vec(vec![]);
-        let expected_cursor_location_2 = CursorPath::from_vec(vec![]);
-        let expected_cursor_location_3 = CursorPath::from_vec(vec![]);
-        let expected_cursor_location_4 = CursorPath::from_vec(vec![]);
+        let expected_cursor_location_0 = CursorPath::root();
+        let expected_cursor_location_1 = CursorPath::root();
+        let expected_cursor_location_2 = CursorPath::root();
+        let expected_cursor_location_3 = CursorPath::root();
+        let expected_cursor_location_4 = CursorPath::root();
 
         let arena: Arena<JSON> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
@@ -1727,22 +1499,13 @@ mod tests {
 
     #[test]
     fn dag_level_1_quit() {
-        let start_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]);
-        let start_cursor_location = CursorPath::from_vec(vec![0]);
-        let action = Action::Quit;
-
-        let expected_edit_result: (bool, Result<EditSuccess, EditErr>) =
-            (true, Ok(EditSuccess::Quit));
-        let expected_tree = TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]);
-        let expected_cursor_location = CursorPath::from_vec(vec![0]);
-
-        run_test(
-            start_tree,
-            start_cursor_location,
-            action,
-            expected_edit_result,
-            expected_tree,
-            expected_cursor_location,
+        run_test_ok(
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
+            CursorPath::from_vec(vec![0]),
+            Action::Quit,
+            (true, Ok(EditSuccess::Quit)),
+            TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
+            CursorPath::from_vec(vec![0]),
         );
     }
 }
