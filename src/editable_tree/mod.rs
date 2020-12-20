@@ -621,21 +621,19 @@ mod tests {
         start_cursor_location: CursorPath,
         action: Action,
         expected_edit_result: (bool, Result<EditSuccess, EditErr>),
-        expected_tree: TestJSON,
-        expected_cursor_location: CursorPath,
     ) {
         let arena: Arena<JSON> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location);
+        let root = start_tree.clone().add_to_arena(&arena);
+        let mut editable_tree = DAG::new(&arena, root, start_cursor_location.clone());
 
         assert_eq!(
             expected_edit_result,
             editable_tree.execute_action(action),
             "Not equal in action result"
         );
-        assert_eq!(expected_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(start_tree, editable_tree.root(), "Not equal in tree.");
         assert_eq!(
-            expected_cursor_location, editable_tree.current_cursor_path,
+            start_cursor_location, editable_tree.current_cursor_path,
             "Not equal in cursor location."
         );
     }
@@ -686,8 +684,6 @@ mod tests {
             CursorPath::root(),
             Action::InsertBefore('f'),
             (false, Err(EditErr::AddSiblingToRoot)),
-            TestJSON::Array(vec![]),
-            CursorPath::root(),
         );
 
         //  tree level == 1
@@ -696,8 +692,6 @@ mod tests {
             CursorPath::root(),
             Action::InsertBefore('f'),
             (false, Err(EditErr::AddSiblingToRoot)),
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
-            CursorPath::root(),
         );
     }
 
@@ -708,8 +702,6 @@ mod tests {
             CursorPath::root(),
             Action::InsertAfter('f'),
             (false, Err(EditErr::AddSiblingToRoot)),
-            TestJSON::Array(vec![]),
-            CursorPath::root(),
         );
 
         // tree level == 1
@@ -718,8 +710,6 @@ mod tests {
             CursorPath::root(),
             Action::InsertAfter('f'),
             (false, Err(EditErr::AddSiblingToRoot)),
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
-            CursorPath::root(),
         );
     }
 
@@ -752,8 +742,6 @@ mod tests {
                     parent_name: "<unknown>".to_string(),
                 }),
             ),
-            TestJSON::False,
-            CursorPath::root(),
         );
         //
         // tree level == 1
@@ -780,8 +768,6 @@ mod tests {
             CursorPath::root(),
             Action::Undefined("c".to_string()),
             (false, Err(EditErr::Invalid("c".to_string()))),
-            TestJSON::Array(vec![]),
-            CursorPath::root(),
         );
     }
 
@@ -792,8 +778,6 @@ mod tests {
             CursorPath::root(),
             Action::Delete,
             (false, Err(EditErr::DeletingRoot)),
-            TestJSON::Array(vec![]),
-            CursorPath::root(),
         );
 
         // dag level==1
@@ -802,8 +786,6 @@ mod tests {
             CursorPath::root(),
             Action::Delete,
             (false, Err(EditErr::DeletingRoot)),
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
-            CursorPath::root(),
         );
     }
 
@@ -815,8 +797,6 @@ mod tests {
             CursorPath::root(),
             Action::MoveCursor(Direction::Prev),
             (false, Err(EditErr::MoveToSiblingOfRoot)),
-            TestJSON::Array(vec![]),
-            CursorPath::root(),
         );
         // move to next sibling node of root
         run_test_err(
@@ -824,8 +804,6 @@ mod tests {
             CursorPath::root(),
             Action::MoveCursor(Direction::Next),
             (false, Err(EditErr::MoveToSiblingOfRoot)),
-            TestJSON::Array(vec![]),
-            CursorPath::root(),
         );
         // move to parent node of root
         run_test_err(
@@ -833,8 +811,6 @@ mod tests {
             CursorPath::root(),
             Action::MoveCursor(Direction::Up),
             (false, Err(EditErr::MoveToParentOfRoot)),
-            TestJSON::Array(vec![]),
-            CursorPath::root(),
         );
         // move to nonexistent child node of root
         run_test_err(
@@ -842,8 +818,6 @@ mod tests {
             CursorPath::root(),
             Action::MoveCursor(Direction::Down),
             (false, Err(EditErr::MoveToNonexistentChild)),
-            TestJSON::Array(vec![]),
-            CursorPath::root(),
         );
 
         // move to nonexistent child node of root
@@ -852,8 +826,6 @@ mod tests {
             CursorPath::root(),
             Action::MoveCursor(Direction::Down),
             (false, Err(EditErr::MoveToNonexistentChild)),
-            TestJSON::Array(vec![]),
-            CursorPath::root(),
         );
         // move to root from child
         run_test_ok(
@@ -1299,8 +1271,6 @@ mod tests {
             CursorPath::from_vec(vec![1]),
             Action::Undefined("f".to_string()),
             (false, Err(EditErr::Invalid("f".to_string()))),
-            TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
-            CursorPath::from_vec(vec![1]),
         );
     }
 
