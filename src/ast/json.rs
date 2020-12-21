@@ -1,5 +1,5 @@
 use super::display_token::{DisplayToken, RecTok};
-use super::size::Size;
+use crate::core::Size;
 use super::{Ast, DeleteError, InsertError};
 use crate::arena::Arena;
 
@@ -399,7 +399,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::size::Size;
+    use crate::core::Size;
     use super::super::test_json::TestJSON;
     use super::JSONFormat;
     use crate::arena::Arena;

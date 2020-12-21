@@ -1,4 +1,4 @@
-use crate::editable_tree::Direction;
+use crate::core::Direction;
 
 pub mod keystroke_log {
     //! A utility datastructure to store and render a log of keystrokes.  This is mostly used to give

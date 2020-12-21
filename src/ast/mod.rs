@@ -2,14 +2,14 @@
 
 pub mod display_token;
 pub mod json;
-pub mod size;
+//pub mod size;
 pub mod test_json;
 
 use std::error::Error;
 
 use crate::arena::Arena;
 use display_token::{write_tokens, DisplayToken, RecTok};
-use size::Size;
+use crate::core::Size;
 
 /// The possible ways an insertion could fail
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

@@ -1,13 +1,13 @@
 pub mod arena;
 pub mod ast;
-pub mod editable_tree;
+pub mod core;
 pub mod editor;
 
 use crate::arena::Arena;
 use crate::ast::json::JSONFormat;
 use crate::ast::test_json::TestJSON;
-use crate::editable_tree::{cursor_path::CursorPath, DAG};
-use crate::editor::Editor;
+use crate::core::Path;
+use crate::editor::{Editor, dag::DAG};
 
 fn main() {
     // Initialise the logging and startup
@@ -27,7 +27,7 @@ fn main() {
     ])
     .add_to_arena(&arena);
 
-    let mut tree = DAG::new(&arena, root, CursorPath::root());
+    let mut tree = DAG::new(&arena, root, Path::root());
     let editor = Editor::new(
         &mut tree,
         JSONFormat::Pretty,
