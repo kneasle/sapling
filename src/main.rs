@@ -7,7 +7,7 @@ use crate::arena::Arena;
 use crate::ast::json::JSONFormat;
 use crate::ast::test_json::TestJSON;
 use crate::core::Path;
-use crate::editor::{Editor, dag::DAG};
+use crate::editor::{dag::DAG, Editor};
 
 fn main() {
     // Initialise the logging and startup

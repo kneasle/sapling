@@ -7,7 +7,7 @@ use crate::ast;
 use crate::ast::Ast;
 use crate::editor::normal_mode::Action;
 
-use crate::core::{Path, Direction, Side};
+use crate::core::{Direction, Path, Side};
 
 /// An enum that's returned when any of the 'edit' methods in [`DAG`] are successful.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -561,12 +561,12 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::{Direction, Side, Path};
     use super::{EditErr, EditSuccess};
     use crate::arena::Arena;
     use crate::ast::json::JSON;
     use crate::ast::test_json::TestJSON;
-    use crate::editor::{DAG,normal_mode::Action};
+    use crate::core::{Direction, Path, Side};
+    use crate::editor::{normal_mode::Action, DAG};
 
     fn run_test_ok(
         start_tree: TestJSON,

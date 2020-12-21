@@ -1,13 +1,13 @@
 //! The top-level functionality of Sapling
 
-pub mod normal_mode;
 pub mod dag;
+pub mod normal_mode;
 
 use crate::ast::display_token::DisplayToken;
 use crate::ast::Ast;
 use crate::core::Size;
 
-use dag::{DAG, EditResult, LogMessage};
+use dag::{EditResult, LogMessage, DAG};
 
 //use crate::editable_tree::{EditResult, LogMessage, DAG};
 use normal_mode::{keystroke_log, parse_keystroke, KeyMap};

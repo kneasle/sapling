@@ -8,8 +8,8 @@ pub mod test_json;
 use std::error::Error;
 
 use crate::arena::Arena;
-use display_token::{write_tokens, DisplayToken, RecTok};
 use crate::core::Size;
+use display_token::{write_tokens, DisplayToken, RecTok};
 
 /// The possible ways an insertion could fail
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
