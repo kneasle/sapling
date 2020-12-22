@@ -2,20 +2,20 @@ use crate::ast::Ast;
 
 /// A tree-independent struct for representing the locations of nodes within trees.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct CursorPath {
+pub struct Path {
     child_indices: Vec<usize>,
 }
 
-impl CursorPath {
+impl Path {
     /// Creates a cursor path from a given [`Vec`]
     #[inline]
-    pub fn from_vec(vec: Vec<usize>) -> CursorPath {
-        CursorPath { child_indices: vec }
+    pub fn from_vec(vec: Vec<usize>) -> Path {
+        Path { child_indices: vec }
     }
 
     /// Creates a cursor path that refers to the root of any tree.
     #[inline]
-    pub fn root() -> CursorPath {
+    pub fn root() -> Path {
         Self::from_vec(vec![])
     }
 
@@ -55,7 +55,7 @@ impl CursorPath {
     }
 
     /// Pushes a new child onto the path.  This has the effect of moving the cursor one level down
-    /// the tree, to the `new_child_index`th child of the node the `CursorPath` is currently
+    /// the tree, to the `new_child_index`th child of the node the `Path` is currently
     /// pointing at.
     #[inline]
     pub fn push(&mut self, new_child_index: usize) {
@@ -99,7 +99,7 @@ impl CursorPath {
     }
 }
 
-/// An iterator that walks down a tree following a [`CursorPath`].  The first item returned from
+/// An iterator that walks down a tree following a [`Path`].  The first item returned from
 /// this iterator is always the root of the tree.  As a consequence, this yields one more AST node
 /// than the original tree had.
 pub struct NodeIter<'arena, 'p, Node>
@@ -114,10 +114,10 @@ impl<'arena, 'p, Node> NodeIter<'arena, 'p, Node>
 where
     Node: Ast<'arena>,
 {
-    /// Creates a new `NodeIter` that follows a given [`CursorPath`] down from a root `Node`.  This
-    /// will only be called from [`CursorPath::node_iter`].
+    /// Creates a new `NodeIter` that follows a given [`Path`] down from a root `Node`.  This
+    /// will only be called from [`Path::node_iter`].
     #[inline]
-    fn new(root: &'arena Node, path: &'p CursorPath) -> Self {
+    fn new(root: &'arena Node, path: &'p Path) -> Self {
         NodeIter {
             node: Some(root),
             iter: path.iter(),
@@ -166,14 +166,14 @@ impl<'arena, Node: Ast<'arena>> std::iter::FusedIterator for NodeIter<'arena, '_
 
 #[cfg(test)]
 mod tests {
-    use super::CursorPath;
+    use super::Path;
     use crate::arena::Arena;
     use crate::ast::{json::JSON, test_json::TestJSON, Ast};
 
     #[test]
     fn is_root() {
         // A path that's created as a root is ... a root!
-        let mut path = CursorPath::root();
+        let mut path = Path::root();
         assert!(path.is_root());
         // Moving to any child stops it being a root
         path.push(0);
@@ -192,7 +192,7 @@ mod tests {
     #[test]
     fn depth() {
         // A path that's created as a root is ... a root!
-        let mut path = CursorPath::root();
+        let mut path = Path::root();
         assert_eq!(path.depth(), 0);
         // Moving to any child stops it being a root
         path.push(0);
@@ -219,7 +219,7 @@ mod tests {
         ])
         .add_to_arena(&arena);
         // Create a path to the root, and test properties of it
-        let mut path = CursorPath::root();
+        let mut path = Path::root();
         assert_eq!(path.node_iter(root).collect::<Vec<&JSON<'_>>>(), [root]);
         // Move the path to the 2nd ('1th') child (which is 'false')
         path.push(1);
@@ -277,7 +277,7 @@ mod tests {
         ])
         .add_to_arena(&arena);
         // Create a path to the root, and check that the cursor is the root
-        let mut path = CursorPath::root();
+        let mut path = Path::root();
         assert!(std::ptr::eq(path.cursor(root), root));
         // Move down to the 'false' object
         path.push(1);
@@ -302,7 +302,7 @@ mod tests {
         ])
         .add_to_arena(&arena);
         // Create a path to the root.  The root has no parent
-        let mut path = CursorPath::root();
+        let mut path = Path::root();
         assert_eq!(path.cursor_and_parent(root), (root, None));
         // Move down to the 'false' object.  Now the parent is the root
         path.push(1);

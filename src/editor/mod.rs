@@ -1,10 +1,14 @@
 //! The top-level functionality of Sapling
 
+pub mod dag;
 pub mod normal_mode;
 
 use crate::ast::display_token::DisplayToken;
-use crate::ast::{size, Ast};
-use crate::editable_tree::{EditResult, LogMessage, DAG};
+use crate::ast::Ast;
+use crate::core::Size;
+
+use dag::{EditResult, LogMessage, DAG};
+
 use normal_mode::{keystroke_log, parse_keystroke, KeyMap};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
@@ -75,7 +79,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 // Print the string
                 self.term.print(row, col, string).unwrap();
                 // Move the cursor to the end of the string
-                let size = size::Size::from(string);
+                let size = Size::from(string);
                 if size.lines() == 0 {
                     col += size.last_line_length();
                 } else {
@@ -88,7 +92,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 // Print the string
                 self.term.print_with_attr(row, col, string, $attr).unwrap();
                 // Move the cursor to the end of the string
-                let size = size::Size::from(string);
+                let size = Size::from(string);
                 if size.lines() == 0 {
                     col += size.last_line_length();
                 } else {
@@ -248,7 +252,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 #[cfg(test)]
 mod tests {
     use super::normal_mode::{default_keymap, parse_keystroke, Action};
-    use crate::editable_tree::Direction;
+    use crate::core::Direction;
 
     #[test]
     fn parse_keystroke_complete() {

@@ -1,7 +1,7 @@
 use super::display_token::{DisplayToken, RecTok};
-use super::size::Size;
 use super::{Ast, DeleteError, InsertError};
 use crate::arena::Arena;
+use crate::core::Size;
 
 /// An enum to hold the different ways that a JSON AST can be formatted
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -399,11 +399,11 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::size::Size;
     use super::super::test_json::TestJSON;
     use super::JSONFormat;
     use crate::arena::Arena;
     use crate::ast::Ast;
+    use crate::core::Size;
 
     #[test]
     fn to_text() {

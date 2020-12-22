@@ -1,4 +1,31 @@
-pub const ZERO: Size = Size::new(0, 0);
+mod path;
+pub use path::Path;
+
+/// The possible ways you can move the cursor
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum Direction {
+    Up,
+    Down,
+    Prev,
+    Next,
+}
+
+/// An enum to represent the two sides of a node
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum Side {
+    Prev,
+    Next,
+}
+
+impl Side {
+    /// Converts this `Side` into either `"before"` or `"after"`
+    pub fn relational_word(&self) -> &'static str {
+        match self {
+            Side::Prev => "before",
+            Side::Next => "after",
+        }
+    }
+}
 
 /// A struct used to represent the screen space occupied by a single node of an AST.  This can be
 /// thought of as the size of the bounding box of that node.  The important thing about this is
@@ -19,6 +46,7 @@ impl Size {
         }
     }
 
+    pub const ZERO: Size = Size::new(0, 0);
     /// Returns how many `\n` characters this node contains.  For example, the node `true`
     /// occupies `0` lines, whereas the following:
     /// ```text
@@ -121,8 +149,8 @@ mod tests {
             &["\n\t\r", "bang", "\n\n\n\n last line here!\r"],
         ];
         for strings in tests {
-            let mut total_size_add = super::ZERO;
-            let mut total_size_add_assign = super::ZERO;
+            let mut total_size_add = Size::ZERO;
+            let mut total_size_add_assign = Size::ZERO;
             let mut full_string = String::new();
             for s in *strings {
                 total_size_add = total_size_add + Size::from(*s);
