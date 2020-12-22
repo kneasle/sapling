@@ -7,6 +7,23 @@ use crate::editor::normal_mode::Action;
 
 use crate::core::{Direction, Path, Side};
 
+/// The two possible locations where an edit could cause nodes to be replaced
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum EditLocation {
+    /// The edit caused the cursor to be replaced
+    Cursor = 0,
+    /// The edit caused the parent to be replaced
+    Parent = 1,
+}
+
+impl EditLocation {
+    /// How many steps above the cursor was the edit made
+    #[inline]
+    fn steps_above_cursor(self) -> usize {
+        self as usize
+    }
+}
+
 /// An enum that's returned when any of the 'edit' methods in [`DAG`] are successful.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum EditSuccess {
@@ -242,6 +259,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 
     /// Move one step back in the tree history
     pub fn undo(&mut self) -> EditResult {
+        log::trace!("Performing undo.");
         // Early return if there are no changes to undo
         if self.history_index == 0 {
             return Err(EditErr::NoChangesToUndo);
@@ -252,11 +270,13 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // with its location in the snapshot we are going forward to
         self.current_cursor_path
             .clone_from(&self.root_history[self.history_index].1);
+        log::debug!("Setting cursor path to {:?}", self.current_cursor_path);
         Ok(EditSuccess::Undo)
     }
 
     /// Move one step forward in the tree history
     pub fn redo(&mut self) -> EditResult {
+        log::trace!("Performing redo.");
         // Early return if there are no changes to redo
         if self.history_index >= self.root_history.len() - 1 {
             return Err(EditErr::NoChangesToRedo);
@@ -267,51 +287,68 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // with its location in the snapshot we are going back to
         self.current_cursor_path
             .clone_from(&self.root_history[self.history_index].1);
+        log::debug!("Setting cursor path to {:?}", self.current_cursor_path);
         Ok(EditSuccess::Redo)
     }
 
     /* EDITING METHODS */
 
-    /// Utility function to finish an edit.  This handles removing any redo history, and cloning
-    /// the nodes that are parents of the node that changed.
-    fn finish_edit(
+    fn perform_edit(
         &mut self,
-        nodes_to_clone: &[&'arena Node],
-        steps_above_cursor: usize,
-        new_node: Node,
-    ) {
-        // Remove future trees from the history vector so that the currently 'checked-out' tree is
-        // the most recent tree in the history.
-        while self.history_index < self.root_history.len() - 1 {
-            // TODO: Deallocate the tree so that we don't get a 'memory leak'
-            self.root_history.pop();
-        }
+        mut edit_func: impl FnMut(
+            &mut Self,
+            Option<(&'arena Node, usize)>,
+            &'arena Node,
+        ) -> Result<(Node, EditLocation, EditSuccess), EditErr>,
+    ) -> EditResult {
+        // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
+        // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
+        // yield values from the root downwards, whereas we need the nodes in the opposite order.
+        let nodes_to_clone: Vec<&Node> = self.current_cursor_path.node_iter(self.root()).collect();
+        let old_cursor_path: Path = self.current_cursor_path.clone();
+
+        // Unwrap is safe because `nodes_to_clone` must always contain at least the root
+        let mut reverse_node_iter = nodes_to_clone.iter().copied().rev();
+        let cursor = reverse_node_iter.next().unwrap();
+        // Unwrapping in the closureis safe, because if the cursor does have a parent, then the
+        // cursor_path must have at least one element
+        let parent_and_index = reverse_node_iter
+            .next()
+            .map(|node| (node, old_cursor_path.last().unwrap()));
+
+        /* PERFORM THE EDIT */
+
+        let (new_node, edit_location, success) = edit_func(self, parent_and_index, cursor)?;
+        let steps_above_cursor = edit_location.steps_above_cursor();
+
+        /* CLONE ALL THE PARENT NODES TO GET A NEW ROOT */
+
         // Because AST nodes are immutable, we make changes to nodes by entirely cloning the path
         // down to the node under the cursor.  We do this starting at the node under the cursor and
         // work our way up parent by parent until we reach the root of the tree.  At that point,
         // this node becomes the root of the new tree.
         let mut node = self.arena.alloc(new_node);
-        // SANITY CHECK: Assert that items_to_clone and self.cursor_path have the same length once
-        // steps_above_cursor have been taken off - i.e. that we aren't losing any information by
-        // zipping the two things together
-        if nodes_to_clone.len() != self.current_cursor_path.depth() - steps_above_cursor {
-            panic!(
-                "`nodes_to_clone` ({:?}) has a different length to `self.cursor_path` ({:?}) with \
-{} items popped.",
-                nodes_to_clone, self.current_cursor_path, steps_above_cursor
-            );
-        }
         // Iterate backwards over the child indices and the nodes, whilst cloning the tree and
         // replacing the correct child reference to point to the newly created node.
-        for (n, child_index) in nodes_to_clone.iter().rev().zip(
-            self.current_cursor_path
-                .iter()
-                .rev()
-                .skip(steps_above_cursor),
-        ) {
+        for (n, child_index) in nodes_to_clone
+            .iter()
+            .rev()
+            .skip(1)
+            .zip(old_cursor_path.iter().rev())
+            .skip(steps_above_cursor)
+        {
             let mut cloned_node = (*n).clone();
             cloned_node.children_mut()[*child_index] = node;
             node = self.arena.alloc(cloned_node);
+        }
+
+        /* UPDATE THE HISTORY */
+
+        // Remove future trees from the history vector so that the currently 'checked-out' tree is
+        // the most recent tree in the history.
+        while self.history_index < self.root_history.len() - 1 {
+            // TODO: Deallocate the tree so that we don't get a 'memory leak'
+            self.root_history.pop();
         }
         // At this point, `node` contains a reference to the root of the new tree, so we just add
         // this to the history, along with the cursor path.
@@ -319,199 +356,161 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
             .push((node, self.current_cursor_path.clone()));
         // Move the history index on by one so that we are pointing at the latest change
         self.history_index = self.root_history.len() - 1;
+
+        /* RETURN SUCCESS */
+        Ok(success)
     }
 
     /// Replaces the current cursor with a node represented by `c`
     fn replace_cursor(&mut self, c: char) -> EditResult {
-        /* CHECK THE VALIDITY OF ARGUMENTS */
+        self.perform_edit(
+            |_this: &mut Self,
+             _parent_and_index: Option<(&'arena Node, usize)>,
+             cursor: &'arena Node| {
+                if !cursor.is_replace_char(c) {
+                    return Err(EditErr::CannotBeChild {
+                        c,
+                        parent_name: _parent_and_index
+                            .map_or("<root>".to_string(), |(p, _)| p.display_name()),
+                    });
+                }
 
-        // Cache the node under the cursor, since finding the cursor involves non-trivial amounts
-        // of work
-        let cursor = self.cursor();
-        // Short circuit if the char to insert couldn't correspond to a valid child
-        if !cursor.is_replace_char(c) {
-            return Err(EditErr::CannotBeChild {
-                c,
-                // TODO: Get the parent name
-                parent_name: "<unknown>".to_string(),
-            });
-        }
+                let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
 
-        /* PERFORM THE ACTION */
-
-        let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
-        // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
-        // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
-        // yield values from the root downwards, whereas we need the nodes in the opposite order.
-        let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
-        // The last value of nodes_to_clone is the node under the cursor, which we do not need to
-        // clone, so we pop that reference.
-        assert!(nodes_to_clone.pop().is_some());
-
-        /* FINISH THE EDIT AND RETURN SUCCESS */
-
-        // Store the new_node's display name before it's consumed by `finish_edit`
-        let new_node_name = new_node.display_name();
-        self.finish_edit(&nodes_to_clone, 0, new_node);
-        Ok(EditSuccess::Replace {
-            c,
-            name: new_node_name,
-        })
+                let new_node_name = new_node.display_name();
+                Ok((
+                    new_node,
+                    EditLocation::Cursor,
+                    EditSuccess::Replace {
+                        c,
+                        name: new_node_name,
+                    },
+                ))
+            },
+        )
     }
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the last
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
     fn insert_child(&mut self, c: char) -> EditResult {
-        /* CHECK THE VALIDITY OF ARGUMENTS */
+        self.perform_edit(
+            |this: &mut Self,
+             _parent_and_index: Option<(&'arena Node, usize)>,
+             cursor: &'arena Node| {
+                // Short circuit if `c` couldn't be a valid child of the cursor
+                if !cursor.is_insert_char(c) {
+                    return Err(EditErr::CannotBeChild {
+                        c,
+                        parent_name: cursor.display_name(),
+                    });
+                }
 
-        // Cache the node under the cursor, since finding the cursor involves non-trivial amounts
-        // of work
-        let cursor = self.cursor();
-        // Short circuit if `c` couldn't be a valid child of the cursor
-        if !cursor.is_insert_char(c) {
-            return Err(EditErr::CannotBeChild {
-                c,
-                parent_name: cursor.display_name(),
-            });
-        }
+                // Create the node to insert
+                let new_node = this
+                    .arena
+                    .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
+                let new_node_name = new_node.display_name();
+                // Clone the node that currently is the cursor, and add the new child to the end of its
+                // children.
+                let mut cloned_cursor = cursor.clone();
+                // Store the new_node's display name before it's consumed by `finish_edit`
+                // Add the new child to the children of the cloned cursor
+                cloned_cursor.insert_child(new_node, this.arena, cloned_cursor.children().len())?;
 
-        /* PERFORM THE ACTION */
-
-        let new_node = self
-            .arena
-            .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
-        // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
-        // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
-        // yield values from the root downwards, whereas we need the nodes in the opposite order.
-        let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
-        // Clone the node that currently is the cursor, and add the new child to the end of its
-        // children.  Unwrapping here is fine, because `cursor_path::NodeIter` will always return
-        // one value.
-        let mut cloned_cursor = nodes_to_clone.pop().unwrap().clone();
-        // Store the new_node's display name before it's consumed by `finish_edit`
-        let new_node_name = new_node.display_name();
-        // Add the new child to the children of the cloned cursor
-        cloned_cursor.insert_child(new_node, self.arena, cloned_cursor.children().len())?;
-
-        /* FINISH THE EDIT AND RETURN SUCCESS */
-
-        self.finish_edit(&nodes_to_clone, 0, cloned_cursor);
-        Ok(EditSuccess::InsertChild {
-            c,
-            name: new_node_name,
-        })
+                Ok((
+                    cloned_cursor,
+                    EditLocation::Cursor,
+                    EditSuccess::InsertChild {
+                        c,
+                        name: new_node_name,
+                    },
+                ))
+            },
+        )
     }
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the first
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
     fn insert_next_to_cursor(&mut self, c: char, side: Side) -> EditResult {
-        /* CHECK VALIDITY OF ARGUMENTS */
+        self.perform_edit(
+            |this: &mut Self,
+             parent_and_index: Option<(&'arena Node, usize)>,
+             _cursor: &'arena Node| {
+                // Find (and cache) the parent of the cursor.  If the parent of the cursor doesn't exist,
+                // the cursor must be the root and we can't insert a node next to the root.
+                let (parent, cursor_index) = parent_and_index.ok_or(EditErr::AddSiblingToRoot)?;
 
-        // Find (and cache) the parent of the cursor.  If the parent of the cursor doesn't exist,
-        // the cursor must be the root and we can't insert a node next to the root.
-        let parent = match self.cursor_and_parent().1 {
-            None => return Err(EditErr::AddSiblingToRoot),
-            Some(p) => p,
-        };
-        // Short circuit if not an insertable char
-        if !parent.is_insert_char(c) {
-            return Err(EditErr::CannotBeChild {
-                c,
-                parent_name: parent.display_name(),
-            });
-        }
+                // Short circuit if not an insertable char
+                if !parent.is_insert_char(c) {
+                    return Err(EditErr::CannotBeChild {
+                        c,
+                        parent_name: parent.display_name(),
+                    });
+                }
 
-        /* PERFORM THE INSERTION */
+                let insert_index = cursor_index
+                    + match side {
+                        Side::Prev => 0,
+                        Side::Next => 1,
+                    };
+                let mut cloned_parent = parent.clone();
+                // Create the new sibling node according to the given char.
+                let new_node = this
+                    .arena
+                    .alloc(cloned_parent.from_char(c).ok_or(EditErr::CharNotANode(c))?);
+                // Store the new_node's display name before it's consumed by `insert_child`
+                let new_node_name = new_node.display_name();
+                // Add the new child to the children of the cloned cursor
+                cloned_parent.insert_child(new_node, this.arena, insert_index)?;
 
-        // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
-        // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
-        // yield values from the root downwards, whereas we need the nodes in the opposite order.
-        let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
-        // Pop the cursor, because it will be unchanged.  The only part of this that we need is
-        // the cursor's index.
-        assert!(nodes_to_clone.pop().is_some());
-        // Find the index of the cursor, so that we know where to insert.  We can unwrap, because
-        // if we were at the root, then we'd early return from the if statement above
-        let cursor_sibling_index = *self.current_cursor_path.last_mut().unwrap();
-        let insert_index = cursor_sibling_index
-            + match side {
-                Side::Prev => 0,
-                Side::Next => 1,
-            };
-        // Clone the node that currently is the cursor, and add the new child to the end of its
-        // children.  Unwrapping here is fine, because `cursor_path::NodeIter` will always
-        // return one value.
-        let mut cloned_parent = nodes_to_clone.pop().unwrap().clone();
-        // Create the new child node according to the given char.
-        let new_child_node = self
-            .arena
-            .alloc(cloned_parent.from_char(c).ok_or(EditErr::CharNotANode(c))?);
-        // Store the new_node's display name before it's consumed by `insert_child`
-        let new_node_name = new_child_node.display_name();
-        // Add the new child to the children of the cloned cursor
-        cloned_parent.insert_child(new_child_node, self.arena, insert_index)?;
-
-        /* FINISH THE EDIT AND RETURN SUCCESS */
-
-        // Finish the edit and update the history
-        self.finish_edit(&nodes_to_clone, 1, cloned_parent);
-        // Return the success
-        Ok(EditSuccess::InsertNextToCursor {
-            side,
-            c,
-            name: new_node_name,
-        })
+                // Return the success
+                Ok((
+                    cloned_parent,
+                    EditLocation::Parent,
+                    EditSuccess::InsertNextToCursor {
+                        side,
+                        c,
+                        name: new_node_name,
+                    },
+                ))
+            },
+        )
     }
 
     fn delete_cursor(&mut self) -> EditResult {
-        /* CHECK VALIDITY OF ARGUMENTS */
+        self.perform_edit(
+            |this: &mut Self,
+             parent_and_index: Option<(&'arena Node, usize)>,
+             cursor: &'arena Node| {
+                // Find (and cache) the parent of the cursor.  If the parent of the cursor doesn't exist,
+                // the cursor must be the root and we can't delete the root.
+                let (parent, cursor_index) = parent_and_index.ok_or(EditErr::DeletingRoot)?;
+                // Cache the name of the cursor **before** it gets deleted
+                let deleted_node_name = cursor.display_name();
 
-        // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
-        // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
-        // yield values from the root downwards, whereas we need the nodes in the opposite order.
-        let mut nodes_to_clone: Vec<_> = self.current_cursor_path.node_iter(self.root()).collect();
-        // Pop the cursor, because it will be unchanged.  We can unwrap here, because
-        // `Path::node_iter` will always yield at least one node (the first value returned is
-        // a reference to the root).
-        let deleted_node_name = nodes_to_clone.pop().unwrap().display_name();
-        // Short circuit if we're trying to delete the root
-        if nodes_to_clone.is_empty() {
-            return Err(EditErr::DeletingRoot);
-        }
+                let mut cloned_parent = parent.clone();
+                cloned_parent.delete_child(cursor_index)?;
 
-        /* PERFORM THE INSERTION */
+                let new_parents_child_count = cloned_parent.children().len();
+                if new_parents_child_count == 0 {
+                    // If we remove the only child of a node then we move the cursor up
+                    this.current_cursor_path.pop();
+                } else if cursor_index == new_parents_child_count {
+                    // If we deleted the last child of a node (and this isn't the last child), we move
+                    // the cursor back by one.  We can unwrap here because we know we aren't
+                    // removing the root
+                    *this.current_cursor_path.last_mut().unwrap() -= 1;
+                }
 
-        // Find the index of the cursor, so that we know where to delete.  We can unwrap, because
-        // if we were at the root, then we'd early return from the if statement above.
-        let cursor_sibling_index = *self.current_cursor_path.last_mut().unwrap();
-        let mut cloned_parent = nodes_to_clone.pop().unwrap().clone();
-        cloned_parent.delete_child(cursor_sibling_index)?;
-        // Cache this so that we can
-        let new_parents_child_count = cloned_parent.children().len();
-
-        /* FINISH THE EDIT AND RETURN SUCCESS */
-
-        self.finish_edit(&nodes_to_clone, 1, cloned_parent);
-
-        /* MOVE THE CURSOR TO THE NEAREST VALID NODE */
-
-        // IMPORTANTLY, we move the cursor **AFTER** calling `self.finish_edit`, because
-        // `self.finish_edit` reads the cursor path
-
-        // If we remove the only child of a node then we move the cursor up
-        if new_parents_child_count == 0 {
-            self.current_cursor_path.pop();
-        } else {
-            // If we deleted the last child of a node (and this isn't the last child), we move
-            // the cursor back by one
-            if cursor_sibling_index == new_parents_child_count {
-                // We can unwrap here because we know we aren't removing the root
-                *self.current_cursor_path.last_mut().unwrap() -= 1;
-            }
-        }
-        Ok(EditSuccess::Delete {
-            name: deleted_node_name,
-        })
+                Ok((
+                    cloned_parent,
+                    EditLocation::Parent,
+                    EditSuccess::Delete {
+                        name: deleted_node_name,
+                    },
+                ))
+            },
+        )
     }
 
     /// Execute an [`Action`] generated by user's keystrokes.  Returns `true` if the user executed
@@ -613,7 +612,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_insertchild() {
+    fn root_insertchild() {
         run_test_ok(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -652,7 +651,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_insertbefore() {
+    fn root_insertbefore() {
         run_test_err(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -670,7 +669,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_insertafter() {
+    fn root_insertafter() {
         run_test_err(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -688,7 +687,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_repalce() {
+    fn root_replace() {
         run_test_ok(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -713,7 +712,7 @@ mod tests {
                 false,
                 Err(EditErr::CannotBeChild {
                     c: 'm',
-                    parent_name: "<unknown>".to_string(),
+                    parent_name: "<root>".to_string(),
                 }),
             ),
         );
@@ -736,7 +735,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_undefined() {
+    fn root_undefined() {
         run_test_err(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -746,7 +745,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_delete() {
+    fn root_delete() {
         run_test_err(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -764,7 +763,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_movecursor() {
+    fn root_movecursor() {
         // move to previous sibling node of root
         run_test_err(
             TestJSON::Array(vec![]),
@@ -813,7 +812,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_quit() {
+    fn root_quit() {
         run_test_ok(
             TestJSON::Array(vec![]),
             Path::root(),
@@ -825,7 +824,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_undo() {
+    fn root_undo() {
         let start_tree = TestJSON::Array(vec![]);
         let start_cursor_location_0 = Path::root();
 
@@ -932,7 +931,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_root_redo() {
+    fn root_redo() {
         let start_tree = TestJSON::Array(vec![]);
         let start_cursor_location_0 = Path::root();
 
@@ -1078,7 +1077,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_insertchild() {
+    fn level_1_insertchild() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
             Path::from_vec(vec![0]),
@@ -1096,7 +1095,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_insertafter() {
+    fn level_1_insertafter() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
             Path::from_vec(vec![0]),
@@ -1143,7 +1142,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_insertbefore() {
+    fn level_1_insertbefore() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
             Path::from_vec(vec![0]),
@@ -1190,7 +1189,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_delete() {
+    fn level_1_delete() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
             Path::from_vec(vec![1]),
@@ -1221,7 +1220,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_replace() {
+    fn level_1_replace() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
             Path::from_vec(vec![1]),
@@ -1239,7 +1238,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_undefined() {
+    fn level_1_undefined() {
         run_test_err(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
             Path::from_vec(vec![1]),
@@ -1249,7 +1248,7 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_movecursor() {
+    fn level_1_movecursor() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
             Path::root(),
@@ -1261,188 +1260,99 @@ mod tests {
     }
 
     #[test]
-    fn dag_level_1_undo() {
+    fn level_1_undo_and_redo() {
+        // The original snapshot of the tree
         let start_tree = TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let start_cursor_location_0 = Path::root();
+        let end_tree = TestJSON::False;
 
-        let action_0 = Action::Replace('f');
-        let action_1 = Action::Undo;
-
-        let expected_edit_result_0: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::Replace {
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_edit_result_1: (bool, Result<EditSuccess, EditErr>) =
-            (false, Ok(EditSuccess::Undo));
-
-        let expected_tree_0 = TestJSON::False;
-        let expected_tree_1 =
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-
-        let expected_cursor_location_0 = Path::root();
-        let expected_cursor_location_1 = Path::root();
-
+        // Create and initialise DAG to test
         let arena: Arena<JSON> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location_0);
+        let mut editable_tree = DAG::new(&arena, root, Path::root());
 
+        // Step 1: Replace root with `false`
+        println!("Inserting `false`");
         assert_eq!(
-            expected_edit_result_0,
-            editable_tree.execute_action(action_0),
-            "Not equal in action result"
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            editable_tree.execute_action(Action::Replace('f')),
+            "Not equal in action result."
         );
-        assert_eq!(expected_tree_0, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
         assert_eq!(
-            expected_cursor_location_0, editable_tree.current_cursor_path,
+            Path::root(),
+            editable_tree.current_cursor_path,
             "Not equal in cursor location."
         );
 
-        // undo
+        // Perform one undo.  This be successful, because it's undoing the replace-with-false
+        println!("Performing first undo");
         assert_eq!(
-            expected_edit_result_1,
-            editable_tree.execute_action(action_1),
+            (false, Ok(EditSuccess::Undo)),
+            editable_tree.execute_action(Action::Undo),
             "Not equal in action result"
         );
-        assert_eq!(expected_tree_1, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(start_tree, editable_tree.root(), "Not equal in tree.");
         assert_eq!(
-            expected_cursor_location_1, editable_tree.current_cursor_path,
+            Path::root(),
+            editable_tree.current_cursor_path,
+            "Not equal in cursor location."
+        );
+
+        // Perform another undo.  This won't be successful, because there's nothing to undo
+        println!("Performing the 2nd undo");
+        assert_eq!(
+            (false, Err(EditErr::NoChangesToUndo)),
+            editable_tree.execute_action(Action::Undo),
+            "Not equal in action result"
+        );
+        assert_eq!(
+            start_tree,
+            editable_tree.root(),
+            "Failed undo modified the tree"
+        );
+        assert_eq!(
+            Path::root(),
+            editable_tree.current_cursor_path,
+            "Failed undo moved the cursor"
+        );
+
+        // Redo the change we undid (this should succeed)
+        println!("Performing the 1st redo");
+        assert_eq!(
+            (false, Ok(EditSuccess::Redo)),
+            editable_tree.execute_action(Action::Redo),
+            "Not equal in action result"
+        );
+        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(
+            Path::root(),
+            editable_tree.current_cursor_path,
+            "Not equal in cursor location."
+        );
+
+        // Redo another time, but there are no changes to redo
+        println!("Performing the 2nd redo");
+        assert_eq!(
+            (false, Err(EditErr::NoChangesToRedo)),
+            editable_tree.execute_action(Action::Redo),
+            "Not equal in action result"
+        );
+        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(
+            Path::root(),
+            editable_tree.current_cursor_path,
             "Not equal in cursor location."
         );
     }
 
     #[test]
-    fn dag_level_1_redo() {
-        let start_tree = TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let start_cursor_location_0 = Path::root();
-
-        let action_0 = Action::Replace('f');
-        let action_1 = Action::Undo;
-        let action_2 = Action::Undo;
-        let action_3 = Action::Redo;
-        let action_4 = Action::Redo;
-
-        let expected_edit_result_0: (bool, Result<EditSuccess, EditErr>) = (
-            false,
-            Ok(EditSuccess::Replace {
-                c: 'f',
-                name: "false".to_string(),
-            }),
-        );
-        let expected_edit_result_1: (bool, Result<EditSuccess, EditErr>) =
-            (false, Ok(EditSuccess::Undo));
-
-        let expected_edit_result_2: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::NoChangesToUndo));
-
-        let expected_edit_result_3: (bool, Result<EditSuccess, EditErr>) =
-            (false, Ok(EditSuccess::Redo));
-
-        let expected_edit_result_4: (bool, Result<EditSuccess, EditErr>) =
-            (false, Err(EditErr::NoChangesToRedo));
-
-        let expected_tree_0 = TestJSON::False;
-        let expected_tree_1 =
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let expected_tree_2 =
-            TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let expected_tree_3 = TestJSON::False;
-        let expected_tree_4 = TestJSON::False;
-
-        let expected_cursor_location_0 = Path::root();
-        let expected_cursor_location_1 = Path::root();
-        let expected_cursor_location_2 = Path::root();
-        let expected_cursor_location_3 = Path::root();
-        let expected_cursor_location_4 = Path::root();
-
-        let arena: Arena<JSON> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location_0);
-
-        assert_eq!(
-            expected_edit_result_0,
-            editable_tree.execute_action(action_0),
-            "Not equal in action result (move 0)."
-        );
-        assert_eq!(
-            expected_tree_0,
-            editable_tree.root(),
-            "Not equal in tree (move 0)."
-        );
-        assert_eq!(
-            expected_cursor_location_0, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 0)."
-        );
-
-        // undo 1
-        assert_eq!(
-            expected_edit_result_1,
-            editable_tree.execute_action(action_1),
-            "Not equal in action result (move 1)"
-        );
-        assert_eq!(
-            expected_tree_1,
-            editable_tree.root(),
-            "Not equal in tree (move 1)."
-        );
-        assert_eq!(
-            expected_cursor_location_1, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 1)."
-        );
-
-        // undo 2
-        assert_eq!(
-            expected_edit_result_2,
-            editable_tree.execute_action(action_2),
-            "Not equal in action result (move 2)"
-        );
-        assert_eq!(
-            expected_tree_2,
-            editable_tree.root(),
-            "Not equal in tree (move 2)."
-        );
-        assert_eq!(
-            expected_cursor_location_2, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 2)."
-        );
-
-        // redo 1
-        assert_eq!(
-            expected_edit_result_3,
-            editable_tree.execute_action(action_3),
-            "Not equal in action result (move 3)"
-        );
-        assert_eq!(
-            expected_tree_3,
-            editable_tree.root(),
-            "Not equal in tree (move 3)."
-        );
-        assert_eq!(
-            expected_cursor_location_3, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 3)."
-        );
-
-        // redo 2
-        assert_eq!(
-            expected_edit_result_4,
-            editable_tree.execute_action(action_4),
-            "Not equal in action result (move 4)"
-        );
-        assert_eq!(
-            expected_tree_4,
-            editable_tree.root(),
-            "Not equal in tree (move 4)."
-        );
-        assert_eq!(
-            expected_cursor_location_4, editable_tree.current_cursor_path,
-            "Not equal in cursor location (move 4)."
-        );
-    }
-
-    #[test]
-    fn dag_level_1_quit() {
+    fn level_1_quit() {
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
             Path::from_vec(vec![0]),
@@ -1450,6 +1360,44 @@ mod tests {
             (true, Ok(EditSuccess::Quit)),
             TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
             Path::from_vec(vec![0]),
+        );
+    }
+
+    /// This is a regression test for issue #51 (fixed in PR #53), where Sapling crashes if:
+    /// 1. The user deletes the cursor when the cursor is the last child of its parent
+    /// 2. The user undoes this edit
+    /// 3. The user redoes this edit
+    #[test]
+    fn delete_cursor_crash_bug() {
+        // Create and initialise DAG to test (start with JSON `[null]` with the cursor selecting
+        // the `null`)
+        let arena: Arena<JSON> = Arena::new();
+        let root = TestJSON::Array(vec![TestJSON::Null]).add_to_arena(&arena);
+        let mut editable_tree = DAG::new(&arena, root, Path::from_vec(vec![0]));
+
+        // Delete the node under the cursor, causing the cursor to move to the root
+        assert_eq!(
+            (
+                false,
+                Ok(EditSuccess::Delete {
+                    name: "null".to_string()
+                })
+            ),
+            editable_tree.execute_action(Action::Delete)
+        );
+        assert_eq!(editable_tree.current_cursor_path, Path::root());
+
+        // Undo this change, causing the cursor to move back to `null`
+        assert_eq!(
+            (false, Ok(EditSuccess::Undo)),
+            editable_tree.execute_action(Action::Undo)
+        );
+
+        // Redo the change.  It's not really important what the tree is here, so long as the DAG
+        // doesn't panic
+        assert_eq!(
+            (false, Ok(EditSuccess::Redo)),
+            editable_tree.execute_action(Action::Redo)
         );
     }
 }
