@@ -27,7 +27,6 @@ impl Side {
     }
 }
 
-pub const ZERO: Size = Size::new(0, 0);
 /// A struct used to represent the screen space occupied by a single node of an AST.  This can be
 /// thought of as the size of the bounding box of that node.  The important thing about this is
 /// that it is independent of the text indentation, meaning that if a node gets reused multiple
@@ -47,6 +46,7 @@ impl Size {
         }
     }
 
+    pub const ZERO: Size = Size::new(0, 0);
     /// Returns how many `\n` characters this node contains.  For example, the node `true`
     /// occupies `0` lines, whereas the following:
     /// ```text
@@ -123,7 +123,7 @@ impl std::ops::AddAssign for Size {
 
 #[cfg(test)]
 mod tests {
-    use super::{Size, ZERO};
+    use super::Size;
 
     #[test]
     fn from_str() {
@@ -149,8 +149,8 @@ mod tests {
             &["\n\t\r", "bang", "\n\n\n\n last line here!\r"],
         ];
         for strings in tests {
-            let mut total_size_add = ZERO;
-            let mut total_size_add_assign = ZERO;
+            let mut total_size_add = Size::ZERO;
+            let mut total_size_add_assign = Size::ZERO;
             let mut full_string = String::new();
             for s in *strings {
                 total_size_add = total_size_add + Size::from(*s);
