@@ -3,18 +3,20 @@
 pub mod dag;
 pub mod normal_mode;
 
-use crate::ast::display_token::DisplayToken;
+use crate::ast::display_token::{DisplayToken, SyntaxCategory};
 use crate::ast::Ast;
+use crate::config::{ColorScheme, DEBUG_HIGHLIGHTING};
 use crate::core::Size;
-
 use dag::{EditResult, LogMessage, DAG};
-
 use normal_mode::{keystroke_log, parse_keystroke, KeyMap};
-use std::collections::hash_map::DefaultHasher;
+
+use std::borrow::Borrow;
+use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::Hasher;
+
 use tuikit::prelude::*;
 
-/// A struct to hold the top-level components of the editor.
+/// A singleton struct to hold the top-level components of Sapling.
 pub struct Editor<'arena, Node: Ast<'arena>> {
     /// The [`EditableTree`] that the `Editor` is editing
     tree: &'arena mut DAG<'arena, Node>,
@@ -23,9 +25,11 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     /// The `tuikit` terminal that the `Editor` is rendering to
     term: Term,
     /// The current contents of the keystroke buffer
-    keystroke: String,
+    keystroke_buffer: String,
     /// The configured key map
     keymap: KeyMap,
+    /// The configured colour scheme
+    color_scheme: ColorScheme,
     /// A list of the keystrokes that have been executed, along with a summary of what they mean
     keystroke_log: keystroke_log::KeyStrokeLog,
 }
@@ -36,25 +40,22 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         tree: &'arena mut DAG<'arena, Node>,
         format_style: Node::FormatStyle,
         keymap: KeyMap,
+        color_scheme: ColorScheme,
     ) -> Editor<'arena, Node> {
         let term = Term::new().unwrap();
         Editor {
             tree,
             term,
             format_style,
-            keystroke: String::new(),
+            keystroke_buffer: String::new(),
             keymap,
+            color_scheme,
             keystroke_log: keystroke_log::KeyStrokeLog::new(10),
         }
     }
 
     /// Render the tree to the screen
     fn render_tree(&self, row: usize, col: usize) {
-        // Mutable variables to track where the terminal cursor should go
-        let mut row = row;
-        let mut col = col;
-        let mut indentation_amount = 0;
-
         let cols = [
             Color::MAGENTA,
             Color::RED,
@@ -71,6 +72,13 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             Color::LIGHT_MAGENTA,
             Color::LIGHT_WHITE,
         ];
+
+        // Mutable variables to track where the terminal cursor should go
+        let mut row = row;
+        let mut col = col;
+        let mut indentation_amount = 0;
+
+        let mut unknown_categories: HashSet<SyntaxCategory> = HashSet::with_capacity(0);
 
         /// A cheeky macro to print a string to the terminal
         macro_rules! term_print {
@@ -104,13 +112,18 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
         for (node, tok) in self.tree.root().display_tokens(&self.format_style) {
             match tok {
-                DisplayToken::Text(s) => {
-                    // Hash the ref to decide on the colour
-                    let col = {
+                DisplayToken::Text(s, category) => {
+                    let col = if DEBUG_HIGHLIGHTING {
+                        // Hash the ref to decide on the colour
                         let mut hasher = DefaultHasher::new();
                         node.hash(&mut hasher);
                         let hash = hasher.finish();
                         cols[hash as usize % cols.len()]
+                    } else {
+                        *self.color_scheme.get(category).unwrap_or_else(|| {
+                            unknown_categories.insert(category);
+                            &Color::LIGHT_MAGENTA
+                        })
                     };
                     // Generate the display attributes depending on if the node is selected
                     let attr = if std::ptr::eq(node, self.tree.cursor()) {
@@ -119,7 +132,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                         Attr::default().fg(col)
                     };
                     // Print the token
-                    term_print!(s.as_str(), attr);
+                    term_print!(s.borrow(), attr);
                 }
                 DisplayToken::Whitespace(n) => {
                     col += n;
@@ -135,6 +148,11 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                     indentation_amount -= 4;
                 }
             }
+        }
+
+        // Print warning messages for unknown syntax categories
+        for c in unknown_categories {
+            log::error!("Unknown highlight category '{}'", c);
         }
     }
 
@@ -165,8 +183,8 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         self.term
             .print(
                 height - 1,
-                width - 5 - self.keystroke.chars().count(),
-                &self.keystroke,
+                width - 5 - self.keystroke_buffer.chars().count(),
+                &self.keystroke_buffer,
             )
             .unwrap();
 
@@ -183,16 +201,16 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /// 2. The [`EditResult`] of the edit, or `None` if the keystroke is incomplete
     fn consume_keystroke(&mut self, c: char) -> (bool, Option<EditResult>) {
         // Add the new keypress to the keystroke
-        self.keystroke.push(c);
+        self.keystroke_buffer.push(c);
         // Attempt to parse the keystroke, and take action if the keystroke is
         // complete
-        match parse_keystroke(&self.keymap, &self.keystroke) {
+        match parse_keystroke(&self.keymap, &self.keystroke_buffer) {
             Some(action) => {
                 let (should_quit, result) = self.tree.execute_action(action);
                 // Add the keystroke to the keystroke log and clear the keystroke buffer
                 self.keystroke_log
-                    .push(self.keystroke.clone(), &self.keymap);
-                self.keystroke.clear();
+                    .push(self.keystroke_buffer.clone(), &self.keymap);
+                self.keystroke_buffer.clear();
                 // Return the result of the action
                 (should_quit, Some(result))
             }
@@ -220,7 +238,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                         }
                     }
                     Key::ESC => {
-                        self.keystroke.clear();
+                        self.keystroke_buffer.clear();
                     }
                     _ => {}
                 }

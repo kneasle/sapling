@@ -249,7 +249,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // Move the history index back by one to perform the undo
         self.history_index -= 1;
         // Follow the behaviour of other text editors and update the location of the cursor
-        // with its location in the snapshot we are going back to
+        // with its location in the snapshot we are going forward to
         self.current_cursor_path
             .clone_from(&self.root_history[self.history_index].1);
         Ok(EditSuccess::Undo)
