@@ -9,7 +9,6 @@ use crate::core::Size;
 
 use dag::{EditResult, LogMessage, DAG};
 
-//use crate::editable_tree::{EditResult, LogMessage, DAG};
 use normal_mode::{keystroke_log, parse_keystroke, KeyMap};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;

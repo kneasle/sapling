@@ -27,6 +27,7 @@ impl Side {
     }
 }
 
+const ZERO: Size = Size::new(0, 0);
 /// A struct used to represent the screen space occupied by a single node of an AST.  This can be
 /// thought of as the size of the bounding box of that node.  The important thing about this is
 /// that it is independent of the text indentation, meaning that if a node gets reused multiple
@@ -122,8 +123,7 @@ impl std::ops::AddAssign for Size {
 
 #[cfg(test)]
 mod tests {
-    const ZERO: Size = Size::new(0, 0);
-    use super::Size;
+    use super::{Size, ZERO};
 
     #[test]
     fn from_str() {

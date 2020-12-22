@@ -1,7 +1,5 @@
 //! Code for an editable, undoable forest of syntax trees.
 
-//pub mod cursor_path;
-
 use crate::arena::Arena;
 use crate::ast;
 use crate::ast::Ast;
