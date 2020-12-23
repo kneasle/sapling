@@ -468,6 +468,11 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                 let new_node_name = new_node.display_name();
                 // Add the new child to the children of the cloned cursor
                 cloned_parent.insert_child(new_node, this.arena, insert_index)?;
+                // move the cursor to the right node.
+                *this.current_cursor_path.last_mut().unwrap() += match side {
+                    Side::Prev => 0,
+                    Side::Next => 1,
+                };
 
                 // Return the success
                 Ok((
@@ -1119,7 +1124,7 @@ mod tests {
                 TestJSON::False,
                 TestJSON::True,
             ]),
-            Path::from_vec(vec![0]),
+            Path::from_vec(vec![1]),
         );
 
         // DAG level == 2
@@ -1143,7 +1148,7 @@ mod tests {
                 TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
                 TestJSON::False,
             ]),
-            Path::from_vec(vec![1]),
+            Path::from_vec(vec![2]),
         );
     }
 
