@@ -20,5 +20,11 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Run clippy
+      run: cargo clippy
     - name: Run rustfmt
       run: rustfmt src/**/*.rs --check
+    - name: Check docs
+      run: |
+          rustup update nightly
+          cargo +nightly doc --no-deps --document-private-items

@@ -18,7 +18,7 @@ use tuikit::prelude::*;
 
 /// A singleton struct to hold the top-level components of Sapling.
 pub struct Editor<'arena, Node: Ast<'arena>> {
-    /// The [`EditableTree`] that the `Editor` is editing
+    /// The `DAG` that is storing the history of the `Editor`
     tree: &'arena mut DAG<'arena, Node>,
     /// The style that the tree is being printed to the screen
     format_style: Node::FormatStyle,

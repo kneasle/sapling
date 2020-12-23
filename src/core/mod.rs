@@ -1,16 +1,25 @@
+//! A collection of core datatypes that are used across Sapling's codebase
+
 mod path;
+
+// Re-export `core::path::Path` as `core::Path`
 pub use path::Path;
 
 /// The possible ways you can move the cursor
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Direction {
+    /// The [`Direction`] from a node to its parent/ancestors
     Up,
+    /// The [`Direction`] from a node to its children/descendants
     Down,
+    /// The [`Direction`] from a node to its lower-indexed siblings
     Prev,
+    /// the [`Direction`] from a node to its higher-indexed siblings
     Next,
 }
 
 /// An enum to represent the two sides of a node
+#[allow(missing_docs)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Side {
     Prev,
@@ -38,6 +47,9 @@ pub struct Size {
 }
 
 impl Size {
+    /// The [`Size`] of something that occupies no space on the screen.
+    pub const ZERO: Size = Size::new(0, 0);
+
     /// Constructs a new `Size` from its parts
     pub const fn new(lines: usize, last_line_length: usize) -> Size {
         Size {
@@ -46,7 +58,6 @@ impl Size {
         }
     }
 
-    pub const ZERO: Size = Size::new(0, 0);
     /// Returns how many `\n` characters this node contains.  For example, the node `true`
     /// occupies `0` lines, whereas the following:
     /// ```text

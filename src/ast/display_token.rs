@@ -1,34 +1,37 @@
+//! Descriptions of the tokens that Sapling uses to render ASTs to the screen.
+
 use super::Ast;
 use std::borrow::Cow;
 
 /// How many spaces corespond to one indentation level
 const INDENT_WIDTH: usize = 4;
 
+/// A module of `const`s that represent the default [`SyntaxCategories`](SyntaxCategory)
 pub mod syntax_category {
     /// Text that shouldn't be highlighted a specific colour: used for things like punctuation.
-    pub const DEFAULT: &'static str = "default";
+    pub const DEFAULT: &str = "default";
     /// Constant values like 'true', 'false'
-    pub const CONST: &'static str = "const";
+    pub const CONST: &str = "const";
     /// Literal values like strings and integers
-    pub const LITERAL: &'static str = "literal";
+    pub const LITERAL: &str = "literal";
     /// Non-documentation comments
-    pub const COMMENT: &'static str = "comment";
+    pub const COMMENT: &str = "comment";
     /// Code identifier, such as variables or function names
-    pub const IDENT: &'static str = "ident";
+    pub const IDENT: &str = "ident";
     /// A name that's reserved by the language for a specific purpose (e.g. `if`, `while` in nearly
     /// every language; `use`, `pub`, `const` in Rust)
-    pub const KEYWORD: &'static str = "keyword";
+    pub const KEYWORD: &str = "keyword";
     /// A pre-processor directive.  For example: `#if`, `#define` in C/C++ or `#[derive(...)]` in
     /// Rust
-    pub const PRE_PROC: &'static str = "pre-proc";
+    pub const PRE_PROC: &str = "pre-proc";
     /// A datatype, e.g. `int`, `long` from C or `usize`, `f64`, `String` in Rust
-    pub const TYPE: &'static str = "type";
+    pub const TYPE: &str = "type";
     /// Special pieces of text, such as escaped characters (`\n`, `\t`, etc.) in string literals
-    pub const SPECIAL: &'static str = "special";
+    pub const SPECIAL: &str = "special";
     /// Copied from Vim (do we really need this?)
-    pub const UNDERLINED: &'static str = "underlined";
+    pub const UNDERLINED: &str = "underlined";
     /// Any code that is an error
-    pub const ERROR: &'static str = "error";
+    pub const ERROR: &str = "error";
 }
 
 /// A category of text that should be syntax highlighted the same color.
@@ -56,7 +59,10 @@ pub enum DisplayToken {
 /// child references to be recursively expanded.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RecTok<'arena, Node> {
+    /// Display a [`DisplayToken`] that is part of the current node
     Tok(DisplayToken),
+    /// Display the tokens of a child in this position of the text (this will generate a recursive
+    /// call to [`Ast::display_tokens`]).
     Child(&'arena Node),
 }
 
