@@ -473,7 +473,6 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                     Side::Prev => 0,
                     Side::Next => 1,
                 };
-
                 // Return the success
                 Ok((
                     cloned_parent,
@@ -1108,8 +1107,8 @@ mod tests {
     #[test]
     fn level_1_insertafter() {
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
-            Path::from_vec(vec![0]),
+            TestJSON::Array(vec![TestJSON::True, TestJSON::True]),
+            Path::from_vec(vec![1]),
             Action::InsertAfter('f'),
             (
                 false,
@@ -1119,12 +1118,8 @@ mod tests {
                     name: "false".to_string(),
                 }),
             ),
-            TestJSON::Array(vec![
-                TestJSON::Array(vec![]),
-                TestJSON::False,
-                TestJSON::True,
-            ]),
-            Path::from_vec(vec![0]),
+            TestJSON::Array(vec![TestJSON::True, TestJSON::True, TestJSON::False]),
+            Path::from_vec(vec![2]),
         );
 
         // DAG level == 2
@@ -1148,7 +1143,7 @@ mod tests {
                 TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
                 TestJSON::False,
             ]),
-            Path::from_vec(vec![1]),
+            Path::from_vec(vec![2]),
         );
     }
 
