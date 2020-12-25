@@ -470,7 +470,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                 cloned_parent.insert_child(new_node, this.arena, insert_index)?;
                 // move the cursor to the correct location, we can unwrap it here, because we
                 // know we will not insert sibling to root node
-                *this.current_cursor_path.last_mut().unwrap() += insert_index;
+                *this.current_cursor_path.last_mut().unwrap() = insert_index;
                 // Return the success
                 Ok((
                     cloned_parent,
