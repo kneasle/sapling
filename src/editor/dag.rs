@@ -468,11 +468,9 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                 let new_node_name = new_node.display_name();
                 // Add the new child to the children of the cloned cursor
                 cloned_parent.insert_child(new_node, this.arena, insert_index)?;
-                // move the cursor to the correct location
-                *this.current_cursor_path.last_mut().unwrap() += match side {
-                    Side::Prev => 0,
-                    Side::Next => 1,
-                };
+                // move the cursor to the correct location, we can unwrap it here, because we
+                // know we will not insert sibling to root node
+                *this.current_cursor_path.last_mut().unwrap() += insert_index;
                 // Return the success
                 Ok((
                     cloned_parent,
