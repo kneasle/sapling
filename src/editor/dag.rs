@@ -423,6 +423,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                 // Add the new child to the children of the cloned cursor
                 cloned_cursor.insert_child(new_node, this.arena, cloned_cursor.children().len())?;
 
+                // moves the cursor to the newly added child
                 this.current_cursor_path.push(cursor.children().len());
 
                 Ok((
