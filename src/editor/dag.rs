@@ -423,6 +423,8 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                 // Add the new child to the children of the cloned cursor
                 cloned_cursor.insert_child(new_node, this.arena, cloned_cursor.children().len())?;
 
+                this.current_cursor_path.push(cursor.children().len());
+
                 Ok((
                     cloned_cursor,
                     EditLocation::Cursor,
@@ -633,7 +635,7 @@ mod tests {
                 }),
             ),
             TestJSON::Array(vec![TestJSON::False]),
-            Path::root(),
+            Path::from_vec(vec![0]),
         );
 
         //DAG level == 1
@@ -654,7 +656,7 @@ mod tests {
                 TestJSON::True,
                 TestJSON::Null,
             ]),
-            Path::root(),
+            Path::from_vec(vec![2]),
         )
     }
 
@@ -1098,7 +1100,7 @@ mod tests {
                 }),
             ),
             TestJSON::Array(vec![TestJSON::Array(vec![TestJSON::False]), TestJSON::True]),
-            Path::from_vec(vec![0]),
+            Path::from_vec(vec![0, 0]),
         );
     }
 
