@@ -10,7 +10,7 @@ Saturdays.  Smash the subscribe button to not miss upcoming streams!
 
 Most of the ideas for this project come from my friend Shtanton's
 [blog post](http://shtanton.com/ex.html).  The concept of directly editing syntax trees is called
-['structured editing'](https://en.wikipedia.org/wiki/Structure_editor) and is not a new concept;
+['structured editing'](https://en.wikipedia.org/wiki/Structure_editor) and is not new;
 the purpose of Sapling is to use ideas from structured editing to **speed up** moment-to-moment
 code editing, much how editors like Vim and Emacs speed up editing.  Sapling's editing model will
 be largely inspired by [Vim](https://github.com/vim/vim)/[NeoVim](https://github.com/neovim/neovim)
