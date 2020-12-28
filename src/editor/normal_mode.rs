@@ -2,8 +2,8 @@
 
 use crate::core::Direction;
 
-/// The possible keystroke typed by user without any parameters.
-/// It can be mapped to a single key.
+/// The possible keystroke typed by user without any parameters.  Each `KeyStroke` can be mapped to
+/// an individual [`char`].
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum KeyStroke {
     /// Quit Sapling
@@ -65,8 +65,6 @@ pub enum ActionCategory {
     /// The [`Action`] was [`Undefined`](Action::Undefined)
     Undefined,
 }
-
-impl ActionCategory {}
 
 /// Mapping of keys to keystrokes.
 /// Shortcut definition, also allows us to change the type if needed.

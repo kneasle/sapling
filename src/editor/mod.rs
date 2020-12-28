@@ -260,11 +260,11 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
     /// Start the editor and enter the mainloop
     pub fn run(mut self) {
-        // Start the mainloop
+        // Start the mainloop, which will not exit until Sapling is ready to close
         self.mainloop();
-        log::trace!("Making the cursor reappear.");
         // Show the cursor before closing so that the cursor isn't permanently disabled
-        // (see issue https://github.com/lotabout/tuikit/issues/28)
+        // (see issue `lotabout/tuikit#28`: https://github.com/lotabout/tuikit/issues/28)
+        log::trace!("Making the cursor reappear.");
         self.term.show_cursor(true).unwrap();
         self.term.present().unwrap();
     }
