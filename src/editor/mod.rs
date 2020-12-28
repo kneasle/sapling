@@ -1,14 +1,17 @@
 //! The top-level functionality of Sapling
 
 pub mod dag;
+pub mod keystroke_log;
 pub mod normal_mode;
 
 use crate::ast::display_token::{DisplayToken, SyntaxCategory};
 use crate::ast::Ast;
 use crate::config::{ColorScheme, DEBUG_HIGHLIGHTING};
 use crate::core::Size;
+
 use dag::{EditResult, LogMessage, DAG};
-use normal_mode::{keystroke_log, parse_keystroke, KeyMap};
+use keystroke_log::KeyStrokeLog;
+use normal_mode::{parse_keystroke, KeyMap};
 
 use std::borrow::Borrow;
 use std::collections::{hash_map::DefaultHasher, HashSet};
@@ -31,7 +34,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     /// The configured colour scheme
     color_scheme: ColorScheme,
     /// A list of the keystrokes that have been executed, along with a summary of what they mean
-    keystroke_log: keystroke_log::KeyStrokeLog,
+    keystroke_log: KeyStrokeLog,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
@@ -50,7 +53,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             keystroke_buffer: String::new(),
             keymap,
             color_scheme,
-            keystroke_log: keystroke_log::KeyStrokeLog::new(10),
+            keystroke_log: KeyStrokeLog::new(10),
         }
     }
 
