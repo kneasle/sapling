@@ -43,7 +43,7 @@ fn main() {
     let editor = Editor::new(
         &mut tree,
         JSONFormat::Pretty,
-        editor::normal_mode::default_keymap(),
+        config::default_keymap(),
         config::default_color_scheme(),
     );
     editor.run();

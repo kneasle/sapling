@@ -1,5 +1,6 @@
 //! The code for 'normal-mode', similar to that of Vim
 
+use crate::config::{default_keymap, KeyMap};
 use crate::core::Direction;
 
 /// The possible keystroke typed by user without any parameters.  Each `KeyStroke` can be mapped to
@@ -66,29 +67,6 @@ pub enum ActionCategory {
     Undefined,
 }
 
-/// Mapping of keys to keystrokes.
-/// Shortcut definition, also allows us to change the type if needed.
-pub type KeyMap = std::collections::HashMap<char, KeyStroke>;
-
-/// Generates a 'canonical' [`KeyMap`].  These keybindings will be very similar to those of Vim.
-pub fn default_keymap() -> KeyMap {
-    hmap::hmap! {
-        'q' => KeyStroke::Quit,
-        'i' => KeyStroke::InsertBefore,
-        'a' => KeyStroke::InsertAfter,
-        'o' => KeyStroke::InsertChild,
-        'r' => KeyStroke::Replace,
-        'x' => KeyStroke::Delete,
-        'c' => KeyStroke::MoveCursor(Direction::Down),
-        'p' => KeyStroke::MoveCursor(Direction::Up),
-        'h' => KeyStroke::MoveCursor(Direction::Prev),
-        'j' => KeyStroke::MoveCursor(Direction::Next),
-        'k' => KeyStroke::MoveCursor(Direction::Prev),
-        'l' => KeyStroke::MoveCursor(Direction::Next),
-        'u' => KeyStroke::Undo,
-        'R' => KeyStroke::Redo
-    }
-}
 
 /// The possible meanings of a user-typed keystroke
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

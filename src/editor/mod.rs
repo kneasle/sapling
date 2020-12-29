@@ -6,12 +6,12 @@ pub mod normal_mode;
 
 use crate::ast::display_token::{DisplayToken, SyntaxCategory};
 use crate::ast::Ast;
-use crate::config::{ColorScheme, DEBUG_HIGHLIGHTING};
+use crate::config::{ColorScheme, KeyMap, DEBUG_HIGHLIGHTING};
 use crate::core::Size;
 
 use dag::{EditResult, LogMessage, DAG};
 use keystroke_log::KeyStrokeLog;
-use normal_mode::{parse_keystroke, KeyMap};
+use normal_mode::parse_keystroke;
 
 use std::borrow::Borrow;
 use std::collections::{hash_map::DefaultHasher, HashSet};
@@ -272,7 +272,8 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
 #[cfg(test)]
 mod tests {
-    use super::normal_mode::{default_keymap, parse_keystroke, Action};
+    use super::normal_mode::{parse_keystroke, Action};
+    use crate::config::default_keymap;
     use crate::core::Direction;
 
     #[test]
@@ -303,7 +304,7 @@ mod tests {
 
     #[test]
     fn parse_keystroke_incomplete() {
-        let keymap = super::normal_mode::default_keymap();
+        let keymap = default_keymap();
         for keystroke in &["", "r", "o"] {
             assert_eq!(parse_keystroke(&keymap, *keystroke), None);
         }
