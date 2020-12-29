@@ -63,3 +63,22 @@ pub fn default_keymap() -> KeyMap {
     }
 }
 
+/* COMPLETE CONFIG */
+
+/// A struct to hold the entire run-time configuration of Sapling
+#[derive(Debug, Clone)]
+pub struct Config {
+    /// A mapping between [`char`]s and [`KeyStroke`]s
+    pub keymap: KeyMap,
+    /// The current [`ColorScheme`] of Sapling
+    pub color_scheme: ColorScheme,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            keymap: default_keymap(),
+            color_scheme: default_color_scheme(),
+        }
+    }
+}

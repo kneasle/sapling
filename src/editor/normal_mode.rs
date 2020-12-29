@@ -67,7 +67,6 @@ pub enum ActionCategory {
     Undefined,
 }
 
-
 /// The possible meanings of a user-typed keystroke
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Action {

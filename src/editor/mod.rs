@@ -6,7 +6,7 @@ pub mod normal_mode;
 
 use crate::ast::display_token::{DisplayToken, SyntaxCategory};
 use crate::ast::Ast;
-use crate::config::{ColorScheme, KeyMap, DEBUG_HIGHLIGHTING};
+use crate::config::{Config, KeyMap, DEBUG_HIGHLIGHTING};
 use crate::core::Size;
 
 use dag::{EditResult, LogMessage, DAG};
@@ -29,10 +29,8 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     term: Term,
     /// The current contents of the keystroke buffer
     keystroke_buffer: String,
-    /// The configured key map
-    keymap: KeyMap,
-    /// The configured colour scheme
-    color_scheme: ColorScheme,
+    /// The current user configuration
+    config: Config,
     /// A list of the keystrokes that have been executed, along with a summary of what they mean
     keystroke_log: KeyStrokeLog,
 }
@@ -42,8 +40,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     pub fn new(
         tree: &'arena mut DAG<'arena, Node>,
         format_style: Node::FormatStyle,
-        keymap: KeyMap,
-        color_scheme: ColorScheme,
+        config: Config,
     ) -> Editor<'arena, Node> {
         let term = Term::new().unwrap();
         Editor {
@@ -51,8 +48,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             term,
             format_style,
             keystroke_buffer: String::new(),
-            keymap,
-            color_scheme,
+            config,
             keystroke_log: KeyStrokeLog::new(10),
         }
     }
@@ -123,7 +119,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                         let hash = hasher.finish();
                         cols[hash as usize % cols.len()]
                     } else {
-                        *self.color_scheme.get(category).unwrap_or_else(|| {
+                        *self.config.color_scheme.get(category).unwrap_or_else(|| {
                             unknown_categories.insert(category);
                             &Color::LIGHT_MAGENTA
                         })
@@ -207,12 +203,12 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         self.keystroke_buffer.push(c);
         // Attempt to parse the keystroke, and take action if the keystroke is
         // complete
-        match parse_keystroke(&self.keymap, &self.keystroke_buffer) {
+        match parse_keystroke(&self.config.keymap, &self.keystroke_buffer) {
             Some(action) => {
                 let (should_quit, result) = self.tree.execute_action(action);
                 // Add the keystroke to the keystroke log and clear the keystroke buffer
                 self.keystroke_log
-                    .push(self.keystroke_buffer.clone(), &self.keymap);
+                    .push(self.keystroke_buffer.clone(), &self.config.keymap);
                 self.keystroke_buffer.clear();
                 // Return the result of the action
                 (should_quit, Some(result))

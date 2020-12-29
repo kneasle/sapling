@@ -14,6 +14,7 @@ pub mod editor;
 use crate::arena::Arena;
 use crate::ast::json::JSONFormat;
 use crate::ast::test_json::TestJSON;
+use crate::config::Config;
 use crate::core::Path;
 use crate::editor::{dag::DAG, Editor};
 
@@ -40,11 +41,6 @@ fn main() {
     .add_to_arena(&arena);
 
     let mut tree = DAG::new(&arena, root, Path::root());
-    let editor = Editor::new(
-        &mut tree,
-        JSONFormat::Pretty,
-        config::default_keymap(),
-        config::default_color_scheme(),
-    );
+    let editor = Editor::new(&mut tree, JSONFormat::Pretty, Config::default());
     editor.run();
 }
