@@ -3,21 +3,50 @@
 pub mod dag;
 pub mod keystroke_log;
 pub mod normal_mode;
+pub mod state;
 
 use crate::ast::display_token::{DisplayToken, SyntaxCategory};
 use crate::ast::Ast;
-use crate::config::{Config, KeyMap, DEBUG_HIGHLIGHTING};
+use crate::config::{Config, DEBUG_HIGHLIGHTING};
 use crate::core::Size;
 
-use dag::{EditResult, LogMessage, DAG};
+use dag::DAG;
 use keystroke_log::KeyStrokeLog;
-use normal_mode::parse_keystroke;
+use state::State;
 
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::Hasher;
 
 use tuikit::prelude::*;
+
+/// The [`State`] that Sapling is in during a transition function.  This has to exist, but
+/// none of the methods should ever be called, since doing so would require the transition function
+/// to unexpectedly fail, which is not possible (since the transition function must return a new
+/// [`State`] or `panic`, in which case execution stops and the `IntermediateState` is never used).
+/// This is a zero-sized type, so constructing a `Box<IntermediateState as State>` does not perform
+/// any heap allocations.
+#[derive(Debug, Copy, Clone)]
+struct IntermediateState;
+
+impl<'arena, Node: Ast<'arena>> State<'arena, Node> for IntermediateState {
+    fn transition(
+        self: Box<Self>,
+        _key: Key,
+        _config: &Config,
+        _tree: &mut DAG<'arena, Node>,
+    ) -> Box<dyn State<'arena, Node>> {
+        panic!("Invalid state should never exist except during state transitions.");
+    }
+
+    fn is_quit(&self) -> bool {
+        panic!("Invalid state should never exist except during state transitions.");
+    }
+
+    fn keystroke_buffer<'s>(&'s self) -> Cow<'s, str> {
+        panic!("Invalid state should never exist except during state transitions.");
+    }
+}
 
 /// A singleton struct to hold the top-level components of Sapling.
 pub struct Editor<'arena, Node: Ast<'arena>> {
@@ -27,8 +56,8 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     format_style: Node::FormatStyle,
     /// The `tuikit` terminal that the `Editor` is rendering to
     term: Term,
-    /// The current contents of the keystroke buffer
-    keystroke_buffer: String,
+    /// The current [`State`] of Sapling
+    state: Box<dyn State<'arena, Node>>,
     /// The current user configuration
     config: Config,
     /// A list of the keystrokes that have been executed, along with a summary of what they mean
@@ -47,7 +76,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             tree,
             term,
             format_style,
-            keystroke_buffer: String::new(),
+            state: Box::new(normal_mode::State::default()),
             config,
             keystroke_log: KeyStrokeLog::new(10),
         }
@@ -179,11 +208,12 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             .print(height - 1, 0, "Press 'q' to exit.")
             .unwrap();
         // Draw the current keystroke buffer
+        let keystroke_buffer = self.state.keystroke_buffer();
         self.term
             .print(
                 height - 1,
-                width - 5 - self.keystroke_buffer.chars().count(),
-                &self.keystroke_buffer,
+                width - 5 - keystroke_buffer.chars().count(),
+                keystroke_buffer.borrow(),
             )
             .unwrap();
 
@@ -192,61 +222,39 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         self.term.present().unwrap();
     }
 
-    /// Consumes a [`char`] and adds it to the keystroke buffer.  If the keystroke buffer contains a
-    /// valid keystroke, then execute that keystroke.
-    ///
-    /// This returns a tuple of:
-    /// 1. A [`bool`] value that determines whether or not Sapling should quit
-    /// 2. The [`EditResult`] of the edit, or `None` if the keystroke is incomplete
-    fn consume_keystroke(&mut self, c: char) -> (bool, Option<EditResult>) {
-        // Add the new keypress to the keystroke
-        self.keystroke_buffer.push(c);
-        // Attempt to parse the keystroke, and take action if the keystroke is
-        // complete
-        match parse_keystroke(&self.config.keymap, &self.keystroke_buffer) {
-            Some(action) => {
-                let (should_quit, result) = self.tree.execute_action(action);
-                // Add the keystroke to the keystroke log and clear the keystroke buffer
-                self.keystroke_log
-                    .push(self.keystroke_buffer.clone(), &self.config.keymap);
-                self.keystroke_buffer.clear();
-                // Return the result of the action
-                (should_quit, Some(result))
-            }
-            None => (false, None),
-        }
-    }
-
     fn mainloop(&mut self) {
         log::trace!("Starting mainloop");
         // Sit in the infinte mainloop
         while let Ok(event) = self.term.poll_event() {
             /* RESPOND TO THE USER'S INPUT */
             if let Event::Key(key) = event {
-                match key {
-                    Key::Char(c) => {
-                        // Consume the new keystroke
-                        let (should_quit, result) = self.consume_keystroke(c);
-                        // Write the result's message to the log if the keystroke was complete
-                        if let Some(res) = result {
-                            res.log_message();
-                        }
-                        // `self.add_char_to_keystroke` returns `true` if the editor should quit
-                        if should_quit {
-                            break;
-                        }
-                    }
-                    Key::ESC => {
-                        self.keystroke_buffer.clear();
-                    }
-                    _ => {}
-                }
+                // Consume the key and use it to move through the state machine.  Here, we use
+                // `std::mem::replace` to allow us to move `self.state` into `State::transition` by
+                // replacing it with the temporary value of `Box::new(IntermediateState)`.
+                //
+                // `Box::new(IntermediateState)` is creating a `Box` of a zero-size type, which
+                // according to the docs
+                // (https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new) does not
+                // perform a heap allocation.
+                self.state = State::transition(
+                    std::mem::replace(
+                        &mut self.state,
+                        Box::new(IntermediateState) as Box<dyn State<'arena, Node>>,
+                    ),
+                    key,
+                    &self.config,
+                    &mut self.tree,
+                );
+            }
+
+            // If we have reached `state::Quit` then we should exit the main loop
+            if self.state.is_quit() {
+                break;
             }
 
             // Make sure that the logger isn't taller than the screen
             self.keystroke_log
                 .set_max_entries(self.term.term_size().unwrap().1.min(10));
-
             // Update the screen after every input (if this becomes a bottleneck then we can
             // optimise the number of calls to `update_display` but for now it's not worth the
             // added complexity)
@@ -263,46 +271,5 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         log::trace!("Making the cursor reappear.");
         self.term.show_cursor(true).unwrap();
         self.term.present().unwrap();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::normal_mode::{parse_keystroke, Action};
-    use crate::config::default_keymap;
-    use crate::core::Direction;
-
-    #[test]
-    fn parse_keystroke_complete() {
-        let keymap = default_keymap();
-        for (keystroke, expected_effect) in &[
-            ("q", Action::Quit),
-            ("x", Action::Delete),
-            ("d", Action::Undefined("d".to_string())),
-            ("h", Action::MoveCursor(Direction::Prev)),
-            ("j", Action::MoveCursor(Direction::Next)),
-            ("k", Action::MoveCursor(Direction::Prev)),
-            ("l", Action::MoveCursor(Direction::Next)),
-            ("pajlbsi", Action::MoveCursor(Direction::Up)),
-            ("Pxx", Action::Undefined("Pxx".to_string())),
-            ("Qsx", Action::Undefined("Qsx".to_string())),
-            ("ra", Action::Replace('a')),
-            ("rg", Action::Replace('g')),
-            ("oX", Action::InsertChild('X')),
-            ("oP", Action::InsertChild('P')),
-        ] {
-            assert_eq!(
-                parse_keystroke(&keymap, *keystroke),
-                Some(expected_effect.clone())
-            );
-        }
-    }
-
-    #[test]
-    fn parse_keystroke_incomplete() {
-        let keymap = default_keymap();
-        for keystroke in &["", "r", "o"] {
-            assert_eq!(parse_keystroke(&keymap, *keystroke), None);
-        }
     }
 }

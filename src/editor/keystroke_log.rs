@@ -3,23 +3,43 @@
 
 #[allow(unused_imports)] // used solely for doc-comments
 use super::normal_mode::Action;
-use super::normal_mode::ActionCategory;
 
 use tuikit::prelude::*;
 
-/// Returns the [`Color`] that all [`Action`]s of a given [`ActionCategory`] should be
-/// displayed.  This is not implemented as a method on [`ActionCategory`], because doing so
-/// would require [`ActionCategory`] to rely on the specific terminal backend used.  This way,
+/// A category grouping similar actions
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum Category {
+    /// An [`Action`] that moves the cursor
+    Move,
+    /// Either [`Action::Undo`] or [`Action::Redo`]
+    History,
+    /// An [`Action`] that inserts extra nodes into the tree
+    Insert,
+    /// An [`Action`] that replaces some nodes in the tree
+    Replace,
+    /// An [`Action`] that causes nodes to be deleted from the tree
+    Delete,
+    /// The action of the keystrokes is that Sapling should quit
+    Quit,
+    /// The keystrokes did not correspond to a well-defined action
+    Undefined,
+}
+
+/// Returns the [`Color`] that all [`Action`]s of a given [`Category`] should be
+/// displayed.  This is not implemented as a method on [`Category`], because doing so
+/// would require [`Category`] to rely on the specific terminal backend used.  This way,
 /// we keep the terminal backend as encapsulated as possible.
-pub fn term_color(category: ActionCategory) -> Color {
-    match category {
-        ActionCategory::Move => Color::LIGHT_BLUE,
-        ActionCategory::History => Color::LIGHT_YELLOW,
-        ActionCategory::Insert => Color::LIGHT_GREEN,
-        ActionCategory::Replace => Color::CYAN,
-        ActionCategory::Delete => Color::RED,
-        ActionCategory::Quit => Color::MAGENTA,
-        ActionCategory::Undefined => Color::LIGHT_RED,
+impl Category {
+    fn term_color(self) -> Color {
+        match self {
+            Category::Move => Color::LIGHT_BLUE,
+            Category::History => Color::LIGHT_YELLOW,
+            Category::Insert => Color::LIGHT_GREEN,
+            Category::Replace => Color::CYAN,
+            Category::Delete => Color::RED,
+            Category::Quit => Color::MAGENTA,
+            Category::Undefined => Color::LIGHT_RED,
+        }
     }
 }
 
@@ -114,7 +134,7 @@ impl KeyStrokeLog {
     }
 
     /// Pushes a new keystroke to the log.
-    pub fn push(&mut self, keystroke: String, keymap: &super::KeyMap) {
+    pub fn push(&mut self, keystroke: String, description: String, category: Category) {
         // If the keystroke is identical to the last log entry, incrememnt that counter by one
         if Some(&keystroke) == self.keystrokes.last().map(|e| &e.keystroke) {
             // We can safely unwrap here, because the guard of the `if` statement guaruntees
@@ -122,21 +142,11 @@ impl KeyStrokeLog {
             self.keystrokes.last_mut().unwrap().count += 1;
             return;
         }
-        // If the keystroke is different, then we should add a new entry for it
-        let (description, color) = if keystroke.is_empty() {
-            log::error!("Empty keystroke executed!");
-            ("<empty keystroke>".to_string(), Color::LIGHT_RED)
-        } else if let Some(action) = super::parse_keystroke(&keymap, &keystroke) {
-            (action.description(), term_color(action.category()))
-        } else {
-            log::error!("Incomplete keystroke executed!");
-            ("<incomplete keystroke>".to_string(), Color::LIGHT_RED)
-        };
         self.keystrokes.push(Entry {
             count: 1,
             keystroke,
             description,
-            color,
+            color: category.term_color(),
         });
         // Since we added an item, we should enforce the entry limit
         self.enforce_entry_limit();
