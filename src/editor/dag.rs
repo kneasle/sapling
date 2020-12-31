@@ -732,20 +732,6 @@ mod tests {
             Path::root(),
         );
 
-        run_test_ok(
-            TestJSON::Object(vec![("key".to_string(), TestJSON::True)]),
-            Path::root(),
-            Action::Replace('f'),
-            (
-                false,
-                Ok(EditSuccess::Replace {
-                    c: 'f',
-                    name: "false".to_string(),
-                }),
-            ),
-            TestJSON::False,
-            Path::root(),
-        );
         // Char not a node
         run_test_err(
             TestJSON::False,
@@ -1270,54 +1256,6 @@ mod tests {
         );
 
         run_test_ok(
-            TestJSON::Array(vec![
-                TestJSON::True,
-                TestJSON::Object(vec![("key".to_string(), TestJSON::True)]),
-            ]),
-            Path::from_vec(vec![1, 0, 1]),
-            Action::Replace('n'),
-            (
-                false,
-                Ok(EditSuccess::Replace {
-                    c: 'n',
-                    name: "null".to_string(),
-                }),
-            ),
-            TestJSON::Array(vec![
-                TestJSON::True,
-                TestJSON::Object(vec![("key".to_string(), TestJSON::Null)]),
-            ]),
-            Path::from_vec(vec![1, 0, 1]),
-        );
-
-        run_test_ok(
-            TestJSON::Array(vec![
-                TestJSON::True,
-                TestJSON::Object(vec![
-                    ("key-1".to_string(), TestJSON::False),
-                    ("key-2".to_string(), TestJSON::True),
-                ]),
-            ]),
-            Path::from_vec(vec![1, 0, 1]),
-            Action::Replace('n'),
-            (
-                false,
-                Ok(EditSuccess::Replace {
-                    c: 'n',
-                    name: "null".to_string(),
-                }),
-            ),
-            TestJSON::Array(vec![
-                TestJSON::True,
-                TestJSON::Object(vec![
-                    ("key-1".to_string(), TestJSON::Null),
-                    ("key-2".to_string(), TestJSON::True),
-                ]),
-            ]),
-            Path::from_vec(vec![1, 0, 1]),
-        );
-
-        run_test_ok(
             TestJSON::Object(vec![
                 ("key-1".to_string(), TestJSON::False),
                 ("key-2".to_string(), TestJSON::True),
@@ -1462,6 +1400,64 @@ mod tests {
             "Not equal in action result"
         );
         assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(
+            Path::root(),
+            editable_tree.current_cursor_path,
+            "Not equal in cursor location."
+        );
+    }
+
+    #[test]
+    #[ignore]
+    // This is the test cases for issue 27
+    fn level_2_undo() {
+        // The original snapshot of the tree
+
+        let start_tree = TestJSON::Array(vec![
+            TestJSON::Null,
+            TestJSON::Object(vec![("key".to_string(), TestJSON::True)]),
+            TestJSON::False,
+        ]);
+
+        let expected_tree = TestJSON::Array(vec![
+            TestJSON::Null,
+            TestJSON::Object(vec![]),
+            TestJSON::False,
+        ]);
+
+        // Create and initialise DAG to test
+        let arena: Arena<JSON> = Arena::new();
+        let root = start_tree.add_to_arena(&arena);
+        let start_cursor_location = Path::from_vec(vec![1, 0]);
+        let expected_cursor_location = Path::from_vec(vec![1]);
+        let mut editable_tree = DAG::new(&arena, root, start_cursor_location);
+
+        // Step 1: Delete TestJSON::object's child
+        println!("Delete `key-value` pair");
+        assert_eq!(
+            (
+                false,
+                Ok(EditSuccess::Delete {
+                    name: "field".to_string()
+                })
+            ),
+            editable_tree.execute_action(Action::Delete),
+            "Not equal in action result."
+        );
+        assert_eq!(expected_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(
+            expected_cursor_location, editable_tree.current_cursor_path,
+            "Not equal in cursor location."
+        );
+
+        // Perform one undo.
+        println!("Performing undo");
+        assert_eq!(
+            (false, Ok(EditSuccess::Undo)),
+            editable_tree.execute_action(Action::Undo),
+            "Not equal in action result"
+        );
+        assert_eq!(start_tree, editable_tree.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
             editable_tree.current_cursor_path,

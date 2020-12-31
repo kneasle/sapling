@@ -21,7 +21,6 @@ const CHAR_NULL: char = 'n';
 const CHAR_ARRAY: char = 'a';
 const CHAR_OBJECT: char = 'o';
 const CHAR_STRING: char = 's';
-const CHAR_FIELD: char = 'e';
 
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
@@ -59,11 +58,28 @@ impl JSON<'_> {
                 CHAR_ARRAY,
                 CHAR_OBJECT,
                 CHAR_STRING,
-                CHAR_FIELD,
             ]
             .iter()
             .copied(),
         )
+    }
+
+    fn holds_child(&self) -> bool {
+        match self {
+            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => false,
+            JSON::Object(_) | JSON::Array(_) | JSON::Field(_) => true,
+        }
+    }
+
+    fn holds_paired_child(&self) -> bool {
+        match self {
+            JSON::Field(_) => true,
+            _ => false,
+        }
+    }
+
+    fn valid_key_chars() -> Box<dyn Iterator<Item = char>> {
+        Box::new([CHAR_STRING].iter().copied())
     }
 }
 
@@ -378,9 +394,9 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     /* AST EDITING FUNCTIONS */
 
-    fn replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
-        Self::all_object_chars()
-    }
+    //fn replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
+    //   Self::all_object_chars()
+    //}
 
     fn from_char(&self, c: char) -> Option<Self> {
         match c {
@@ -394,26 +410,25 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         }
     }
 
-    fn holds_child(&self) -> bool {
-        match self {
-            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => false,
-            JSON::Object(_) | JSON::Array(_) | JSON::Field(_) => true,
-        }
-    }
-
-    fn valid_chars(&self) -> Box<dyn Iterator<Item = char>> {
+    fn valid_chars() -> Box<dyn Iterator<Item = char>> {
         Self::all_object_chars()
     }
 
-    fn valid_key_chars(&self) -> Box<dyn Iterator<Item = char>> {
-        Box::new([CHAR_STRING].iter().copied())
+    fn is_valid_child(&self, index: usize, c: char) -> bool {
+        if self.holds_paired_child() {
+            match index {
+                0 => Self::valid_key_chars().any(|x| x == c),
+                _ => Self::valid_chars().any(|x| x == c),
+            }
+        } else if self.holds_child() {
+            Self::valid_chars().any(|x| x == c)
+        } else {
+            false
+        }
     }
 
-    fn holds_paired_child(&self) -> bool {
-        match self {
-            JSON::Field(_) => true,
-            _ => false,
-        }
+    fn is_valid_root(&self, c: char) -> bool {
+        Self::valid_chars().any(|x| x == c)
     }
 }
 
