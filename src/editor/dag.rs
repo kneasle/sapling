@@ -382,37 +382,24 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                                     .map_or("<root>".to_string(), |(p, _)| p.display_name()),
                             });
                         }
-
-                        let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
-
-                        let new_node_name = new_node.display_name();
-                        Ok((
-                            new_node,
-                            EditLocation::Cursor,
-                            EditSuccess::Replace {
-                                c,
-                                name: new_node_name,
-                            },
-                        ))
                     }
                     None => {
                         if !cursor.is_valid_root(c) {
                             return Err(EditErr::CharNotANode(c));
                         }
-
-                        let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
-
-                        let new_node_name = new_node.display_name();
-                        Ok((
-                            new_node,
-                            EditLocation::Cursor,
-                            EditSuccess::Replace {
-                                c,
-                                name: new_node_name,
-                            },
-                        ))
                     }
                 }
+                let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
+
+                let new_node_name = new_node.display_name();
+                Ok((
+                    new_node,
+                    EditLocation::Cursor,
+                    EditSuccess::Replace {
+                        c,
+                        name: new_node_name,
+                    },
+                ))
             },
         )
     }
@@ -433,70 +420,38 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                                 parent_name: cursor.display_name(),
                             });
                         }
-
-                        // Create the node to insert
-                        let new_node = this
-                            .arena
-                            .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
-                        let new_node_name = new_node.display_name();
-                        // Clone the node that currently is the cursor, and add the new child to the end of its
-                        // children.
-                        let mut cloned_cursor = cursor.clone();
-                        // Store the new_node's display name before it's consumed by `finish_edit`
-                        // Add the new child to the children of the cloned cursor
-                        cloned_cursor.insert_child(
-                            new_node,
-                            this.arena,
-                            cloned_cursor.children().len(),
-                        )?;
-
-                        // moves the cursor to the newly added child
-                        this.current_cursor_path.push(cursor.children().len());
-
-                        Ok((
-                            cloned_cursor,
-                            EditLocation::Cursor,
-                            EditSuccess::InsertChild {
-                                c,
-                                name: new_node_name,
-                            },
-                        ))
                     }
                     None => {
                         // Short circuit if `c` couldn't be a valid child of the cursor
                         if !cursor.is_valid_root(c) {
                             return Err(EditErr::CharNotANode(c));
                         }
-
-                        // Create the node to insert
-                        let new_node = this
-                            .arena
-                            .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
-                        let new_node_name = new_node.display_name();
-                        // Clone the node that currently is the cursor, and add the new child to the end of its
-                        // children.
-                        let mut cloned_cursor = cursor.clone();
-                        // Store the new_node's display name before it's consumed by `finish_edit`
-                        // Add the new child to the children of the cloned cursor
-                        cloned_cursor.insert_child(
-                            new_node,
-                            this.arena,
-                            cloned_cursor.children().len(),
-                        )?;
-
-                        // moves the cursor to the newly added child
-                        this.current_cursor_path.push(cursor.children().len());
-
-                        Ok((
-                            cloned_cursor,
-                            EditLocation::Cursor,
-                            EditSuccess::InsertChild {
-                                c,
-                                name: new_node_name,
-                            },
-                        ))
                     }
                 }
+
+                // Create the node to insert
+                let new_node = this
+                    .arena
+                    .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
+                let new_node_name = new_node.display_name();
+                // Clone the node that currently is the cursor, and add the new child to the end of its
+                // children.
+                let mut cloned_cursor = cursor.clone();
+                // Store the new_node's display name before it's consumed by `finish_edit`
+                // Add the new child to the children of the cloned cursor
+                cloned_cursor.insert_child(new_node, this.arena, cloned_cursor.children().len())?;
+
+                // moves the cursor to the newly added child
+                this.current_cursor_path.push(cursor.children().len());
+
+                Ok((
+                    cloned_cursor,
+                    EditLocation::Cursor,
+                    EditSuccess::InsertChild {
+                        c,
+                        name: new_node_name,
+                    },
+                ))
             },
         )
     }
