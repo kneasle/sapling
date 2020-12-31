@@ -1299,7 +1299,6 @@ mod tests {
 
     #[test]
     fn level_1_replace() {
-        /*
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
             Path::from_vec(vec![1]),
@@ -1356,7 +1355,7 @@ mod tests {
             TestJSON::Array(vec![
                 TestJSON::True,
                 TestJSON::Object(vec![
-                    ("key-1".to_string(), TestJSON::False),
+                    ("key-1".to_string(), TestJSON::Null),
                     ("key-2".to_string(), TestJSON::True),
                 ]),
             ]),
@@ -1383,27 +1382,7 @@ mod tests {
             ]),
             Path::from_vec(vec![1, 1]),
         );
-        */
-        run_test_ok(
-            TestJSON::Object(vec![
-                ("key-1".to_string(), TestJSON::False),
-                ("key-2".to_string(), TestJSON::True),
-            ]),
-            Path::from_vec(vec![1, 1]),
-            Action::Replace('n'),
-            (
-                false,
-                Ok(EditSuccess::Replace {
-                    c: 'n',
-                    name: "null".to_string(),
-                }),
-            ),
-            TestJSON::Object(vec![
-                ("key-1".to_string(), TestJSON::False),
-                ("key-2".to_string(), TestJSON::Null),
-            ]),
-            Path::from_vec(vec![1, 1]),
-        );
+
         run_test_err(
             TestJSON::Object(vec![
                 ("key-1".to_string(), TestJSON::False),
