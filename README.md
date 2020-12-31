@@ -97,8 +97,12 @@ play around with Sapling as it currently stands, the best way is to clone the re
 from source (you'll need [Rust](https://www.rust-lang.org/learn/get-started) installed in order to do this):
 ```bash
 git clone https://github.com/kneasle/sapling.git
-cargo run
+cargo run 2> log
 ```
+
+Note that Sapling will not compile for Windows.  Windows support is absolutely intended, but Sapling currently uses
+[tuikit](https://github.com/lotabout/tuikit) as a terminal abstraction, which does not yet have Windows support.  PRs to
+Sapling or `tuikit` to add support for Windows would be very much appreciated.
 
 ### Current Keybindings
 
