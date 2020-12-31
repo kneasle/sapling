@@ -316,7 +316,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // Unwrap is safe because `nodes_to_clone` must always contain at least the root
         let mut reverse_node_iter = nodes_to_clone.iter().copied().rev();
         let cursor = reverse_node_iter.next().unwrap();
-        // Unwrapping in the closureis safe, because if the cursor does have a parent, then the
+        // Unwrapping in the closure is safe, because if the cursor does have a parent, then the
         // cursor_path must have at least one element
         let parent_and_index = reverse_node_iter
             .next()
@@ -373,25 +373,46 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
             |_this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
-                if !cursor.is_replace_char(c) {
-                    return Err(EditErr::CannotBeChild {
-                        c,
-                        parent_name: _parent_and_index
-                            .map_or("<root>".to_string(), |(p, _)| p.display_name()),
-                    });
+                match _parent_and_index {
+                    Some((parent, cursor_index)) => {
+                        if !parent.is_valid_child(cursor_index, c) {
+                            return Err(EditErr::CannotBeChild {
+                                c,
+                                parent_name: _parent_and_index
+                                    .map_or("<root>".to_string(), |(p, _)| p.display_name()),
+                            });
+                        }
+
+                        let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
+
+                        let new_node_name = new_node.display_name();
+                        Ok((
+                            new_node,
+                            EditLocation::Cursor,
+                            EditSuccess::Replace {
+                                c,
+                                name: new_node_name,
+                            },
+                        ))
+                    }
+                    None => {
+                        if !cursor.is_valid_root(c) {
+                            return Err(EditErr::CharNotANode(c));
+                        }
+
+                        let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
+
+                        let new_node_name = new_node.display_name();
+                        Ok((
+                            new_node,
+                            EditLocation::Cursor,
+                            EditSuccess::Replace {
+                                c,
+                                name: new_node_name,
+                            },
+                        ))
+                    }
                 }
-
-                let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
-
-                let new_node_name = new_node.display_name();
-                Ok((
-                    new_node,
-                    EditLocation::Cursor,
-                    EditSuccess::Replace {
-                        c,
-                        name: new_node_name,
-                    },
-                ))
             },
         )
     }
@@ -403,37 +424,79 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
             |this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
-                // Short circuit if `c` couldn't be a valid child of the cursor
-                if !cursor.is_insert_char(c) {
-                    return Err(EditErr::CannotBeChild {
-                        c,
-                        parent_name: cursor.display_name(),
-                    });
+                match _parent_and_index {
+                    Some((parent, cursor_index)) => {
+                        if !parent.is_valid_child(cursor_index, c) {
+                            // Short circuit if `c` couldn't be a valid child of the cursor
+                            return Err(EditErr::CannotBeChild {
+                                c,
+                                parent_name: cursor.display_name(),
+                            });
+                        }
+
+                        // Create the node to insert
+                        let new_node = this
+                            .arena
+                            .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
+                        let new_node_name = new_node.display_name();
+                        // Clone the node that currently is the cursor, and add the new child to the end of its
+                        // children.
+                        let mut cloned_cursor = cursor.clone();
+                        // Store the new_node's display name before it's consumed by `finish_edit`
+                        // Add the new child to the children of the cloned cursor
+                        cloned_cursor.insert_child(
+                            new_node,
+                            this.arena,
+                            cloned_cursor.children().len(),
+                        )?;
+
+                        // moves the cursor to the newly added child
+                        this.current_cursor_path.push(cursor.children().len());
+
+                        Ok((
+                            cloned_cursor,
+                            EditLocation::Cursor,
+                            EditSuccess::InsertChild {
+                                c,
+                                name: new_node_name,
+                            },
+                        ))
+                    }
+                    None => {
+                        // Short circuit if `c` couldn't be a valid child of the cursor
+                        if !cursor.is_valid_root(c) {
+                            return Err(EditErr::CharNotANode(c));
+                        }
+
+                        // Create the node to insert
+                        let new_node = this
+                            .arena
+                            .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
+                        let new_node_name = new_node.display_name();
+                        // Clone the node that currently is the cursor, and add the new child to the end of its
+                        // children.
+                        let mut cloned_cursor = cursor.clone();
+                        // Store the new_node's display name before it's consumed by `finish_edit`
+                        // Add the new child to the children of the cloned cursor
+                        cloned_cursor.insert_child(
+                            new_node,
+                            this.arena,
+                            cloned_cursor.children().len(),
+                        )?;
+
+                        // moves the cursor to the newly added child
+                        this.current_cursor_path.push(cursor.children().len());
+
+                        Ok((
+                            cloned_cursor,
+                            EditLocation::Cursor,
+                            EditSuccess::InsertChild {
+                                c,
+                                name: new_node_name,
+                            },
+                        ))
+                    }
                 }
-
-                // Create the node to insert
-                let new_node = this
-                    .arena
-                    .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
-                let new_node_name = new_node.display_name();
-                // Clone the node that currently is the cursor, and add the new child to the end of its
-                // children.
-                let mut cloned_cursor = cursor.clone();
-                // Store the new_node's display name before it's consumed by `finish_edit`
-                // Add the new child to the children of the cloned cursor
-                cloned_cursor.insert_child(new_node, this.arena, cloned_cursor.children().len())?;
-
-                // moves the cursor to the newly added child
-                this.current_cursor_path.push(cursor.children().len());
-
-                Ok((
-                    cloned_cursor,
-                    EditLocation::Cursor,
-                    EditSuccess::InsertChild {
-                        c,
-                        name: new_node_name,
-                    },
-                ))
             },
         )
     }
@@ -450,7 +513,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                 let (parent, cursor_index) = parent_and_index.ok_or(EditErr::AddSiblingToRoot)?;
 
                 // Short circuit if not an insertable char
-                if !parent.is_insert_char(c) {
+                if !parent.is_valid_child(cursor_index, c) {
                     return Err(EditErr::CannotBeChild {
                         c,
                         parent_name: parent.display_name(),
@@ -714,18 +777,26 @@ mod tests {
             Path::root(),
         );
 
+        run_test_ok(
+            TestJSON::Object(vec![("key".to_string(), TestJSON::True)]),
+            Path::root(),
+            Action::Replace('f'),
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'f',
+                    name: "false".to_string(),
+                }),
+            ),
+            TestJSON::False,
+            Path::root(),
+        );
         // Char not a node
         run_test_err(
             TestJSON::False,
             Path::root(),
             Action::Replace('m'),
-            (
-                false,
-                Err(EditErr::CannotBeChild {
-                    c: 'm',
-                    parent_name: "<root>".to_string(),
-                }),
-            ),
+            (false, Err(EditErr::CharNotANode('m'))),
         );
         //
         // tree level == 1
@@ -1228,6 +1299,7 @@ mod tests {
 
     #[test]
     fn level_1_replace() {
+        /*
         run_test_ok(
             TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
             Path::from_vec(vec![1]),
@@ -1241,6 +1313,111 @@ mod tests {
             ),
             TestJSON::Array(vec![TestJSON::True, TestJSON::Null]),
             Path::from_vec(vec![1]),
+        );
+
+        run_test_ok(
+            TestJSON::Array(vec![
+                TestJSON::True,
+                TestJSON::Object(vec![("key".to_string(), TestJSON::True)]),
+            ]),
+            Path::from_vec(vec![1, 0, 1]),
+            Action::Replace('n'),
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'n',
+                    name: "null".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![
+                TestJSON::True,
+                TestJSON::Object(vec![("key".to_string(), TestJSON::Null)]),
+            ]),
+            Path::from_vec(vec![1, 0, 1]),
+        );
+
+        run_test_ok(
+            TestJSON::Array(vec![
+                TestJSON::True,
+                TestJSON::Object(vec![
+                    ("key-1".to_string(), TestJSON::False),
+                    ("key-2".to_string(), TestJSON::True),
+                ]),
+            ]),
+            Path::from_vec(vec![1, 0, 1]),
+            Action::Replace('n'),
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'n',
+                    name: "null".to_string(),
+                }),
+            ),
+            TestJSON::Array(vec![
+                TestJSON::True,
+                TestJSON::Object(vec![
+                    ("key-1".to_string(), TestJSON::False),
+                    ("key-2".to_string(), TestJSON::True),
+                ]),
+            ]),
+            Path::from_vec(vec![1, 0, 1]),
+        );
+
+        run_test_ok(
+            TestJSON::Object(vec![
+                ("key-1".to_string(), TestJSON::False),
+                ("key-2".to_string(), TestJSON::True),
+            ]),
+            Path::from_vec(vec![1, 1]),
+            Action::Replace('n'),
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'n',
+                    name: "null".to_string(),
+                }),
+            ),
+            TestJSON::Object(vec![
+                ("key-1".to_string(), TestJSON::False),
+                ("key-2".to_string(), TestJSON::Null),
+            ]),
+            Path::from_vec(vec![1, 1]),
+        );
+        */
+        run_test_ok(
+            TestJSON::Object(vec![
+                ("key-1".to_string(), TestJSON::False),
+                ("key-2".to_string(), TestJSON::True),
+            ]),
+            Path::from_vec(vec![1, 1]),
+            Action::Replace('n'),
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'n',
+                    name: "null".to_string(),
+                }),
+            ),
+            TestJSON::Object(vec![
+                ("key-1".to_string(), TestJSON::False),
+                ("key-2".to_string(), TestJSON::Null),
+            ]),
+            Path::from_vec(vec![1, 1]),
+        );
+        run_test_err(
+            TestJSON::Object(vec![
+                ("key-1".to_string(), TestJSON::False),
+                ("key-2".to_string(), TestJSON::True),
+            ]),
+            Path::from_vec(vec![1, 0]),
+            Action::Replace('n'),
+            (
+                false,
+                Err(EditErr::CannotBeChild {
+                    c: 'n',
+                    parent_name: ("field".to_string()),
+                }),
+            ),
         );
     }
 

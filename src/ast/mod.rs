@@ -219,12 +219,35 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
     /// if it isn't, then this should return [`None`].
     fn from_char(&self, c: char) -> Option<Self>;
 
-    /// Generate an iterator over the possible shorthand [`char`]s that a user could type to insert
-    /// other nodes into this one
-    fn insert_chars(&self) -> Box<dyn Iterator<Item = char>>;
+    /// Generate an iterator over the possible shorthand [`char`]s for valid  node
+    fn valid_chars(&self) -> Box<dyn Iterator<Item = char>>;
 
-    /// Returns whether or not a given [`char`] is in [`Self::insert_chars`]
-    fn is_insert_char(&self, c: char) -> bool {
-        self.insert_chars().any(|x| x == c)
+    /// Generate an iterator over the possible shorthand [`char`]s that a user could use as a key
+    /// in node that hold key-value pairs
+    fn valid_key_chars(&self) -> Box<dyn Iterator<Item = char>>;
+
+    /// Returns whether or not the current node can have child in key-value form
+    fn holds_paired_child(&self) -> bool;
+
+    /// Returns whether or not the current node can have child in key-value form
+    fn holds_child(&self) -> bool;
+
+    /// Returns whether or not a given index and [`char`] is a valid child
+    fn is_valid_child(&self, index: usize, c: char) -> bool {
+        if self.holds_paired_child() {
+            match index {
+                0 => self.valid_key_chars().any(|x| x == c),
+                _ => self.valid_chars().any(|x| x == c),
+            }
+        } else if self.holds_child() {
+            self.valid_chars().any(|x| x == c)
+        } else {
+            false
+        }
+    }
+
+    /// Returns whether or not a give index and ['char'] is a valid root
+    fn is_valid_root(&self, c: char) -> bool {
+        self.valid_chars().any(|x| x == c)
     }
 }
