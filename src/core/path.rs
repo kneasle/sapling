@@ -78,7 +78,7 @@ impl Path {
         self.child_indices.is_empty()
     }
 
-    /// Returns a mutable reference to the last child index in the path (if it exists).
+    /// Returns the last child index in the path (if it exists).
     #[inline]
     pub fn last(&self) -> Option<usize> {
         self.child_indices.last().copied()
