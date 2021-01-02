@@ -389,8 +389,9 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                         }
                     }
                 }
-                let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
-
+                // Create the node to replace
+                // we can use unwrap here, because 'c' is always one of valid chars.
+                let new_node = cursor.from_char(c).unwrap();
                 let new_node_name = new_node.display_name();
                 Ok((
                     new_node,
@@ -428,11 +429,9 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                         }
                     }
                 }
-
                 // Create the node to insert
-                let new_node = this
-                    .arena
-                    .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
+                // we can use unwrap here, because 'c' is always one of valid chars.
+                let new_node = this.arena.alloc(cursor.from_char(c).unwrap());
                 let new_node_name = new_node.display_name();
                 // Clone the node that currently is the cursor, and add the new child to the end of its
                 // children.

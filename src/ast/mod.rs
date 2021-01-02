@@ -206,8 +206,8 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
     /* AST EDITING FUNCTIONS */
 
     /// Generate a new node from a [`char`] that a user typed.  If `c` is an element of
-    /// [`valid_chars`](Ast::valid_chars), at current cursor position, [is_valid_child](Ast::is_valid_child) or [is_valid_root](Ast::is_valid_root) they must return [`true`],
-    /// if it isn't, then this should return [`false`].
+    /// [`valid_chars`](Ast::valid_chars), this must return [`Some`],
+    /// if it isn't, then this should return [`None`].
     fn from_char(&self, c: char) -> Option<Self>;
 
     /// Generate an iterator over the possible shorthand [`char`]s for valid  node

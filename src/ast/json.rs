@@ -63,24 +63,6 @@ impl JSON<'_> {
             .copied(),
         )
     }
-
-    fn holds_child(&self) -> bool {
-        match self {
-            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => false,
-            JSON::Object(_) | JSON::Array(_) | JSON::Field(_) => true,
-        }
-    }
-
-    fn holds_paired_child(&self) -> bool {
-        match self {
-            JSON::Field(_) => true,
-            _ => false,
-        }
-    }
-
-    fn valid_key_chars() -> Box<dyn Iterator<Item = char>> {
-        Box::new([CHAR_STRING].iter().copied())
-    }
 }
 
 impl Default for JSON<'_> {
@@ -394,10 +376,6 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     /* AST EDITING FUNCTIONS */
 
-    //fn replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
-    //   Self::all_object_chars()
-    //}
-
     fn from_char(&self, c: char) -> Option<Self> {
         match c {
             CHAR_TRUE => Some(JSON::True),
@@ -415,15 +393,19 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
     }
 
     fn is_valid_child(&self, index: usize, c: char) -> bool {
-        if self.holds_paired_child() {
-            match index {
-                0 => Self::valid_key_chars().any(|x| x == c),
-                _ => Self::valid_chars().any(|x| x == c),
+        match self {
+            // values like 'true' and 'false' can never have children
+            JSON::True | JSON::False | JSON::Str(_) | JSON::Null => false,
+            // arrays and objects can have any children (except `field` inside `array`, which can't be inserted)
+            JSON::Array(_) | JSON::Object(_) => true,
+            // fields must have their left hand side be a string
+            JSON::Field(_) => {
+                if index == 0 {
+                    c == CHAR_STRING
+                } else {
+                    true
+                }
             }
-        } else if self.holds_child() {
-            Self::valid_chars().any(|x| x == c)
-        } else {
-            false
         }
     }
 
