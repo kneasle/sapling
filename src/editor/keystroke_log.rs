@@ -1,6 +1,8 @@
 //! A utility datastructure to store and render a log of keystrokes.  This is mostly used to give
 //! the viewers of my streams feedback for what I'm typing.
 
+use crate::core::KeyDisplay;
+
 #[allow(unused_imports)] // used solely for doc-comments
 use super::normal_mode::Action;
 
@@ -47,9 +49,19 @@ impl Category {
 /// accumulation of many identical keystrokes that are executed consecutively.
 struct Entry {
     count: usize,
-    keystroke: String,
+    keystrokes: Vec<Key>,
     description: String,
     color: Color,
+}
+
+impl Entry {
+    fn keystroke_string(&self) -> String {
+        let mut string = String::new();
+        for k in &self.keystrokes {
+            string.push_str(&k.compact_string());
+        }
+        string
+    }
 }
 
 /// A utility struct to store and display a log of which keystrokes have been executed recently.
@@ -57,7 +69,10 @@ struct Entry {
 pub struct KeyStrokeLog {
     /// A list of keystrokes that have been run
     keystrokes: Vec<Entry>,
+    /// The maximum number of entries that should be displayed at once
     max_entries: usize,
+    /// The keystrokes that will be included in the next log entry
+    unlogged_keystrokes: Vec<Key>,
 }
 
 impl KeyStrokeLog {
@@ -66,6 +81,7 @@ impl KeyStrokeLog {
         KeyStrokeLog {
             keystrokes: vec![],
             max_entries,
+            unlogged_keystrokes: vec![],
         }
     }
 
@@ -94,7 +110,7 @@ impl KeyStrokeLog {
         let cmd_col_width = self
             .keystrokes
             .iter()
-            .map(|e| e.keystroke.len())
+            .map(|e| e.keystroke_string().len())
             .max()
             .unwrap_or(0)
             .max(2);
@@ -108,7 +124,7 @@ impl KeyStrokeLog {
             term.print_with_attr(
                 row + i,
                 col + count_col_width + 1,
-                &e.keystroke,
+                &e.keystroke_string(),
                 Attr::default().fg(Color::WHITE),
             )
             .unwrap();
@@ -133,10 +149,16 @@ impl KeyStrokeLog {
         }
     }
 
-    /// Pushes a new keystroke to the log.
-    pub fn push(&mut self, keystroke: String, description: String, category: Category) {
+    /// Log a new [`Key`] that should be added to the next log entry.
+    pub fn push_key(&mut self, key: Key) {
+        self.unlogged_keystrokes.push(key);
+    }
+
+    /// Creates a new entry in the log, which occured as a result of the [`Key`]s already
+    /// [`push_key`](Self::push_key)ed.
+    pub fn log_entry(&mut self, description: String, category: Category) {
         // If the keystroke is identical to the last log entry, incrememnt that counter by one
-        if Some(&keystroke) == self.keystrokes.last().map(|e| &e.keystroke) {
+        if Some(&self.unlogged_keystrokes) == self.keystrokes.last().map(|e| &e.keystrokes) {
             // We can safely unwrap here, because the guard of the `if` statement guaruntees
             // that `self.keystroke.last()` is `Some(_)`
             self.keystrokes.last_mut().unwrap().count += 1;
@@ -144,7 +166,7 @@ impl KeyStrokeLog {
         }
         self.keystrokes.push(Entry {
             count: 1,
-            keystroke,
+            keystrokes: self.unlogged_keystrokes.drain(..).collect(),
             description,
             color: category.term_color(),
         });

@@ -1,8 +1,10 @@
 //! A collection of core datatypes that are used across Sapling's codebase
 
+mod key_display;
 mod path;
 
-// Re-export `core::path::Path` as `core::Path`
+// Re-export `core::path::Path` and `core::key_display::KeyDisplay` as `core::{Path, KeyDisplay}`
+pub use key_display::KeyDisplay;
 pub use path::Path;
 
 /// The possible ways you can move the cursor
