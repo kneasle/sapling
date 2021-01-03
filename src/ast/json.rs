@@ -376,10 +376,6 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     /* AST EDITING FUNCTIONS */
 
-    fn replace_chars(&self) -> Box<dyn Iterator<Item = char>> {
-        Self::all_object_chars()
-    }
-
     fn from_char(&self, c: char) -> Option<Self> {
         match c {
             CHAR_TRUE => Some(JSON::True),
@@ -392,13 +388,29 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         }
     }
 
-    fn insert_chars(&self) -> Box<dyn Iterator<Item = char>> {
+    fn valid_chars() -> Box<dyn Iterator<Item = char>> {
+        Self::all_object_chars()
+    }
+
+    fn is_valid_child(&self, index: usize, c: char) -> bool {
         match self {
-            JSON::True | JSON::False | JSON::Null | JSON::Field(_) | JSON::Str(_) => {
-                Box::new(std::iter::empty())
+            // values like 'true' and 'false' can never have children
+            JSON::True | JSON::False | JSON::Str(_) | JSON::Null => false,
+            // arrays and objects can have any children (except `field` inside `array`, which can't be inserted)
+            JSON::Array(_) | JSON::Object(_) => true,
+            // fields must have their left hand side be a string
+            JSON::Field(_) => {
+                if index == 0 {
+                    c == CHAR_STRING
+                } else {
+                    true
+                }
             }
-            JSON::Object(_) | JSON::Array(_) => Self::all_object_chars(),
         }
+    }
+
+    fn is_valid_root(&self, c: char) -> bool {
+        Self::valid_chars().any(|x| x == c)
     }
 }
 

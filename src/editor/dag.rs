@@ -316,7 +316,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
         // Unwrap is safe because `nodes_to_clone` must always contain at least the root
         let mut reverse_node_iter = nodes_to_clone.iter().copied().rev();
         let cursor = reverse_node_iter.next().unwrap();
-        // Unwrapping in the closureis safe, because if the cursor does have a parent, then the
+        // Unwrapping in the closure is safe, because if the cursor does have a parent, then the
         // cursor_path must have at least one element
         let parent_and_index = reverse_node_iter
             .next()
@@ -373,16 +373,25 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
             |_this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
-                if !cursor.is_replace_char(c) {
-                    return Err(EditErr::CannotBeChild {
-                        c,
-                        parent_name: _parent_and_index
-                            .map_or("<root>".to_string(), |(p, _)| p.display_name()),
-                    });
+                match _parent_and_index {
+                    Some((parent, cursor_index)) => {
+                        if !parent.is_valid_child(cursor_index, c) {
+                            return Err(EditErr::CannotBeChild {
+                                c,
+                                parent_name: _parent_and_index
+                                    .map_or("<root>".to_string(), |(p, _)| p.display_name()),
+                            });
+                        }
+                    }
+                    None => {
+                        if !cursor.is_valid_root(c) {
+                            return Err(EditErr::CharNotANode(c));
+                        }
+                    }
                 }
-
-                let new_node = cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?;
-
+                // Create the node to replace
+                // we can use unwrap here, because 'c' is always one of valid chars.
+                let new_node = cursor.from_char(c).unwrap();
                 let new_node_name = new_node.display_name();
                 Ok((
                     new_node,
@@ -403,18 +412,26 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
             |this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
-                // Short circuit if `c` couldn't be a valid child of the cursor
-                if !cursor.is_insert_char(c) {
-                    return Err(EditErr::CannotBeChild {
-                        c,
-                        parent_name: cursor.display_name(),
-                    });
+                match _parent_and_index {
+                    Some((parent, cursor_index)) => {
+                        if !parent.is_valid_child(cursor_index, c) {
+                            // Short circuit if `c` couldn't be a valid child of the cursor
+                            return Err(EditErr::CannotBeChild {
+                                c,
+                                parent_name: cursor.display_name(),
+                            });
+                        }
+                    }
+                    None => {
+                        // Short circuit if `c` couldn't be a valid child of the cursor
+                        if !cursor.is_valid_root(c) {
+                            return Err(EditErr::CharNotANode(c));
+                        }
+                    }
                 }
-
                 // Create the node to insert
-                let new_node = this
-                    .arena
-                    .alloc(cursor.from_char(c).ok_or(EditErr::CharNotANode(c))?);
+                // we can use unwrap here, because 'c' is always one of valid chars.
+                let new_node = this.arena.alloc(cursor.from_char(c).unwrap());
                 let new_node_name = new_node.display_name();
                 // Clone the node that currently is the cursor, and add the new child to the end of its
                 // children.
@@ -450,7 +467,7 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
                 let (parent, cursor_index) = parent_and_index.ok_or(EditErr::AddSiblingToRoot)?;
 
                 // Short circuit if not an insertable char
-                if !parent.is_insert_char(c) {
+                if !parent.is_valid_child(cursor_index, c) {
                     return Err(EditErr::CannotBeChild {
                         c,
                         parent_name: parent.display_name(),
@@ -719,13 +736,7 @@ mod tests {
             TestJSON::False,
             Path::root(),
             Action::Replace('m'),
-            (
-                false,
-                Err(EditErr::CannotBeChild {
-                    c: 'm',
-                    parent_name: "<root>".to_string(),
-                }),
-            ),
+            (false, Err(EditErr::CharNotANode('m'))),
         );
         //
         // tree level == 1
@@ -1242,6 +1253,43 @@ mod tests {
             TestJSON::Array(vec![TestJSON::True, TestJSON::Null]),
             Path::from_vec(vec![1]),
         );
+
+        run_test_ok(
+            TestJSON::Object(vec![
+                ("key-1".to_string(), TestJSON::False),
+                ("key-2".to_string(), TestJSON::True),
+            ]),
+            Path::from_vec(vec![1, 1]),
+            Action::Replace('n'),
+            (
+                false,
+                Ok(EditSuccess::Replace {
+                    c: 'n',
+                    name: "null".to_string(),
+                }),
+            ),
+            TestJSON::Object(vec![
+                ("key-1".to_string(), TestJSON::False),
+                ("key-2".to_string(), TestJSON::Null),
+            ]),
+            Path::from_vec(vec![1, 1]),
+        );
+
+        run_test_err(
+            TestJSON::Object(vec![
+                ("key-1".to_string(), TestJSON::False),
+                ("key-2".to_string(), TestJSON::True),
+            ]),
+            Path::from_vec(vec![1, 0]),
+            Action::Replace('n'),
+            (
+                false,
+                Err(EditErr::CannotBeChild {
+                    c: 'n',
+                    parent_name: ("field".to_string()),
+                }),
+            ),
+        );
     }
 
     #[test]
@@ -1351,6 +1399,64 @@ mod tests {
             "Not equal in action result"
         );
         assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(
+            Path::root(),
+            editable_tree.current_cursor_path,
+            "Not equal in cursor location."
+        );
+    }
+
+    #[test]
+    #[ignore]
+    // This is the test cases for issue 27
+    fn level_2_undo() {
+        // The original snapshot of the tree
+
+        let start_tree = TestJSON::Array(vec![
+            TestJSON::Null,
+            TestJSON::Object(vec![("key".to_string(), TestJSON::True)]),
+            TestJSON::False,
+        ]);
+
+        let expected_tree = TestJSON::Array(vec![
+            TestJSON::Null,
+            TestJSON::Object(vec![]),
+            TestJSON::False,
+        ]);
+
+        // Create and initialise DAG to test
+        let arena: Arena<JSON> = Arena::new();
+        let root = start_tree.add_to_arena(&arena);
+        let start_cursor_location = Path::from_vec(vec![1, 0]);
+        let expected_cursor_location = Path::from_vec(vec![1]);
+        let mut editable_tree = DAG::new(&arena, root, start_cursor_location);
+
+        // Step 1: Delete TestJSON::object's child
+        println!("Delete `key-value` pair");
+        assert_eq!(
+            (
+                false,
+                Ok(EditSuccess::Delete {
+                    name: "field".to_string()
+                })
+            ),
+            editable_tree.execute_action(Action::Delete),
+            "Not equal in action result."
+        );
+        assert_eq!(expected_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(
+            expected_cursor_location, editable_tree.current_cursor_path,
+            "Not equal in cursor location."
+        );
+
+        // Perform one undo.
+        println!("Performing undo");
+        assert_eq!(
+            (false, Ok(EditSuccess::Undo)),
+            editable_tree.execute_action(Action::Undo),
+            "Not equal in action result"
+        );
+        assert_eq!(start_tree, editable_tree.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
             editable_tree.current_cursor_path,

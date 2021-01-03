@@ -205,26 +205,17 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
 
     /* AST EDITING FUNCTIONS */
 
-    /// Generate an iterator over the possible shorthand [`char`]s that a user could type to replace
-    /// this node with something else.
-    fn replace_chars(&self) -> Box<dyn Iterator<Item = char>>;
-
-    /// Returns whether or not a given [`char`] is in [`Self::replace_chars`]
-    fn is_replace_char(&self, c: char) -> bool {
-        self.replace_chars().any(|x| x == c)
-    }
-
     /// Generate a new node from a [`char`] that a user typed.  If `c` is an element of
-    /// [`get_replace_chars`](Ast::replace_chars), this must return [`Some`] node,
+    /// [`valid_chars`](Ast::valid_chars), this must return [`Some`],
     /// if it isn't, then this should return [`None`].
     fn from_char(&self, c: char) -> Option<Self>;
 
-    /// Generate an iterator over the possible shorthand [`char`]s that a user could type to insert
-    /// other nodes into this one
-    fn insert_chars(&self) -> Box<dyn Iterator<Item = char>>;
+    /// Generate an iterator over the possible shorthand [`char`]s for valid  node
+    fn valid_chars() -> Box<dyn Iterator<Item = char>>;
 
-    /// Returns whether or not a given [`char`] is in [`Self::insert_chars`]
-    fn is_insert_char(&self, c: char) -> bool {
-        self.insert_chars().any(|x| x == c)
-    }
+    /// Returns whether or not a given index and [`char`] is a valid child
+    fn is_valid_child(&self, index: usize, c: char) -> bool;
+
+    /// Returns whether or not a give index and ['char'] is a valid root
+    fn is_valid_root(&self, c: char) -> bool;
 }

@@ -108,7 +108,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                     col = size.last_line_length();
                 }
             }};
-        };
+        }
 
         for (node, tok) in self.tree.root().display_tokens(&self.format_style) {
             match tok {
