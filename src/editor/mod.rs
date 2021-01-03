@@ -35,7 +35,10 @@ impl<'arena, Node: Ast<'arena>> State<'arena, Node> for IntermediateState {
         _key: Key,
         _config: &Config,
         _tree: &mut DAG<'arena, Node>,
-    ) -> Box<dyn State<'arena, Node>> {
+    ) -> (
+        Box<dyn State<'arena, Node>>,
+        Option<(String, keystroke_log::Category)>,
+    ) {
         panic!("Invalid state should never exist except during state transitions.");
     }
 
@@ -56,7 +59,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     format_style: Node::FormatStyle,
     /// The `tuikit` terminal that the `Editor` is rendering to
     term: Term,
-    /// The current [`State`] of Sapling
+    /// The current state-machine [`State`] that Sapling is in
     state: Box<dyn State<'arena, Node>>,
     /// The current user configuration
     config: Config,
@@ -236,7 +239,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 // according to the docs
                 // (https://doc.rust-lang.org/std/boxed/struct.Box.html#method.new) does not
                 // perform a heap allocation.
-                self.state = State::transition(
+                let (new_state, log_entry) = State::transition(
                     std::mem::replace(
                         &mut self.state,
                         Box::new(IntermediateState) as Box<dyn State<'arena, Node>>,
@@ -245,6 +248,14 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                     &self.config,
                     &mut self.tree,
                 );
+
+                self.state = new_state;
+
+                // Log the key to the keystroke log, and create a log message if required
+                self.keystroke_log.push_key(key);
+                if let Some((description, category)) = log_entry {
+                    self.keystroke_log.log_entry(description, category);
+                }
             }
 
             // If we have reached `state::Quit` then we should exit the main loop

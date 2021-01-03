@@ -1,6 +1,7 @@
 //! The code for 'normal-mode', similar to that of Vim
 
-use super::{dag::DAG, keystroke_log::Category, state};
+use super::dag::{LogMessage, DAG};
+use super::{keystroke_log::Category, state};
 use crate::ast::Ast;
 use crate::config::{Config, KeyMap};
 use crate::core::Direction;
@@ -31,34 +32,45 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
         key: Key,
         config: &Config,
         tree: &mut DAG<'arena, Node>,
-    ) -> Box<dyn state::State<'arena, Node>> {
+    ) -> (
+        Box<dyn state::State<'arena, Node>>,
+        Option<(String, Category)>,
+    ) {
         let c = match key {
             Key::Char(c) => c,
             _ => {
                 self.keystroke_buffer.clear();
-                return self;
+                return (
+                    self,
+                    Some(("Invalid command".to_owned(), Category::Undefined)),
+                );
             }
         };
 
         self.keystroke_buffer.push(c);
 
-        match parse_keystroke(&config.keymap, &self.keystroke_buffer) {
+        let log_entry = match parse_keystroke(&config.keymap, &self.keystroke_buffer) {
             ParseResult::Action(action) => {
-                tree.execute_action(action);
-                ()
+                tree.execute_action(action).log_message();
+                (action.description(), action.category())
             }
             ParseResult::Quit => {
                 self.keystroke_buffer.clear();
-                return Box::new(state::Quit);
+                return (
+                    Box::new(state::Quit),
+                    Some(("Quit Sapling".to_owned(), Category::Quit)),
+                );
             }
-            ParseResult::Incomplete => return self,
-            ParseResult::Undefined(s) => (),
+            ParseResult::Incomplete => return (self, None),
+            ParseResult::Undefined(s) => {
+                (format!("Undefined command '{}'", s), Category::Undefined)
+            }
         };
 
         // If we haven't returned yet, then clear the buffer
         self.keystroke_buffer.clear();
 
-        self
+        (self, Some(log_entry))
     }
 
     fn keystroke_buffer<'s>(&'s self) -> Cow<'s, str> {
@@ -112,7 +124,7 @@ impl KeyStroke {
 }
 
 /// A single [`Action`] that can be actioned by [`DAG`]
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Action {
     /// Replace the selected node with a node represented by some [`char`]
     Replace(char),

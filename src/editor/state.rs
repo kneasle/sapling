@@ -1,6 +1,7 @@
 //! Definition of the state machine of Sapling's editor modes
 
 use super::dag::DAG;
+use super::keystroke_log::Category;
 use crate::ast::Ast;
 use crate::config::Config;
 
@@ -18,8 +19,8 @@ impl<'arena, Node: Ast<'arena>> State<'arena, Node> for Quit {
         _key: Key,
         _config: &Config,
         _tree: &mut DAG<'arena, Node>,
-    ) -> Box<dyn State<'arena, Node>> {
-        self
+    ) -> (Box<dyn State<'arena, Node>>, Option<(String, Category)>) {
+        (self, None)
     }
 
     fn is_quit(&self) -> bool {
@@ -33,14 +34,14 @@ impl<'arena, Node: Ast<'arena>> State<'arena, Node> for Quit {
 /// - [`Quit`]
 /// - [`crate::editor::normal_mode::State`]
 /// - `crate::editor::IntermediateState` (link doesn't work because `IntermediateState` is private)
-pub trait State<'arena, Node: Ast<'arena>> {
+pub trait State<'arena, Node: Ast<'arena>>: std::fmt::Debug {
     /// Consume a keystroke, returning the `State` after this transition
     fn transition(
         self: Box<Self>,
         key: Key,
         config: &Config,
         tree: &mut DAG<'arena, Node>,
-    ) -> Box<dyn State<'arena, Node>>;
+    ) -> (Box<dyn State<'arena, Node>>, Option<(String, Category)>);
 
     /// Return the keystroke buffer that should be displayed in the bottom right corner of the
     /// screen
