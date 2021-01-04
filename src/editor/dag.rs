@@ -410,22 +410,14 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             |this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
-                match _parent_and_index {
-                    Some((parent, cursor_index)) => {
-                        if !parent.is_valid_child(cursor_index, c) {
-                            // Short circuit if `c` couldn't be a valid child of the cursor
-                            return Err(EditErr::CannotBeChild {
-                                c,
-                                parent_name: cursor.display_name(),
-                            });
-                        }
-                    }
-                    None => {
-                        // Short circuit if `c` couldn't be a valid child of the cursor
-                        if !cursor.is_valid_root(c) {
-                            return Err(EditErr::CharNotANode(c));
-                        }
-                    }
+                log::debug!("Inserting '{}' as a new child.", c);
+                if !cursor.is_valid_child(cursor.children().len(), c) {
+                    log::debug!("New node could not be a valid child of the cursor");
+                    // Short circuit if `c` couldn't be a valid child of the cursor
+                    return Err(EditErr::CannotBeChild {
+                        c,
+                        parent_name: cursor.display_name(),
+                    });
                 }
                 // Create the node to insert
                 // we can use unwrap here, because 'c' is always one of valid chars.
