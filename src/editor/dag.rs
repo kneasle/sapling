@@ -1335,4 +1335,64 @@ mod tests {
 
         let _cursor = editable_tree.cursor();
     }
+
+    /// This is a regression test for issue #68, where Sapling crashes if an invalid char is used
+    /// to insert into any node
+    #[test]
+    #[ignore]
+    fn invalid_insert_crash() {
+        // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
+        // the `null`)
+        let arena: Arena<Json> = Arena::new();
+        let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+        let mut editable_tree = Dag::new(&arena, root, Path::root());
+
+        // Inserting an invalid char into the array should error gracefully
+        assert_eq!(
+            Err(EditErr::CharNotANode('x')),
+            editable_tree.execute_action(Action::InsertChild('x'))
+        );
+
+        // Move the cursor to the 'null'
+        assert_eq!(
+            Ok(EditSuccess::Move(Direction::Down)),
+            editable_tree.move_cursor(Direction::Down)
+        );
+
+        // Inserting an invalid char into the array should error gracefully
+        assert_eq!(
+            Err(EditErr::CharNotANode('x')),
+            editable_tree.execute_action(Action::InsertChild('x'))
+        );
+    }
+
+    /// This is a regression test for issue #68, where Sapling crashes if an invalid char is used
+    /// to insert into any node
+    #[test]
+    #[ignore]
+    fn invalid_replace_crash() {
+        // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
+        // the `null`)
+        let arena: Arena<Json> = Arena::new();
+        let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+        let mut editable_tree = Dag::new(&arena, root, Path::root());
+
+        // Inserting an invalid char into the array should error gracefully
+        assert_eq!(
+            Err(EditErr::CharNotANode('x')),
+            editable_tree.execute_action(Action::Replace('x'))
+        );
+
+        // Move the cursor to the 'null'
+        assert_eq!(
+            Ok(EditSuccess::Move(Direction::Down)),
+            editable_tree.move_cursor(Direction::Down)
+        );
+
+        // Inserting an invalid char into the array should error gracefully
+        assert_eq!(
+            Err(EditErr::CharNotANode('x')),
+            editable_tree.execute_action(Action::Replace('x'))
+        );
+    }
 }
