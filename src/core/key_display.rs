@@ -16,15 +16,27 @@ impl KeyDisplay for Key {
             Key::Char(c) => Cow::from(String::from(c)),
             Key::Ctrl(c) => Cow::from(format!("^{}", c)),
 
-            Key::Up => Cow::from("<UP>"),
-            Key::Down => Cow::from("<DOWN>"),
-            Key::Left => Cow::from("<LEFT>"),
-            Key::Right => Cow::from("<RIGHT>"),
+            Key::Up => Cow::from("<Up>"),
+            Key::Down => Cow::from("<Down>"),
+            Key::Left => Cow::from("<Left>"),
+            Key::Right => Cow::from("<Right>"),
 
             Key::F(num) => Cow::from(format!("<F{}>", num)),
-            Key::ESC => Cow::from("<ESC>"),
+            Key::ESC => Cow::from("<Esc>"),
 
-            _ => unimplemented!(),
+            Key::Backspace => Cow::from("<BS>"),
+            Key::Delete => Cow::from("<Del>"),
+
+            Key::Tab => Cow::from("<Tab>"),
+            Key::Enter => Cow::from("<CR>"),
+
+            Key::Insert => Cow::from("<Insert>"),
+            Key::Home => Cow::from("<Home>"),
+            Key::End => Cow::from("<End>"),
+            Key::PageUp => Cow::from("<PageUp>"),
+            Key::PageDown => Cow::from("<PageDown>"),
+
+            _ => Cow::from(format!("{:?}", self)),
         }
     }
 }

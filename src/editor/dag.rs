@@ -295,8 +295,11 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     fn perform_edit(
         &mut self,
         mut edit_func: impl FnMut(
+            // The `Dag` being edited
             &mut Self,
+            // The parent and the cursor's child index (or `None` if the cursor is at the root)
             Option<(&'arena Node, usize)>,
+            // A reference to the node under the cursor
             &'arena Node,
         ) -> Result<(Node, EditLocation, EditSuccess), EditErr>,
     ) -> EditResult {
@@ -366,13 +369,14 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             |_this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
+                // Early return if the `c` can't go in the cursor's location
                 match _parent_and_index {
                     Some((parent, cursor_index)) => {
                         if !parent.is_valid_child(cursor_index, c) {
                             return Err(EditErr::CannotBeChild {
                                 c,
                                 parent_name: _parent_and_index
-                                    .map_or("<root>".to_string(), |(p, _)| p.display_name()),
+                                    .map_or("<root>".to_owned(), |(p, _)| p.display_name()),
                             });
                         }
                     }
@@ -382,8 +386,9 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                         }
                     }
                 }
-                // Create the node to replace
-                // we can use unwrap here, because 'c' is always one of valid chars.
+
+                // Create the node to replace.  We can use unwrap here, because 'c' is always one
+                // of valid chars.
                 let new_node = cursor.from_char(c).unwrap();
                 let new_node_name = new_node.display_name();
                 Ok((
@@ -405,22 +410,14 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             |this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
-                match _parent_and_index {
-                    Some((parent, cursor_index)) => {
-                        if !parent.is_valid_child(cursor_index, c) {
-                            // Short circuit if `c` couldn't be a valid child of the cursor
-                            return Err(EditErr::CannotBeChild {
-                                c,
-                                parent_name: cursor.display_name(),
-                            });
-                        }
-                    }
-                    None => {
-                        // Short circuit if `c` couldn't be a valid child of the cursor
-                        if !cursor.is_valid_root(c) {
-                            return Err(EditErr::CharNotANode(c));
-                        }
-                    }
+                log::debug!("Inserting '{}' as a new child.", c);
+                if !cursor.is_valid_child(cursor.children().len(), c) {
+                    log::debug!("New node could not be a valid child of the cursor");
+                    // Short circuit if `c` couldn't be a valid child of the cursor
+                    return Err(EditErr::CannotBeChild {
+                        c,
+                        parent_name: cursor.display_name(),
+                    });
                 }
                 // Create the node to insert
                 // we can use unwrap here, because 'c' is always one of valid chars.
@@ -1337,5 +1334,65 @@ mod tests {
         );
 
         let _cursor = editable_tree.cursor();
+    }
+
+    /// This is a regression test for issue #68, where Sapling crashes if an invalid char is used
+    /// to insert into any node
+    #[test]
+    #[ignore]
+    fn invalid_insert_crash() {
+        // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
+        // the `null`)
+        let arena: Arena<Json> = Arena::new();
+        let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+        let mut editable_tree = Dag::new(&arena, root, Path::root());
+
+        // Inserting an invalid char into the array should error gracefully
+        assert_eq!(
+            Err(EditErr::CharNotANode('x')),
+            editable_tree.execute_action(Action::InsertChild('x'))
+        );
+
+        // Move the cursor to the 'null'
+        assert_eq!(
+            Ok(EditSuccess::Move(Direction::Down)),
+            editable_tree.move_cursor(Direction::Down)
+        );
+
+        // Inserting an invalid char into the array should error gracefully
+        assert_eq!(
+            Err(EditErr::CharNotANode('x')),
+            editable_tree.execute_action(Action::InsertChild('x'))
+        );
+    }
+
+    /// This is a regression test for issue #68, where Sapling crashes if an invalid char is used
+    /// to insert into any node
+    #[test]
+    #[ignore]
+    fn invalid_replace_crash() {
+        // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
+        // the `null`)
+        let arena: Arena<Json> = Arena::new();
+        let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+        let mut editable_tree = Dag::new(&arena, root, Path::root());
+
+        // Inserting an invalid char into the array should error gracefully
+        assert_eq!(
+            Err(EditErr::CharNotANode('x')),
+            editable_tree.execute_action(Action::Replace('x'))
+        );
+
+        // Move the cursor to the 'null'
+        assert_eq!(
+            Ok(EditSuccess::Move(Direction::Down)),
+            editable_tree.move_cursor(Direction::Down)
+        );
+
+        // Inserting an invalid char into the array should error gracefully
+        assert_eq!(
+            Err(EditErr::CharNotANode('x')),
+            editable_tree.execute_action(Action::Replace('x'))
+        );
     }
 }

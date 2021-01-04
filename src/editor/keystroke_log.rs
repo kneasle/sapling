@@ -162,15 +162,16 @@ impl KeyStrokeLog {
             // We can safely unwrap here, because the guard of the `if` statement guaruntees
             // that `self.keystroke.last()` is `Some(_)`
             self.keystrokes.last_mut().unwrap().count += 1;
-            return;
+        } else {
+            self.keystrokes.push(Entry {
+                count: 1,
+                keystrokes: self.unlogged_keystrokes.clone(),
+                description,
+                color: category.term_color(),
+            });
+            // Since we added an item, we should enforce the entry limit
+            self.enforce_entry_limit();
         }
-        self.keystrokes.push(Entry {
-            count: 1,
-            keystrokes: self.unlogged_keystrokes.drain(..).collect(),
-            description,
-            color: category.term_color(),
-        });
-        // Since we added an item, we should enforce the entry limit
-        self.enforce_entry_limit();
+        self.unlogged_keystrokes.clear();
     }
 }
