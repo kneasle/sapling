@@ -24,7 +24,7 @@ impl EditLocation {
     }
 }
 
-/// An enum that's returned when any of the 'edit' methods in [`DAG`] are successful.
+/// An enum that's returned when any of the 'edit' methods in [`Dag`] are successful.
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum EditSuccess {
@@ -62,7 +62,7 @@ impl EditSuccess {
     }
 }
 
-/// An error that represents an error in any of the 'edit' methods in [`DAG`].
+/// An error that represents an error in any of the 'edit' methods in [`Dag`].
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum EditErr {
     /* MOVEMENT ERRORS */
@@ -138,7 +138,7 @@ impl From<ast::DeleteError> for EditErr {
     }
 }
 
-/// An alias for [`Result`] that is the return type of all of [`DAG`]'s edit methods.
+/// An alias for [`Result`] that is the return type of all of [`Dag`]'s edit methods.
 pub type EditResult = Result<EditSuccess, EditErr>;
 
 /// A trait-extension that provides a convenient way convert [`EditResult`]s into log messages.
@@ -158,32 +158,32 @@ impl LogMessage for EditResult {
     }
 }
 
-/// A datastructure that stores the history of a tree as a DAG (Directed Acyclic Graph) of
+/// A datastructure that stores the history of a tree as a Dag (Directed Acyclic Graph) of
 /// **immutable** nodes.
 ///
-/// This means that every node that has ever been created exists somewhere in the DAG, and when
+/// This means that every node that has ever been created exists somewhere in the Dag, and when
 /// changes are made, every ancestor of that node is cloned until the root is reached and that
 /// root becomes the new 'current' root.  This is very similar to the way Git handles commits -
 /// each node is like a file/directory and each root is a commit.
 ///
 /// Therefore, moving back through the history is as simple as reading a different root node from
-/// the `roots` vector, and following its descendants through the DAG of nodes.
-pub struct DAG<'arena, Node: Ast<'arena>> {
+/// the `roots` vector, and following its descendants through the Dag of nodes.
+pub struct Dag<'arena, Node: Ast<'arena>> {
     /// The arena in which all the `Node`s will be stored
     arena: &'arena Arena<Node>,
     /// A [`Vec`] containing a reference to the root node at every edit in the undo history.  This
     /// is required to always have length at least one.
     root_history: Vec<(&'arena Node, Path)>,
-    /// An index into [`root_history`](DAG::root_history) of the current edit.  This is required to
+    /// An index into [`root_history`](Dag::root_history) of the current edit.  This is required to
     /// be in `0..root_history.len()`.
     history_index: usize,
     current_cursor_path: Path,
 }
 
-impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
-    /// Builds a new `DAG`, given the tree it should contain
+impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
+    /// Builds a new `Dag`, given the tree it should contain
     pub fn new(arena: &'arena Arena<Node>, root: &'arena Node, cursor_path: Path) -> Self {
-        DAG {
+        Dag {
             arena,
             root_history: vec![(root, cursor_path.clone())],
             history_index: 0,
@@ -570,22 +570,22 @@ impl<'arena, Node: Ast<'arena>> DAG<'arena, Node> {
 mod tests {
     use super::{EditErr, EditSuccess};
     use crate::arena::Arena;
-    use crate::ast::json::JSON;
-    use crate::ast::test_json::TestJSON;
+    use crate::ast::json::Json;
+    use crate::ast::test_json::TestJson;
     use crate::core::{Direction, Path, Side};
-    use crate::editor::{normal_mode::Action, DAG};
+    use crate::editor::{normal_mode::Action, Dag};
 
     fn run_test_ok(
-        start_tree: TestJSON,
+        start_tree: TestJson,
         start_cursor_location: Path,
         action: Action,
         expected_edit_success: EditSuccess,
-        expected_tree: TestJSON,
+        expected_tree: TestJson,
         expected_cursor_location: Path,
     ) {
-        let arena: Arena<JSON> = Arena::new();
+        let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location);
+        let mut editable_tree = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
             Ok(expected_edit_success),
@@ -600,14 +600,14 @@ mod tests {
     }
 
     fn run_test_err(
-        start_tree: TestJSON,
+        start_tree: TestJson,
         start_cursor_location: Path,
         action: Action,
         expected_edit_err: EditErr,
     ) {
-        let arena: Arena<JSON> = Arena::new();
+        let arena: Arena<Json> = Arena::new();
         let root = start_tree.clone().add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location.clone());
+        let mut editable_tree = Dag::new(&arena, root, start_cursor_location.clone());
 
         assert_eq!(
             Err(expected_edit_err),
@@ -624,31 +624,31 @@ mod tests {
     #[test]
     fn root_insertchild() {
         run_test_ok(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::InsertChild('f'),
             EditSuccess::InsertChild {
                 c: 'f',
                 name: "false".to_string(),
             },
-            TestJSON::Array(vec![TestJSON::False]),
+            TestJson::Array(vec![TestJson::False]),
             Path::from_vec(vec![0]),
         );
 
-        //DAG level == 1
+        //Dag level == 1
 
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
             Path::root(),
             Action::InsertChild('n'),
             EditSuccess::InsertChild {
                 c: 'n',
                 name: "null".to_string(),
             },
-            TestJSON::Array(vec![
-                TestJSON::Array(vec![]),
-                TestJSON::True,
-                TestJSON::Null,
+            TestJson::Array(vec![
+                TestJson::Array(vec![]),
+                TestJson::True,
+                TestJson::Null,
             ]),
             Path::from_vec(vec![2]),
         )
@@ -657,7 +657,7 @@ mod tests {
     #[test]
     fn root_insertbefore() {
         run_test_err(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::InsertBefore('f'),
             EditErr::AddSiblingToRoot,
@@ -665,7 +665,7 @@ mod tests {
 
         //  tree level == 1
         run_test_err(
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
             Path::root(),
             Action::InsertBefore('f'),
             EditErr::AddSiblingToRoot,
@@ -675,7 +675,7 @@ mod tests {
     #[test]
     fn root_insertafter() {
         run_test_err(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::InsertAfter('f'),
             EditErr::AddSiblingToRoot,
@@ -683,7 +683,7 @@ mod tests {
 
         // tree level == 1
         run_test_err(
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
             Path::root(),
             Action::InsertAfter('f'),
             EditErr::AddSiblingToRoot,
@@ -693,20 +693,20 @@ mod tests {
     #[test]
     fn root_replace() {
         run_test_ok(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::Replace('f'),
             EditSuccess::Replace {
                 c: 'f',
                 name: "false".to_string(),
             },
-            TestJSON::False,
+            TestJson::False,
             Path::root(),
         );
 
         // Char not a node
         run_test_err(
-            TestJSON::False,
+            TestJson::False,
             Path::root(),
             Action::Replace('m'),
             EditErr::CharNotANode('m'),
@@ -714,14 +714,14 @@ mod tests {
         //
         // tree level == 1
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
             Path::root(),
             Action::Replace('n'),
             EditSuccess::Replace {
                 c: 'n',
                 name: "null".to_string(),
             },
-            TestJSON::Null,
+            TestJson::Null,
             Path::root(),
         );
     }
@@ -729,7 +729,7 @@ mod tests {
     #[test]
     fn root_delete() {
         run_test_err(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::Delete,
             EditErr::DeletingRoot,
@@ -737,7 +737,7 @@ mod tests {
 
         // dag level==1
         run_test_err(
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
             Path::root(),
             Action::Delete,
             EditErr::DeletingRoot,
@@ -748,28 +748,28 @@ mod tests {
     fn root_movecursor() {
         // move to previous sibling node of root
         run_test_err(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::MoveCursor(Direction::Prev),
             EditErr::MoveToSiblingOfRoot,
         );
         // move to next sibling node of root
         run_test_err(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::MoveCursor(Direction::Next),
             EditErr::MoveToSiblingOfRoot,
         );
         // move to parent node of root
         run_test_err(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::MoveCursor(Direction::Up),
             EditErr::MoveToParentOfRoot,
         );
         // move to nonexistent child node of root
         run_test_err(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::MoveCursor(Direction::Down),
             EditErr::MoveToNonexistentChild,
@@ -777,35 +777,35 @@ mod tests {
 
         // move to nonexistent child node of root
         run_test_err(
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
             Action::MoveCursor(Direction::Down),
             EditErr::MoveToNonexistentChild,
         );
         // move to root from child
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::False, TestJSON::True]),
+            TestJson::Array(vec![TestJson::False, TestJson::True]),
             Path::from_vec(vec![1]),
             Action::MoveCursor(Direction::Up),
             EditSuccess::Move(Direction::Up),
-            TestJSON::Array(vec![TestJSON::False, TestJSON::True]),
+            TestJson::Array(vec![TestJson::False, TestJson::True]),
             Path::root(),
         );
     }
 
     #[test]
     fn root_undo() {
-        let start_tree = TestJSON::Array(vec![]);
+        let start_tree = TestJson::Array(vec![]);
         let start_cursor_location = Path::root();
-        let end_tree = TestJSON::False;
+        let end_tree = TestJson::False;
         let end_cursor_location = Path::root();
 
-        // Initialise the DAG with the `start_tree`
-        let arena: Arena<JSON> = Arena::new();
+        // Initialise the Dag with the `start_tree`
+        let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location.clone());
+        let mut editable_tree = Dag::new(&arena, root, start_cursor_location.clone());
 
-        // We start with an empty JSON array (`[]`), and we replace it with `false`
+        // We start with an empty Json array (`[]`), and we replace it with `false`
         assert_eq!(
             Ok(EditSuccess::Replace {
                 c: 'f',
@@ -832,15 +832,15 @@ mod tests {
             "Not equal in cursor location."
         );
 
-        //  DAG level == 1
-        let start_tree = TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
+        //  Dag level == 1
+        let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
         let start_cursor_location = Path::root();
         // We move the cursor so we expect the cursor to move but no change to occur to the tree
         let end_cursor_location = Path::from_vec(vec![0]);
 
-        let arena: Arena<JSON> = Arena::new();
+        let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location);
+        let mut editable_tree = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
             Ok(EditSuccess::Move(Direction::Down)),
@@ -876,12 +876,12 @@ mod tests {
 
     #[test]
     fn root_redo() {
-        let start_tree = TestJSON::Array(vec![]);
-        let end_tree = TestJSON::Object(vec![]);
+        let start_tree = TestJson::Array(vec![]);
+        let end_tree = TestJson::Object(vec![]);
 
-        let arena: Arena<JSON> = Arena::new();
+        let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, Path::root());
+        let mut editable_tree = Dag::new(&arena, root, Path::root());
 
         assert_eq!(
             Ok(EditSuccess::Replace {
@@ -924,15 +924,15 @@ mod tests {
             "Not equal in cursor location."
         );
 
-        //DAG level == 1
-        let start_tree = TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
+        //Dag level == 1
+        let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
         let start_cursor_location = Path::root();
         let end_cursor_location = Path::from_vec(vec![0]);
 
-        // Initialise a DAG with the cursor at the root
-        let arena: Arena<JSON> = Arena::new();
+        // Initialise a Dag with the cursor at the root
+        let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, Path::root());
+        let mut editable_tree = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
             Ok(EditSuccess::Move(Direction::Down)),
@@ -985,14 +985,14 @@ mod tests {
     #[test]
     fn level_1_insertchild() {
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
             Path::from_vec(vec![0]),
             Action::InsertChild('f'),
             EditSuccess::InsertChild {
                 c: 'f',
                 name: "false".to_string(),
             },
-            TestJSON::Array(vec![TestJSON::Array(vec![TestJSON::False]), TestJSON::True]),
+            TestJson::Array(vec![TestJson::Array(vec![TestJson::False]), TestJson::True]),
             Path::from_vec(vec![0, 0]),
         );
     }
@@ -1000,7 +1000,7 @@ mod tests {
     #[test]
     fn level_1_insertafter() {
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::True, TestJSON::True]),
+            TestJson::Array(vec![TestJson::True, TestJson::True]),
             Path::from_vec(vec![1]),
             Action::InsertAfter('f'),
             EditSuccess::InsertNextToCursor {
@@ -1008,15 +1008,15 @@ mod tests {
                 c: 'f',
                 name: "false".to_string(),
             },
-            TestJSON::Array(vec![TestJSON::True, TestJSON::True, TestJSON::False]),
+            TestJson::Array(vec![TestJson::True, TestJson::True, TestJson::False]),
             Path::from_vec(vec![2]),
         );
 
-        // DAG level == 2
+        // Dag level == 2
         run_test_ok(
-            TestJSON::Array(vec![
-                TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
-                TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::Null, TestJson::True]),
+                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
             ]),
             Path::from_vec(vec![1]),
             Action::InsertAfter('f'),
@@ -1025,10 +1025,10 @@ mod tests {
                 c: 'f',
                 name: "false".to_string(),
             },
-            TestJSON::Array(vec![
-                TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
-                TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
-                TestJSON::False,
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::Null, TestJson::True]),
+                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
+                TestJson::False,
             ]),
             Path::from_vec(vec![2]),
         );
@@ -1037,7 +1037,7 @@ mod tests {
     #[test]
     fn level_1_insertbefore() {
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::Array(vec![]), TestJSON::True]),
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
             Path::from_vec(vec![0]),
             Action::InsertBefore('f'),
             EditSuccess::InsertNextToCursor {
@@ -1045,19 +1045,19 @@ mod tests {
                 c: 'f',
                 name: "false".to_string(),
             },
-            TestJSON::Array(vec![
-                TestJSON::False,
-                TestJSON::Array(vec![]),
-                TestJSON::True,
+            TestJson::Array(vec![
+                TestJson::False,
+                TestJson::Array(vec![]),
+                TestJson::True,
             ]),
             Path::from_vec(vec![0]),
         );
 
-        // DAG level == 2
+        // Dag level == 2
         run_test_ok(
-            TestJSON::Array(vec![
-                TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
-                TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::Null, TestJson::True]),
+                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
             ]),
             Path::from_vec(vec![1]),
             Action::InsertBefore('f'),
@@ -1066,10 +1066,10 @@ mod tests {
                 c: 'f',
                 name: "false".to_string(),
             },
-            TestJSON::Array(vec![
-                TestJSON::Array(vec![TestJSON::Null, TestJSON::True]),
-                TestJSON::False,
-                TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::Null, TestJson::True]),
+                TestJson::False,
+                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
             ]),
             Path::from_vec(vec![1]),
         );
@@ -1078,24 +1078,24 @@ mod tests {
     #[test]
     fn level_1_delete() {
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
             Path::from_vec(vec![1]),
             Action::Delete,
             EditSuccess::Delete {
                 name: "array".to_string(),
             },
-            TestJSON::Array(vec![TestJSON::True]),
+            TestJson::Array(vec![TestJson::True]),
             Path::from_vec(vec![0]),
         );
 
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::True]),
+            TestJson::Array(vec![TestJson::True]),
             Path::from_vec(vec![0]),
             Action::Delete,
             EditSuccess::Delete {
                 name: "true".to_string(),
             },
-            TestJSON::Array(vec![]),
+            TestJson::Array(vec![]),
             Path::root(),
         );
     }
@@ -1103,21 +1103,21 @@ mod tests {
     #[test]
     fn level_1_replace() {
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::True, TestJSON::Array(vec![])]),
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
             Path::from_vec(vec![1]),
             Action::Replace('n'),
             EditSuccess::Replace {
                 c: 'n',
                 name: "null".to_string(),
             },
-            TestJSON::Array(vec![TestJSON::True, TestJSON::Null]),
+            TestJson::Array(vec![TestJson::True, TestJson::Null]),
             Path::from_vec(vec![1]),
         );
 
         run_test_ok(
-            TestJSON::Object(vec![
-                ("key-1".to_string(), TestJSON::False),
-                ("key-2".to_string(), TestJSON::True),
+            TestJson::Object(vec![
+                ("key-1".to_string(), TestJson::False),
+                ("key-2".to_string(), TestJson::True),
             ]),
             Path::from_vec(vec![1, 1]),
             Action::Replace('n'),
@@ -1125,17 +1125,17 @@ mod tests {
                 c: 'n',
                 name: "null".to_string(),
             },
-            TestJSON::Object(vec![
-                ("key-1".to_string(), TestJSON::False),
-                ("key-2".to_string(), TestJSON::Null),
+            TestJson::Object(vec![
+                ("key-1".to_string(), TestJson::False),
+                ("key-2".to_string(), TestJson::Null),
             ]),
             Path::from_vec(vec![1, 1]),
         );
 
         run_test_err(
-            TestJSON::Object(vec![
-                ("key-1".to_string(), TestJSON::False),
-                ("key-2".to_string(), TestJSON::True),
+            TestJson::Object(vec![
+                ("key-1".to_string(), TestJson::False),
+                ("key-2".to_string(), TestJson::True),
             ]),
             Path::from_vec(vec![1, 0]),
             Action::Replace('n'),
@@ -1149,11 +1149,11 @@ mod tests {
     #[test]
     fn level_1_movecursor() {
         run_test_ok(
-            TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
+            TestJson::Array(vec![TestJson::True, TestJson::Object(vec![])]),
             Path::root(),
             Action::MoveCursor(Direction::Down),
             EditSuccess::Move(Direction::Down),
-            TestJSON::Array(vec![TestJSON::True, TestJSON::Object(vec![])]),
+            TestJson::Array(vec![TestJson::True, TestJson::Object(vec![])]),
             Path::from_vec(vec![0]),
         );
     }
@@ -1161,13 +1161,13 @@ mod tests {
     #[test]
     fn level_1_undo_and_redo() {
         // The original snapshot of the tree
-        let start_tree = TestJSON::Array(vec![TestJSON::Null, TestJSON::True, TestJSON::False]);
-        let end_tree = TestJSON::False;
+        let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
+        let end_tree = TestJson::False;
 
-        // Create and initialise DAG to test
-        let arena: Arena<JSON> = Arena::new();
+        // Create and initialise Dag to test
+        let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, Path::root());
+        let mut editable_tree = Dag::new(&arena, root, Path::root());
 
         // Step 1: Replace root with `false`
         println!("Inserting `false`");
@@ -1253,26 +1253,26 @@ mod tests {
     fn level_2_undo() {
         // The original snapshot of the tree
 
-        let start_tree = TestJSON::Array(vec![
-            TestJSON::Null,
-            TestJSON::Object(vec![("key".to_string(), TestJSON::True)]),
-            TestJSON::False,
+        let start_tree = TestJson::Array(vec![
+            TestJson::Null,
+            TestJson::Object(vec![("key".to_string(), TestJson::True)]),
+            TestJson::False,
         ]);
 
-        let expected_tree = TestJSON::Array(vec![
-            TestJSON::Null,
-            TestJSON::Object(vec![]),
-            TestJSON::False,
+        let expected_tree = TestJson::Array(vec![
+            TestJson::Null,
+            TestJson::Object(vec![]),
+            TestJson::False,
         ]);
 
-        // Create and initialise DAG to test
-        let arena: Arena<JSON> = Arena::new();
+        // Create and initialise Dag to test
+        let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
         let start_cursor_location = Path::from_vec(vec![1, 0]);
         let expected_cursor_location = Path::from_vec(vec![1]);
-        let mut editable_tree = DAG::new(&arena, root, start_cursor_location);
+        let mut editable_tree = Dag::new(&arena, root, start_cursor_location);
 
-        // Step 1: Delete TestJSON::object's child
+        // Step 1: Delete TestJson::object's child
         println!("Delete `key-value` pair");
         assert_eq!(
             Ok(EditSuccess::Delete {
@@ -1308,11 +1308,11 @@ mod tests {
     /// 3. The user redoes this edit
     #[test]
     fn delete_cursor_crash_bug() {
-        // Create and initialise DAG to test (start with JSON `[null]` with the cursor selecting
+        // Create and initialise Dag to test (start with Json `[null]` with the cursor selecting
         // the `null`)
-        let arena: Arena<JSON> = Arena::new();
-        let root = TestJSON::Array(vec![TestJSON::Null]).add_to_arena(&arena);
-        let mut editable_tree = DAG::new(&arena, root, Path::from_vec(vec![0]));
+        let arena: Arena<Json> = Arena::new();
+        let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+        let mut editable_tree = Dag::new(&arena, root, Path::from_vec(vec![0]));
 
         // Delete the node under the cursor, causing the cursor to move to the root
         assert_eq!(
@@ -1329,7 +1329,7 @@ mod tests {
             editable_tree.execute_action(Action::Undo)
         );
 
-        // Redo the change.  It's not really important what the tree is here, so long as the DAG
+        // Redo the change.  It's not really important what the tree is here, so long as the Dag
         // doesn't panic when the cursor is generated
         assert_eq!(
             Ok(EditSuccess::Redo),
