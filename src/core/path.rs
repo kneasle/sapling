@@ -176,7 +176,7 @@ impl<'arena, Node: Ast<'arena>> std::iter::FusedIterator for NodeIter<'arena, '_
 mod tests {
     use super::Path;
     use crate::arena::Arena;
-    use crate::ast::{json::JSON, test_json::TestJSON, Ast};
+    use crate::ast::{json::Json, test_json::TestJson, Ast};
 
     #[test]
     fn is_root() {
@@ -246,17 +246,17 @@ mod tests {
 
     #[test]
     fn node_iter() {
-        // Create some test JSON and add it to an arena
+        // Create some test Json and add it to an arena
         let arena = Arena::new();
-        let root = TestJSON::Array(vec![
-            TestJSON::True,
-            TestJSON::False,
-            TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+        let root = TestJson::Array(vec![
+            TestJson::True,
+            TestJson::False,
+            TestJson::Object(vec![("value".to_string(), TestJson::True)]),
         ])
         .add_to_arena(&arena);
         // Create a path to the root, and test properties of it
         let mut path = Path::root();
-        assert_eq!(path.node_iter(root).collect::<Vec<&JSON<'_>>>(), [root]);
+        assert_eq!(path.node_iter(root).collect::<Vec<&Json<'_>>>(), [root]);
         // Move the path to the 2nd ('1th') child (which is 'false')
         path.push(1);
         assert_eq!(
@@ -304,12 +304,12 @@ mod tests {
 
     #[test]
     fn cursor() {
-        // Create some test JSON and add it to an arena
+        // Create some test Json and add it to an arena
         let arena = Arena::new();
-        let root = TestJSON::Array(vec![
-            TestJSON::True,
-            TestJSON::False,
-            TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+        let root = TestJson::Array(vec![
+            TestJson::True,
+            TestJson::False,
+            TestJson::Object(vec![("value".to_string(), TestJson::True)]),
         ])
         .add_to_arena(&arena);
         // Create a path to the root, and check that the cursor is the root
@@ -329,12 +329,12 @@ mod tests {
 
     #[test]
     fn cursor_and_parent() {
-        // Create some test JSON and add it to an arena
+        // Create some test Json and add it to an arena
         let arena = Arena::new();
-        let root = TestJSON::Array(vec![
-            TestJSON::True,
-            TestJSON::False,
-            TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+        let root = TestJson::Array(vec![
+            TestJson::True,
+            TestJson::False,
+            TestJson::Object(vec![("value".to_string(), TestJson::True)]),
         ])
         .add_to_arena(&arena);
         // Create a path to the root.  The root has no parent

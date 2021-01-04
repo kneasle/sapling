@@ -7,7 +7,7 @@ use crate::core::Size;
 
 /// An enum to hold the different ways that a JSON AST can be formatted
 #[derive(Eq, PartialEq, Copy, Clone)]
-pub enum JSONFormat {
+pub enum JsonFormat {
     /// The most compact representation, has minimal whitespace.
     /// E.g. `[{"foo": true, "bar": false}, true]`
     Compact,
@@ -25,7 +25,7 @@ const CHAR_STRING: char = 's';
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
 #[derive(Debug, Eq, PartialEq, Clone, Hash)]
-pub enum JSON<'arena> {
+pub enum Json<'arena> {
     /// The JSON value for 'true'.  Corresponds to the string `true`.
     True,
     /// The JSON value 'false'.  Corresponds to the string `false`.
@@ -33,21 +33,21 @@ pub enum JSON<'arena> {
     /// The JSON value 'null'.  Corresponds to the string `null`.
     Null,
     /// A JSON array of multiple values.
-    /// Corresponds to a string `[<v1>, <v2>, ...]` where `v1`, `v2`, ... are JSON values.
-    Array(Vec<&'arena JSON<'arena>>),
-    /// A JSON object, represented as a map of [`String`]s to more JSON values.
+    /// Corresponds to a string `[<v1>, <v2>, ...]` where `v1`, `v2`, ... are Json values.
+    Array(Vec<&'arena Json<'arena>>),
+    /// A JSON object, represented as a map of [`String`]s to more Json values.
     /// Corresponds to a string `{"<key1>": <v1>, "<key2>": <v2>, ...}` where `<key1>`, `<key2>`,
-    /// ... are the keys, and `<v1>`, `<v2>`, ... are the corresponding JSON values.  The `Ref`s
-    /// contained inside this must be [`Field`](JSON::Field)s.
-    Object(Vec<&'arena JSON<'arena>>),
-    /// A JSON object field.  The first `Ref` must be a [`Str`](JSON::Str), and the second is any
+    /// ... are the keys, and `<v1>`, `<v2>`, ... are the corresponding Json values.  The `Ref`s
+    /// contained inside this must be [`Field`](Json::Field)s.
+    Object(Vec<&'arena Json<'arena>>),
+    /// A JSON object field.  The first `Ref` must be a [`Str`](Json::Str), and the second is any
     /// JSON object
-    Field([&'arena JSON<'arena>; 2]),
+    Field([&'arena Json<'arena>; 2]),
     /// A JSON string
     Str(String),
 }
 
-impl JSON<'_> {
+impl Json<'_> {
     /// Return an iterator over all the possible chars that could represent JSON nodes
     fn all_object_chars() -> Box<dyn Iterator<Item = char>> {
         Box::new(
@@ -65,14 +65,14 @@ impl JSON<'_> {
     }
 }
 
-impl Default for JSON<'_> {
-    fn default() -> JSON<'static> {
-        JSON::Object(vec![])
+impl Default for Json<'_> {
+    fn default() -> Json<'static> {
+        Json::Object(vec![])
     }
 }
 
-impl<'arena> Ast<'arena> for JSON<'arena> {
-    type FormatStyle = JSONFormat;
+impl<'arena> Ast<'arena> for Json<'arena> {
+    type FormatStyle = JsonFormat;
 
     /* FORMATTING FUNCTIONS */
 
@@ -80,21 +80,21 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         &'arena self,
         format_style: &Self::FormatStyle,
     ) -> Vec<RecTok<'arena, Self>> {
-        let is_pretty = format_style == &JSONFormat::Pretty;
+        let is_pretty = format_style == &JsonFormat::Pretty;
         match self {
-            JSON::True => vec![RecTok::from_str("true", syntax_category::CONST)],
-            JSON::False => vec![RecTok::from_str("false", syntax_category::CONST)],
-            JSON::Null => vec![RecTok::from_str("null", syntax_category::KEYWORD)],
-            JSON::Str(string) => vec![RecTok::from_string(
+            Json::True => vec![RecTok::from_str("true", syntax_category::CONST)],
+            Json::False => vec![RecTok::from_str("false", syntax_category::CONST)],
+            Json::Null => vec![RecTok::from_str("null", syntax_category::KEYWORD)],
+            Json::Str(string) => vec![RecTok::from_string(
                 format!(r#""{}""#, string),
                 syntax_category::LITERAL,
             )],
-            JSON::Field([key, value]) => vec![
+            Json::Field([key, value]) => vec![
                 RecTok::Child(key),
                 RecTok::from_str(": ", syntax_category::DEFAULT),
                 RecTok::Child(value),
             ],
-            JSON::Array(children) => {
+            Json::Array(children) => {
                 // Special case: if this array is empty, render it as '[]'
                 if children.is_empty() {
                     return vec![RecTok::from_str("[]", syntax_category::DEFAULT)];
@@ -132,7 +132,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
                 // Return the token stream
                 tokens
             }
-            JSON::Object(fields) => {
+            Json::Object(fields) => {
                 // Special case: if this object is empty, render it as '{}'
                 if fields.is_empty() {
                     return vec![RecTok::from_str("{}", syntax_category::DEFAULT)];
@@ -175,18 +175,18 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     fn size(&self, format_style: &Self::FormatStyle) -> Size {
         match format_style {
-            JSONFormat::Pretty => {
+            JsonFormat::Pretty => {
                 match self {
-                    JSON::True => Size::new(0, 4),  // same as Size::from("true")
-                    JSON::False => Size::new(0, 5), // same as Size::from("false")
-                    JSON::Null => Size::new(0, 4),  // same as Size::from("null")
-                    JSON::Str(string) => {
+                    Json::True => Size::new(0, 4),  // same as Size::from("true")
+                    Json::False => Size::new(0, 5), // same as Size::from("false")
+                    Json::Null => Size::new(0, 4),  // same as Size::from("null")
+                    Json::Str(string) => {
                         Size::new(0, 1) + Size::from(string.as_str()) + Size::new(0, 1)
                     }
-                    JSON::Field([key, value]) => {
+                    Json::Field([key, value]) => {
                         key.size(format_style) + Size::new(0, 2) + value.size(format_style)
                     }
-                    JSON::Object(fields) => {
+                    Json::Object(fields) => {
                         // Special case: if the object is empty, then it will be rendered as "{}",
                         // which only takes up one line
                         if fields.is_empty() {
@@ -203,7 +203,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
                         }
                         Size::new(number_of_lines, 1)
                     }
-                    JSON::Array(children) => {
+                    Json::Array(children) => {
                         // Special case: if the array is empty, then it will be rendered as "[]",
                         // which only takes up one line
                         if children.is_empty() {
@@ -222,18 +222,18 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
                     }
                 }
             }
-            JSONFormat::Compact => {
+            JsonFormat::Compact => {
                 match self {
-                    JSON::True => Size::new(0, 4),  // same as Size::from("true")
-                    JSON::False => Size::new(0, 5), // same as Size::from("false")
-                    JSON::Null => Size::new(0, 4),  // same as Size::from("null")
-                    JSON::Str(string) => {
+                    Json::True => Size::new(0, 4),  // same as Size::from("true")
+                    Json::False => Size::new(0, 5), // same as Size::from("false")
+                    Json::Null => Size::new(0, 4),  // same as Size::from("null")
+                    Json::Str(string) => {
                         Size::new(0, 1) + Size::from(string.as_str()) + Size::new(0, 1)
                     }
-                    JSON::Field([key, value]) => {
+                    Json::Field([key, value]) => {
                         key.size(format_style) + Size::new(0, 2) + value.size(format_style)
                     }
-                    JSON::Object(fields) => {
+                    Json::Object(fields) => {
                         // Size accumulator - starts with just the size of "{"
                         let mut size = Size::new(0, 1);
                         // Append all the children, and put ", " between all of them
@@ -249,7 +249,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
                         // Append one more char for "}" to the end, and return
                         size + Size::new(0, 1)
                     }
-                    JSON::Array(children) => {
+                    Json::Array(children) => {
                         // Size accumulator - starts with just the size of "["
                         let mut size = Size::new(0, 1);
                         // Append all the children, and put ", " between all of them
@@ -272,21 +272,21 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     /* DEBUG VIEW FUNCTIONS */
 
-    fn children<'s>(&'s self) -> &'s [&'arena JSON<'arena>] {
+    fn children<'s>(&'s self) -> &'s [&'arena Json<'arena>] {
         match self {
-            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => &[],
-            JSON::Array(children) => &children,
-            JSON::Object(fields) => &fields,
-            JSON::Field(key_value) => &key_value[..],
+            Json::True | Json::False | Json::Null | Json::Str(_) => &[],
+            Json::Array(children) => &children,
+            Json::Object(fields) => &fields,
+            Json::Field(key_value) => &key_value[..],
         }
     }
 
-    fn children_mut<'s>(&'s mut self) -> &'s mut [&'arena JSON<'arena>] {
+    fn children_mut<'s>(&'s mut self) -> &'s mut [&'arena Json<'arena>] {
         match self {
-            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => &mut [],
-            JSON::Array(children) => children,
-            JSON::Object(fields) => fields,
-            JSON::Field(key_value) => &mut key_value[..],
+            Json::True | Json::False | Json::Null | Json::Str(_) => &mut [],
+            Json::Array(children) => children,
+            Json::Object(fields) => fields,
+            Json::Field(key_value) => &mut key_value[..],
         }
     }
 
@@ -297,28 +297,28 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
         index: usize,
     ) -> Result<(), InsertError> {
         match self {
-            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => {
+            Json::True | Json::False | Json::Null | Json::Str(_) => {
                 Err(InsertError::TooManyChildren {
                     name: self.display_name(),
                     max_children: 0,
                 })
             }
-            JSON::Field(_) => Err(InsertError::TooManyChildren {
+            Json::Field(_) => Err(InsertError::TooManyChildren {
                 name: self.display_name(),
                 max_children: 2,
             }),
-            JSON::Object(fields) => {
+            Json::Object(fields) => {
                 /* Inserting into an object is a special case, since we need to allocate more
                  * objects in order to preserve the validity of the tree. */
                 // Allocate an empty string to act as the key
-                let key = arena.alloc(JSON::Str("".to_string()));
+                let key = arena.alloc(Json::Str("".to_string()));
                 // Allocate a field as the parent of the key and new_node
-                let field = arena.alloc(JSON::Field([key, new_node]));
+                let field = arena.alloc(Json::Field([key, new_node]));
                 // Add the new field as a child of `self`
                 fields.insert(index, field);
                 Ok(())
             }
-            JSON::Array(children) => {
+            Json::Array(children) => {
                 children.insert(index, new_node);
                 Ok(())
             }
@@ -327,17 +327,17 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     fn delete_child(&mut self, index: usize) -> Result<(), DeleteError> {
         match self {
-            JSON::True | JSON::False | JSON::Null | JSON::Str(_) => {
+            Json::True | Json::False | Json::Null | Json::Str(_) => {
                 // We shouldn't be able to delete the child of a node with no children - this would
                 // require first selecting the non-existent child, which should be caught by the
                 // cursor path code.
                 unreachable!();
             }
-            JSON::Field(_) => Err(DeleteError::TooFewChildren {
+            Json::Field(_) => Err(DeleteError::TooFewChildren {
                 name: self.display_name(),
                 min_children: 2,
             }),
-            JSON::Object(fields) => {
+            Json::Object(fields) => {
                 if index < fields.len() {
                     fields.remove(index);
                     Ok(())
@@ -348,7 +348,7 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
                     })
                 }
             }
-            JSON::Array(children) => {
+            Json::Array(children) => {
                 if index < children.len() {
                     children.remove(index);
                     Ok(())
@@ -364,13 +364,13 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     fn display_name(&self) -> String {
         match self {
-            JSON::True => "true".to_string(),
-            JSON::False => "false".to_string(),
-            JSON::Null => "null".to_string(),
-            JSON::Array(_) => "array".to_string(),
-            JSON::Object(_) => "object".to_string(),
-            JSON::Field(_) => "field".to_string(),
-            JSON::Str(content) => format!(r#""{}""#, content),
+            Json::True => "true".to_string(),
+            Json::False => "false".to_string(),
+            Json::Null => "null".to_string(),
+            Json::Array(_) => "array".to_string(),
+            Json::Object(_) => "object".to_string(),
+            Json::Field(_) => "field".to_string(),
+            Json::Str(content) => format!(r#""{}""#, content),
         }
     }
 
@@ -378,12 +378,12 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
     fn from_char(&self, c: char) -> Option<Self> {
         match c {
-            CHAR_TRUE => Some(JSON::True),
-            CHAR_FALSE => Some(JSON::False),
-            CHAR_NULL => Some(JSON::Null),
-            CHAR_ARRAY => Some(JSON::Array(vec![])),
-            CHAR_OBJECT => Some(JSON::Object(vec![])),
-            CHAR_STRING => Some(JSON::Str("".to_string())),
+            CHAR_TRUE => Some(Json::True),
+            CHAR_FALSE => Some(Json::False),
+            CHAR_NULL => Some(Json::Null),
+            CHAR_ARRAY => Some(Json::Array(vec![])),
+            CHAR_OBJECT => Some(Json::Object(vec![])),
+            CHAR_STRING => Some(Json::Str("".to_string())),
             _ => None,
         }
     }
@@ -395,11 +395,11 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
     fn is_valid_child(&self, index: usize, c: char) -> bool {
         match self {
             // values like 'true' and 'false' can never have children
-            JSON::True | JSON::False | JSON::Str(_) | JSON::Null => false,
+            Json::True | Json::False | Json::Str(_) | Json::Null => false,
             // arrays and objects can have any children (except `field` inside `array`, which can't be inserted)
-            JSON::Array(_) | JSON::Object(_) => true,
+            Json::Array(_) | Json::Object(_) => true,
             // fields must have their left hand side be a string
-            JSON::Field(_) => {
+            Json::Field(_) => {
                 if index == 0 {
                     c == CHAR_STRING
                 } else {
@@ -416,8 +416,8 @@ impl<'arena> Ast<'arena> for JSON<'arena> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::test_json::TestJSON;
-    use super::JSONFormat;
+    use super::super::test_json::TestJson;
+    use super::JsonFormat;
     use crate::arena::Arena;
     use crate::ast::Ast;
     use crate::core::Size;
@@ -425,12 +425,12 @@ mod tests {
     #[test]
     fn to_text() {
         for (tree, expected_compact_string, expected_pretty_string, tree_string) in &[
-            (TestJSON::True, "true", "true", "true"),
-            (TestJSON::False, "false", "false", "false"),
-            (TestJSON::Array(vec![]), "[]", "[]", "array"),
-            (TestJSON::Object(vec![]), "{}", "{}", "object"),
+            (TestJson::True, "true", "true", "true"),
+            (TestJson::False, "false", "false", "false"),
+            (TestJson::Array(vec![]), "[]", "[]", "array"),
+            (TestJson::Object(vec![]), "{}", "{}", "object"),
             (
-                TestJSON::Array(vec![TestJSON::True, TestJSON::False]),
+                TestJson::Array(vec![TestJson::True, TestJson::False]),
                 "[true, false]",
                 "[
     true,
@@ -441,9 +441,9 @@ mod tests {
   false",
             ),
             (
-                TestJSON::Object(vec![
-                    ("foo".to_string(), TestJSON::True),
-                    ("bar".to_string(), TestJSON::False),
+                TestJson::Object(vec![
+                    ("foo".to_string(), TestJson::True),
+                    ("bar".to_string(), TestJson::False),
                 ]),
                 r#"{"foo": true, "bar": false}"#,
                 r#"{
@@ -459,15 +459,15 @@ mod tests {
     false"#,
             ),
             (
-                TestJSON::Array(vec![
-                    TestJSON::Object(vec![
+                TestJson::Array(vec![
+                    TestJson::Object(vec![
                         (
                             "foos".to_string(),
-                            TestJSON::Array(vec![TestJSON::False, TestJSON::True, TestJSON::False]),
+                            TestJson::Array(vec![TestJson::False, TestJson::True, TestJson::False]),
                         ),
-                        ("bar".to_string(), TestJSON::False),
+                        ("bar".to_string(), TestJson::False),
                     ]),
-                    TestJSON::True,
+                    TestJson::True,
                 ]),
                 r#"[{"foos": [false, true, false], "bar": false}, true]"#,
                 r#"[
@@ -500,17 +500,17 @@ mod tests {
             let arena = Arena::new();
             let root = tree.add_to_arena(&arena);
             // Test compact string
-            let compact_string = root.to_text(&JSONFormat::Compact);
+            let compact_string = root.to_text(&JsonFormat::Compact);
             assert_eq!(compact_string, *expected_compact_string);
             assert_eq!(
-                root.size(&JSONFormat::Compact),
+                root.size(&JsonFormat::Compact),
                 Size::from(*expected_compact_string)
             );
             // Test pretty string
-            let pretty_string = root.to_text(&JSONFormat::Pretty);
+            let pretty_string = root.to_text(&JsonFormat::Pretty);
             assert_eq!(pretty_string, *expected_pretty_string);
             assert_eq!(
-                root.size(&JSONFormat::Pretty),
+                root.size(&JsonFormat::Pretty),
                 Size::from(*expected_pretty_string)
             );
             // Test debug tree view

@@ -1,6 +1,6 @@
 //! The code for 'normal-mode', similar to that of Vim
 
-use super::dag::{LogMessage, DAG};
+use super::dag::{Dag, LogMessage};
 use super::{keystroke_log::Category, state};
 use crate::ast::Ast;
 use crate::config::{Config, KeyMap};
@@ -31,7 +31,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
         mut self: Box<Self>,
         key: Key,
         config: &Config,
-        tree: &mut DAG<'arena, Node>,
+        tree: &mut Dag<'arena, Node>,
     ) -> (
         Box<dyn state::State<'arena, Node>>,
         Option<(String, Category)>,
@@ -123,7 +123,7 @@ impl KeyStroke {
     }
 }
 
-/// A single [`Action`] that can be actioned by [`DAG`]
+/// A single [`Action`] that can be actioned by [`Dag`]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Action {
     /// Replace the selected node with a node represented by some [`char`]
@@ -180,7 +180,7 @@ impl Action {
 /// The possible results of parsing a command
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum ParseResult {
-    /// An [`Action`] that can be executed by a [`DAG`]
+    /// An [`Action`] that can be executed by a [`Dag`]
     Action(Action),
     /// The user wanted to quit Sapling
     Quit,

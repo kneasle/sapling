@@ -12,11 +12,11 @@ pub mod core;
 pub mod editor;
 
 use crate::arena::Arena;
-use crate::ast::json::JSONFormat;
-use crate::ast::test_json::TestJSON;
+use crate::ast::json::JsonFormat;
+use crate::ast::test_json::TestJson;
 use crate::config::Config;
 use crate::core::Path;
-use crate::editor::{dag::DAG, Editor};
+use crate::editor::{dag::Dag, Editor};
 
 /// The entry point of Sapling.
 ///
@@ -32,15 +32,15 @@ fn main() {
     // Create an empty arena for Sapling to use
     log::trace!("Creating arena");
     let arena = Arena::new();
-    // For the time being, start the editor with some pre-made JSON
-    let root = TestJSON::Array(vec![
-        TestJSON::True,
-        TestJSON::False,
-        TestJSON::Object(vec![("value".to_string(), TestJSON::True)]),
+    // For the time being, start the editor with some pre-made Json
+    let root = TestJson::Array(vec![
+        TestJson::True,
+        TestJson::False,
+        TestJson::Object(vec![("value".to_string(), TestJson::True)]),
     ])
     .add_to_arena(&arena);
 
-    let mut tree = DAG::new(&arena, root, Path::root());
-    let editor = Editor::new(&mut tree, JSONFormat::Pretty, Config::default());
+    let mut tree = Dag::new(&arena, root, Path::root());
+    let editor = Editor::new(&mut tree, JsonFormat::Pretty, Config::default());
     editor.run();
 }

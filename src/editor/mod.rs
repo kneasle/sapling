@@ -10,7 +10,7 @@ use crate::ast::Ast;
 use crate::config::{Config, DEBUG_HIGHLIGHTING};
 use crate::core::Size;
 
-use dag::DAG;
+use dag::Dag;
 use keystroke_log::KeyStrokeLog;
 use state::State;
 
@@ -34,7 +34,7 @@ impl<'arena, Node: Ast<'arena>> State<'arena, Node> for IntermediateState {
         self: Box<Self>,
         _key: Key,
         _config: &Config,
-        _tree: &mut DAG<'arena, Node>,
+        _tree: &mut Dag<'arena, Node>,
     ) -> (
         Box<dyn State<'arena, Node>>,
         Option<(String, keystroke_log::Category)>,
@@ -53,8 +53,8 @@ impl<'arena, Node: Ast<'arena>> State<'arena, Node> for IntermediateState {
 
 /// A singleton struct to hold the top-level components of Sapling.
 pub struct Editor<'arena, Node: Ast<'arena>> {
-    /// The `DAG` that is storing the history of the `Editor`
-    tree: &'arena mut DAG<'arena, Node>,
+    /// The `Dag` that is storing the history of the `Editor`
+    tree: &'arena mut Dag<'arena, Node>,
     /// The style that the tree is being printed to the screen
     format_style: Node::FormatStyle,
     /// The `tuikit` terminal that the `Editor` is rendering to
@@ -70,7 +70,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
 impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
     /// Create a new [`Editor`] with a given tree
     pub fn new(
-        tree: &'arena mut DAG<'arena, Node>,
+        tree: &'arena mut Dag<'arena, Node>,
         format_style: Node::FormatStyle,
         config: Config,
     ) -> Editor<'arena, Node> {
