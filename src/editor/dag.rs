@@ -295,8 +295,11 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     fn perform_edit(
         &mut self,
         mut edit_func: impl FnMut(
+            // The `Dag` being edited
             &mut Self,
+            // The parent and the cursor's child index (or `None` if the cursor is at the root)
             Option<(&'arena Node, usize)>,
+            // A reference to the node under the cursor
             &'arena Node,
         ) -> Result<(Node, EditLocation, EditSuccess), EditErr>,
     ) -> EditResult {
@@ -366,13 +369,14 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             |_this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
+                // Early return if the `c` can't go in the cursor's location
                 match _parent_and_index {
                     Some((parent, cursor_index)) => {
                         if !parent.is_valid_child(cursor_index, c) {
                             return Err(EditErr::CannotBeChild {
                                 c,
                                 parent_name: _parent_and_index
-                                    .map_or("<root>".to_string(), |(p, _)| p.display_name()),
+                                    .map_or("<root>".to_owned(), |(p, _)| p.display_name()),
                             });
                         }
                     }
@@ -382,8 +386,9 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                         }
                     }
                 }
-                // Create the node to replace
-                // we can use unwrap here, because 'c' is always one of valid chars.
+
+                // Create the node to replace.  We can use unwrap here, because 'c' is always one
+                // of valid chars.
                 let new_node = cursor.from_char(c).unwrap();
                 let new_node_name = new_node.display_name();
                 Ok((
