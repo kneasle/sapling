@@ -87,6 +87,8 @@ These goals are roughly in order of importance, with the most important first:
   parser that is not language specific.  Designed primarily to provide better syntax highlighting
   for [the Atom text editor](https://github.com/atom/atom).
 - _[grasp](http://www.graspjs.com/)_: A regex-like language for searching JavaScript ASTs.
+- _[r/nosyntax](https://reddit.com/r/nosyntax)_: A subreddit for strutured and projectional editors.  They also have
+  [a list](https://www.reddit.com/r/nosyntax/comments/6xv61b/list_of_projects/) of such projects.
 - _[Barista](https://www.researchgate.net/publication/221518157_Barista_An_implementation_framework_for_enabling_new_tools_interaction_techniques_and_views_in_code_editors)_:
   A structured editor that allows the user to fall back on text editing if required, which is
   something I'd like to explore for Sapling.  The source code is
