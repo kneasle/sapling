@@ -830,29 +830,29 @@ mod tests {
         // Initialise the Dag with the `start_tree`
         let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = Dag::new(&arena, root, start_cursor_location.clone());
+        let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
 
         // We start with an empty Json array (`[]`), and we replace it with `false`
         assert_eq!(
             Ok(EditSuccess::Replace(Class::False)),
-            editable_tree.execute_action(Action::Replace(Insertable::CountedNode(1, 'f'))),
+            dag.replace_cursor(Insertable::CountedNode(1, 'f')),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
-            end_cursor_location, editable_tree.current_cursor_path,
+            end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
         // Undo the change
         assert_eq!(
             Ok(EditSuccess::Undo),
-            editable_tree.execute_action(Action::Undo),
+            dag.undo(),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
-            start_cursor_location, editable_tree.current_cursor_path,
+            start_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
@@ -864,36 +864,28 @@ mod tests {
 
         let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = Dag::new(&arena, root, start_cursor_location);
+        let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
             Ok(EditSuccess::Move(Direction::Down)),
-            editable_tree.execute_action(Action::MoveCursor(Direction::Down)),
+            dag.move_cursor(Direction::Down),
             "Not equal in action result (move 0)."
         );
+        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 0).");
         assert_eq!(
-            start_tree,
-            editable_tree.root(),
-            "Not equal in tree (move 0)."
-        );
-        assert_eq!(
-            end_cursor_location, editable_tree.current_cursor_path,
+            end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 0)."
         );
 
         // undo
         assert_eq!(
             Err(EditErr::NoChangesToUndo),
-            editable_tree.execute_action(Action::Undo),
+            dag.undo(),
             "Not equal in action result (move 1)"
         );
+        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 1).");
         assert_eq!(
-            start_tree,
-            editable_tree.root(),
-            "Not equal in tree (move 1)."
-        );
-        assert_eq!(
-            end_cursor_location, editable_tree.current_cursor_path,
+            end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 1)."
         );
     }
@@ -905,43 +897,43 @@ mod tests {
 
         let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = Dag::new(&arena, root, Path::root());
+        let mut dag = Dag::new(&arena, root, Path::root());
 
         assert_eq!(
             Ok(EditSuccess::Replace(Class::Object)),
-            editable_tree.execute_action(Action::Replace(Insertable::CountedNode(1, 'o'))),
+            dag.replace_cursor(Insertable::CountedNode(1, 'o')),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
-            editable_tree.current_cursor_path,
+            dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
         // undo
         assert_eq!(
             Ok(EditSuccess::Undo),
-            editable_tree.execute_action(Action::Undo),
+            dag.undo(),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
-            editable_tree.current_cursor_path,
+            dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
         // redo
         assert_eq!(
             Ok(EditSuccess::Redo),
-            editable_tree.execute_action(Action::Redo),
+            dag.redo(),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
-            editable_tree.current_cursor_path,
+            dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
@@ -953,52 +945,40 @@ mod tests {
         // Initialise a Dag with the cursor at the root
         let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = Dag::new(&arena, root, start_cursor_location);
+        let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
             Ok(EditSuccess::Move(Direction::Down)),
-            editable_tree.execute_action(Action::MoveCursor(Direction::Down)),
+            dag.move_cursor(Direction::Down),
             "Not equal in action result (move 0)."
         );
+        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 0).");
         assert_eq!(
-            start_tree,
-            editable_tree.root(),
-            "Not equal in tree (move 0)."
-        );
-        assert_eq!(
-            end_cursor_location, editable_tree.current_cursor_path,
+            end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 0)."
         );
 
         // undo
         assert_eq!(
             Err(EditErr::NoChangesToUndo),
-            editable_tree.execute_action(Action::Undo),
+            dag.undo(),
             "Not equal in action result (move 1)."
         );
+        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 1).");
         assert_eq!(
-            start_tree,
-            editable_tree.root(),
-            "Not equal in tree (move 1)."
-        );
-        assert_eq!(
-            end_cursor_location, editable_tree.current_cursor_path,
+            end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 1). "
         );
 
         // redo
         assert_eq!(
             Err(EditErr::NoChangesToRedo),
-            editable_tree.execute_action(Action::Redo),
+            dag.redo(),
             "Not equal in action result (move 2)."
         );
+        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 2).");
         assert_eq!(
-            start_tree,
-            editable_tree.root(),
-            "Not equal in tree (move 2)."
-        );
-        assert_eq!(
-            end_cursor_location, editable_tree.current_cursor_path,
+            end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 2)."
         );
     }
@@ -1175,19 +1155,19 @@ mod tests {
         // Create and initialise Dag to test
         let arena: Arena<Json> = Arena::new();
         let root = start_tree.add_to_arena(&arena);
-        let mut editable_tree = Dag::new(&arena, root, Path::root());
+        let mut dag = Dag::new(&arena, root, Path::root());
 
         // Step 1: Replace root with `false`
         println!("Inserting `false`");
         assert_eq!(
             Ok(EditSuccess::Replace(Class::False)),
-            editable_tree.execute_action(Action::Replace(Insertable::CountedNode(1, 'f'))),
+            dag.replace_cursor(Insertable::CountedNode(1, 'f')),
             "Not equal in action result."
         );
-        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
-            editable_tree.current_cursor_path,
+            dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
@@ -1195,13 +1175,13 @@ mod tests {
         println!("Performing first undo");
         assert_eq!(
             Ok(EditSuccess::Undo),
-            editable_tree.execute_action(Action::Undo),
+            dag.undo(),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
-            editable_tree.current_cursor_path,
+            dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
@@ -1209,17 +1189,13 @@ mod tests {
         println!("Performing the 2nd undo");
         assert_eq!(
             Err(EditErr::NoChangesToUndo),
-            editable_tree.execute_action(Action::Undo),
+            dag.undo(),
             "Not equal in action result"
         );
-        assert_eq!(
-            start_tree,
-            editable_tree.root(),
-            "Failed undo modified the tree"
-        );
+        assert_eq!(start_tree, dag.root(), "Failed undo modified the tree");
         assert_eq!(
             Path::root(),
-            editable_tree.current_cursor_path,
+            dag.current_cursor_path,
             "Failed undo moved the cursor"
         );
 
@@ -1227,13 +1203,13 @@ mod tests {
         println!("Performing the 1st redo");
         assert_eq!(
             Ok(EditSuccess::Redo),
-            editable_tree.execute_action(Action::Redo),
+            dag.redo(),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
-            editable_tree.current_cursor_path,
+            dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
@@ -1241,13 +1217,13 @@ mod tests {
         println!("Performing the 2nd redo");
         assert_eq!(
             Err(EditErr::NoChangesToRedo),
-            editable_tree.execute_action(Action::Redo),
+            dag.redo(),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
-            editable_tree.current_cursor_path,
+            dag.current_cursor_path,
             "Not equal in cursor location."
         );
     }
@@ -1275,7 +1251,7 @@ mod tests {
         let root = start_tree.add_to_arena(&arena);
         let start_cursor_location = Path::from_vec(vec![1, 0]);
         let expected_cursor_location = Path::from_vec(vec![1]);
-        let mut editable_tree = Dag::new(&arena, root, start_cursor_location);
+        let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         // Step 1: Delete TestJson::object's child
         println!("Delete `key-value` pair");
@@ -1283,12 +1259,12 @@ mod tests {
             Ok(EditSuccess::Delete {
                 name: "field".to_string()
             }),
-            editable_tree.execute_action(Action::Delete),
+            dag.delete_cursor(),
             "Not equal in action result."
         );
-        assert_eq!(expected_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(expected_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
-            expected_cursor_location, editable_tree.current_cursor_path,
+            expected_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
@@ -1296,13 +1272,13 @@ mod tests {
         println!("Performing undo");
         assert_eq!(
             Ok(EditSuccess::Undo),
-            editable_tree.execute_action(Action::Undo),
+            dag.undo(),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, editable_tree.root(), "Not equal in tree.");
+        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
             Path::root(),
-            editable_tree.current_cursor_path,
+            dag.current_cursor_path,
             "Not equal in cursor location."
         );
     }
@@ -1317,31 +1293,25 @@ mod tests {
         // the `null`)
         let arena: Arena<Json> = Arena::new();
         let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
-        let mut editable_tree = Dag::new(&arena, root, Path::from_vec(vec![0]));
+        let mut dag = Dag::new(&arena, root, Path::from_vec(vec![0]));
 
         // Delete the node under the cursor, causing the cursor to move to the root
         assert_eq!(
             Ok(EditSuccess::Delete {
                 name: "null".to_string()
             }),
-            editable_tree.execute_action(Action::Delete)
+            dag.delete_cursor(),
         );
-        assert_eq!(editable_tree.current_cursor_path, Path::root());
+        assert_eq!(dag.current_cursor_path, Path::root());
 
         // Undo this change, causing the cursor to move back to `null`
-        assert_eq!(
-            Ok(EditSuccess::Undo),
-            editable_tree.execute_action(Action::Undo)
-        );
+        assert_eq!(Ok(EditSuccess::Undo), dag.undo());
 
         // Redo the change.  It's not really important what the tree is here, so long as the Dag
         // doesn't panic when the cursor is generated
-        assert_eq!(
-            Ok(EditSuccess::Redo),
-            editable_tree.execute_action(Action::Redo)
-        );
+        assert_eq!(Ok(EditSuccess::Redo), dag.redo());
 
-        let _cursor = editable_tree.cursor();
+        let _cursor = dag.cursor();
     }
 
     /// This is a regression test for issue #68, where Sapling crashes if an invalid char is used
@@ -1352,24 +1322,24 @@ mod tests {
         // the `null`)
         let arena: Arena<Json> = Arena::new();
         let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
-        let mut editable_tree = Dag::new(&arena, root, Path::root());
+        let mut dag = Dag::new(&arena, root, Path::root());
 
         // Inserting an invalid char into the array should error gracefully
         assert_eq!(
             Err(EditErr::CharNotANode('x')),
-            editable_tree.execute_action(Action::InsertChild(Insertable::CountedNode(1, 'x')))
+            dag.insert_child(Insertable::CountedNode(1, 'x'))
         );
 
         // Move the cursor to the 'null'
         assert_eq!(
             Ok(EditSuccess::Move(Direction::Down)),
-            editable_tree.move_cursor(Direction::Down)
+            dag.move_cursor(Direction::Down)
         );
 
         // Inserting an invalid char into the array should error gracefully
         assert_eq!(
             Err(EditErr::CharNotANode('x')),
-            editable_tree.execute_action(Action::InsertChild(Insertable::CountedNode(1, 'x')))
+            dag.insert_child(Insertable::CountedNode(1, 'x'))
         );
     }
 
@@ -1381,24 +1351,24 @@ mod tests {
         // the `null`)
         let arena: Arena<Json> = Arena::new();
         let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
-        let mut editable_tree = Dag::new(&arena, root, Path::root());
+        let mut dag = Dag::new(&arena, root, Path::root());
 
         // Inserting an invalid char into the array should error gracefully
         assert_eq!(
             Err(EditErr::CharNotANode('x')),
-            editable_tree.execute_action(Action::Replace(Insertable::CountedNode(1, 'x')))
+            dag.replace_cursor(Insertable::CountedNode(1, 'x'))
         );
 
         // Move the cursor to the 'null'
         assert_eq!(
             Ok(EditSuccess::Move(Direction::Down)),
-            editable_tree.move_cursor(Direction::Down)
+            dag.move_cursor(Direction::Down)
         );
 
         // Inserting an invalid char into the array should error gracefully
         assert_eq!(
             Err(EditErr::CharNotANode('x')),
-            editable_tree.execute_action(Action::Replace(Insertable::CountedNode(1, 'x')))
+            dag.replace_cursor(Insertable::CountedNode(1, 'x'))
         );
     }
 
