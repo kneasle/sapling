@@ -7,6 +7,7 @@ use crate::config::{Config, KeyMap};
 use crate::core::{Direction, Side};
 
 use std::borrow::Cow;
+use std::iter::Peekable;
 
 use tuikit::prelude::Key;
 
@@ -38,7 +39,9 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
     ) {
         self.keystroke_buffer.push(key);
 
-        let log_entry = match parse_keystroke(&config.keymap, &self.keystroke_buffer) {
+        let log_entry = match parse_command(&config.keymap, &self.keystroke_buffer) {
+            // If the command buffer is a valid and complete command, then we execute the resulting
+            // 'action'
             Ok(action) => {
                 match action {
                     // If the command was a 'quit', then immediately make a state transition to the
@@ -63,7 +66,10 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
                 .log_message();
                 (action.description(), action.category())
             }
+            // If the command is incomplete, we early return without clearing the buffer or logging
+            // any messages
             Err(ParseErr::Incomplete) => return (self, None),
+            // If the command is invalid, we report the invalid command as a log message
             Err(ParseErr::Invalid) => (
                 format!("Undefined command '{:?}'", self.keystroke_buffer),
                 Category::Undefined,
@@ -193,32 +199,21 @@ enum ParseErr {
     Incomplete,
 }
 
-/// Attempt to convert a keystroke as a `&`[`str`] into an [`Action`].
-/// This parses the string from the start, and returns when it finds a valid keystroke.
+/// Attempt to parse an entire command.  This is the entry point to the parsing code.  This parser
+/// is a recursive descent parser, where there is a separate function for each syntactic element
+/// ([`parse_insertable`], [`parse_count`], etc.).
 ///
-/// Therefore, `"q489flshb"` will be treated like `"q"`, and will return [`ParseResult::Quit`] even
-/// though `"q489flshb"` is not technically valid.
-/// This function is run every time the user types a keystroke character, and so the user would not
-/// be able to input `"q489flshb"` to this function because doing so would require them to first
-/// input every possible prefix of `"q489flshb"`, including `"q"`.
-fn parse_insertable(
-    keystroke_char_iter: &mut impl Iterator<Item = Key>,
-) -> ParseResult<Insertable> {
-    // Consume the next key or claim incompleteness
-    let key = keystroke_char_iter.next().ok_or(ParseErr::Incomplete)?;
-    // If the next keystroke is a `char`, then return it with success otherwise the command is
-    // invalid
-    if let Key::Char(c) = key {
-        Ok(Insertable::CountedNode(1, c))
-    } else {
-        Err(ParseErr::Invalid)
-    }
-}
+/// Note that this parser will return as soon as a valid command is reached.  Therefore,
+/// `"q489flshb"` will be treated like `"q"`, and will return [`Action::Quit`] even though
+/// `"q489flshb"` is not technically valid.  However, the command buffer is parsed every time the
+/// user types a keystroke character, so the user would not be able to input `"q489flshb"` in one
+/// go because doing so would require them to first input every possible prefix of `"q489flshb"`,
+/// including `"q"`.
+fn parse_command(keymap: &KeyMap, keys: &[Key]) -> ParseResult<Action> {
+    // Generate an iterator of keystrokes, which are treated similar to tokens by the parser.
+    let mut key_iter = keys.iter().copied().peekable();
 
-fn parse_keystroke(keymap: &KeyMap, keys: &[Key]) -> ParseResult<Action> {
-    let mut key_iter = keys.iter().copied();
-
-    // Consume the first char of the keystroke
+    // The first keystroke represents the command name.  No keystrokes is an incomplete command.
     let first_key = key_iter.next().ok_or(ParseErr::Incomplete)?;
 
     Ok(match keymap.get(&first_key).ok_or(ParseErr::Invalid)? {
@@ -235,9 +230,58 @@ fn parse_keystroke(keymap: &KeyMap, keys: &[Key]) -> ParseResult<Action> {
     })
 }
 
+/// Attempt to parse a sequence of [`Key`]strokes into an [`Insertable`].
+///
+/// Currently an [`Insertable`] only has one form ([`Insertable::CountedNode`]), and so this is a
+/// simple matter of attempting to parse a count and then taking one char of the keystroke.
+fn parse_insertable(
+    keystroke_char_iter: &mut Peekable<impl Iterator<Item = Key>>,
+) -> ParseResult<Insertable> {
+    // Parse a count before reading the char
+    let count = parse_count(keystroke_char_iter);
+    // Consume the next key or return incompleteness
+    let key = keystroke_char_iter.next().ok_or(ParseErr::Incomplete)?;
+    // If the next keystroke is a `char`, then return it with success otherwise the command is
+    // invalid
+    if let Key::Char(c) = key {
+        Ok(Insertable::CountedNode(count, c))
+    } else {
+        Err(ParseErr::Invalid)
+    }
+}
+
+/// Parse a 'count' off the front of an sequence of [`Key`]strokes.  This cannot fail, because if
+/// the first [`Key`] is not a numeral, this returns `1`.
+fn parse_count(keystroke_char_iter: &mut Peekable<impl Iterator<Item = Key>>) -> usize {
+    // accumulated_count tracks the number that is represented by the keystrokes already consumed
+    // or None if no numbers have been consumed
+    let mut accumulated_count: Option<usize> = None;
+    loop {
+        let new_digit = match keystroke_char_iter.peek() {
+            Some(Key::Char('0')) => 0,
+            Some(Key::Char('1')) => 1,
+            Some(Key::Char('2')) => 2,
+            Some(Key::Char('3')) => 3,
+            Some(Key::Char('4')) => 4,
+            Some(Key::Char('5')) => 5,
+            Some(Key::Char('6')) => 6,
+            Some(Key::Char('7')) => 7,
+            Some(Key::Char('8')) => 8,
+            Some(Key::Char('9')) => 9,
+            _ => break,
+        };
+        // Pop the digit.  We use lookahead so that we leave the future keystrokes untouched for
+        // the next parsing.
+        keystroke_char_iter.next();
+        // Since we read a new digit, we accumulate it to the count
+        accumulated_count = Some(accumulated_count.map_or(new_digit, |x| x * 10 + new_digit));
+    }
+    accumulated_count.unwrap_or(1)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_keystroke, Action, Insertable, ParseErr};
+    use super::{parse_command, Action, Insertable, ParseErr};
     use crate::config::default_keymap;
     use crate::core::Direction;
     use tuikit::prelude::Key;
@@ -263,13 +307,16 @@ mod tests {
             ("a3t", Action::InsertAfter(Insertable::CountedNode(3, 't'))),
             ("an", Action::InsertAfter(Insertable::CountedNode(1, 'n'))),
             ("a1n", Action::InsertAfter(Insertable::CountedNode(1, 'n'))),
-            ("i0X", Action::InsertAfter(Insertable::CountedNode(0, 'X'))),
-            ("ii", Action::InsertAfter(Insertable::CountedNode(1, 'i'))),
-            ("a1x", Action::InsertAfter(Insertable::CountedNode(1, 'x'))),
+            ("i0X", Action::InsertBefore(Insertable::CountedNode(0, 'X'))),
+            ("ii", Action::InsertBefore(Insertable::CountedNode(1, 'i'))),
+            (
+                "a15x",
+                Action::InsertAfter(Insertable::CountedNode(15, 'x')),
+            ),
             ("q", Action::Quit),
         ] {
             assert_eq!(
-                parse_keystroke(&keymap, &to_char_keys(keystrokes)),
+                parse_command(&keymap, &to_char_keys(keystrokes)),
                 Ok(expected_effect.clone())
             );
         }
@@ -279,8 +326,9 @@ mod tests {
     fn parse_keystroke_invalid() {
         let keymap = default_keymap();
         for keystroke in &["d", "Pxx", "Qsx", "t", "Y", "X", "1", "3", "\""] {
+            println!("Testing {}", keystroke);
             assert_eq!(
-                parse_keystroke(&keymap, &to_char_keys(keystroke)),
+                parse_command(&keymap, &to_char_keys(keystroke)),
                 Err(ParseErr::Invalid)
             );
         }
@@ -289,9 +337,10 @@ mod tests {
     #[test]
     fn parse_keystroke_incomplete() {
         let keymap = default_keymap();
-        for keystroke in &["", "r", "o", "o3", "3", "1o", "a"] {
+        for keystroke in &["", "r", "o", "a", "i", "o3", "i34" /*, "3", "1o" */] {
+            println!("Testing {}", keystroke);
             assert_eq!(
-                parse_keystroke(&keymap, &to_char_keys(keystroke)),
+                parse_command(&keymap, &to_char_keys(keystroke)),
                 Err(ParseErr::Incomplete)
             );
         }
