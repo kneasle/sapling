@@ -206,8 +206,8 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
 
     /// Returns a reference to the node that is currently the root of the AST.
     pub fn root(&self) -> &'arena Node {
-        // This indexing shouldn't panic because we require that `self.history_index` is a valid index
-        // into `self.root_history`, and `self.root_history` has at least one element
+        // This indexing shouldn't panic because we require that `self.history_index` is a valid
+        // index into `self.root_history`, and `self.root_history` has at least one element
         self.root_history[self.history_index].0
     }
 
@@ -455,8 +455,8 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             |this: &mut Self,
              parent_and_index: Option<(&'arena Node, usize)>,
              _cursor: &'arena Node| {
-                // Find (and cache) the parent of the cursor.  If the parent of the cursor doesn't exist,
-                // the cursor must be the root and we can't insert a node next to the root.
+                // Find (and cache) the parent of the cursor.  If the parent of the cursor doesn't
+                // exist, the cursor must be the root and we can't insert a node next to the root.
                 let (parent, cursor_index) = parent_and_index.ok_or(EditErr::AddSiblingToRoot)?;
 
                 // Short circuit if not an insertable char
@@ -495,8 +495,8 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             |this: &mut Self,
              parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
-                // Find (and cache) the parent of the cursor.  If the parent of the cursor doesn't exist,
-                // the cursor must be the root and we can't delete the root.
+                // Find (and cache) the parent of the cursor.  If the parent of the cursor doesn't
+                // exist, the cursor must be the root and we can't delete the root.
                 let (parent, cursor_index) = parent_and_index.ok_or(EditErr::DeletingRoot)?;
                 // Cache the name of the cursor **before** it gets deleted
                 let deleted_node_name = cursor.display_name();
@@ -509,8 +509,8 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                     // If we remove the only child of a node then we move the cursor up
                     this.current_cursor_path.pop();
                 } else if cursor_index == new_parents_child_count {
-                    // If we deleted the last child of a node (and this isn't the last child), we move
-                    // the cursor back by one.  We can unwrap here because we know we aren't
+                    // If we deleted the last child of a node (and this isn't the last child), we
+                    // move the cursor back by one.  We can unwrap here because we know we aren't
                     // removing the root
                     *this.current_cursor_path.last_mut().unwrap() -= 1;
                 }

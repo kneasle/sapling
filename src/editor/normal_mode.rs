@@ -83,8 +83,8 @@ pub enum KeyStroke {
     InsertAfter,
     /// Delete the cursor
     Delete,
-    /// Move cursor in given direction.  The direction is part of the keystroke, since the directions
-    /// all correspond to single key presses.
+    /// Move cursor in given direction.  The direction is part of the keystroke, since movements in
+    /// all 4 directions are mapped to single characters.
     MoveCursor(Direction),
     /// Undo the last change
     Undo,
