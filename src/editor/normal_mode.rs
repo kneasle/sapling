@@ -14,13 +14,13 @@ use tuikit::prelude::Key;
 /// normal mode.
 #[derive(Debug, Clone)]
 pub struct State {
-    keystroke_buffer: String,
+    keystroke_buffer: Vec<Key>,
 }
 
 impl Default for State {
     fn default() -> Self {
         State {
-            keystroke_buffer: String::new(),
+            keystroke_buffer: Vec::new(),
         }
     }
 }
@@ -36,18 +36,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
         Box<dyn state::State<'arena, Node>>,
         Option<(String, Category)>,
     ) {
-        let c = match key {
-            Key::Char(c) => c,
-            _ => {
-                self.keystroke_buffer.clear();
-                return (
-                    self,
-                    Some(("Invalid command".to_owned(), Category::Undefined)),
-                );
-            }
-        };
-
-        self.keystroke_buffer.push(c);
+        self.keystroke_buffer.push(key);
 
         let log_entry = match parse_keystroke(&config.keymap, &self.keystroke_buffer) {
             ParseResult::Action(action) => {
@@ -74,7 +63,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
     }
 
     fn keystroke_buffer<'s>(&'s self) -> Cow<'s, str> {
-        Cow::from(&self.keystroke_buffer)
+        Cow::from(format!("{:?}", self.keystroke_buffer))
     }
 }
 
@@ -231,6 +220,11 @@ mod tests {
     use super::{parse_keystroke, Action, ParseResult};
     use crate::config::default_keymap;
     use crate::core::Direction;
+    use tuikit::prelude::Key;
+
+    fn to_char_keys(string: &str) -> Vec<Key> {
+        string.chars().map(|c| Key::Char(c)).collect::<Vec<_>>()
+    }
 
     #[test]
     fn parse_keystroke_valid() {
@@ -248,8 +242,8 @@ mod tests {
             ("oP", Action::InsertChild('P')),
         ] {
             assert_eq!(
-                parse_keystroke(&keymap, *keystroke),
                 ParseResult::Action(expected_effect.clone())
+                parse_keystroke(&keymap, &to_char_keys(keystrokes)),
             );
         }
     }
@@ -264,8 +258,8 @@ mod tests {
         let keymap = default_keymap();
         for keystroke in &["d", "Pxx", "Qsx"] {
             assert_eq!(
-                parse_keystroke(&keymap, *keystroke),
                 ParseResult::Undefined(keystroke.to_string())
+                parse_keystroke(&keymap, &to_char_keys(keystroke)),
             );
         }
     }
@@ -275,8 +269,8 @@ mod tests {
         let keymap = default_keymap();
         for keystroke in &["", "r", "o"] {
             assert_eq!(
-                parse_keystroke(&keymap, *keystroke),
                 ParseResult::Incomplete
+                parse_keystroke(&keymap, &to_char_keys(keystroke)),
             );
         }
     }
