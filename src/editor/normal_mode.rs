@@ -1,10 +1,10 @@
 //! The code for 'normal-mode', similar to that of Vim
 
-use super::dag::{Dag, LogMessage};
+use super::dag::{Dag, Insertable, LogMessage};
 use super::{keystroke_log::Category, state};
 use crate::ast::Ast;
 use crate::config::{Config, KeyMap};
-use crate::core::Direction;
+use crate::core::{Direction, Side};
 
 use std::borrow::Cow;
 
@@ -39,21 +39,35 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
         self.keystroke_buffer.push(key);
 
         let log_entry = match parse_keystroke(&config.keymap, &self.keystroke_buffer) {
-            ParseResult::Action(action) => {
-                tree.execute_action(action).log_message();
+            Ok(action) => {
+                match action {
+                    // If the command was a 'quit', then immediately make a state transition to the
+                    // 'Quitted' state
+                    Action::Quit => {
+                        return (
+                            Box::new(state::Quit),
+                            Some((action.description(), action.category())),
+                        )
+                    }
+                    // Otherwise, we perform the action on the `Dag`.  This returns the
+                    // `EditResult`, which is logged outside the `match`
+                    Action::Undo => tree.undo(),
+                    Action::Redo => tree.redo(),
+                    Action::MoveCursor(direction) => tree.move_cursor(direction),
+                    Action::Replace(c) => tree.replace_cursor(c),
+                    Action::InsertChild(c) => tree.insert_child(c),
+                    Action::InsertBefore(c) => tree.insert_next_to_cursor(c, Side::Prev),
+                    Action::InsertAfter(c) => tree.insert_next_to_cursor(c, Side::Next),
+                    Action::Delete => tree.delete_cursor(),
+                }
+                .log_message();
                 (action.description(), action.category())
             }
-            ParseResult::Quit => {
-                self.keystroke_buffer.clear();
-                return (
-                    Box::new(state::Quit),
-                    Some(("Quit Sapling".to_owned(), Category::Quit)),
-                );
-            }
-            ParseResult::Incomplete => return (self, None),
-            ParseResult::Undefined(s) => {
-                (format!("Undefined command '{}'", s), Category::Undefined)
-            }
+            Err(ParseErr::Incomplete) => return (self, None),
+            Err(ParseErr::Invalid) => (
+                format!("Undefined command '{:?}'", self.keystroke_buffer),
+                Category::Undefined,
+            ),
         };
 
         // If we haven't returned yet, then clear the buffer
@@ -69,7 +83,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
 
 /// The possible keystroke typed by user without any parameters.  Each `KeyStroke` can be mapped to
 /// an individual [`char`].
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum KeyStroke {
     /// Quit Sapling
     Quit,
@@ -116,13 +130,13 @@ impl KeyStroke {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Action {
     /// Replace the selected node with a node represented by some [`char`]
-    Replace(char),
+    Replace(Insertable),
     /// Insert a new node (given by some [`char`]) as the first child of the selected node
-    InsertChild(char),
+    InsertChild(Insertable),
     /// Insert a new node (given by some [`char`]) before the cursor
-    InsertBefore(char),
+    InsertBefore(Insertable),
     /// Insert a new node (given by some [`char`]) after the cursor
-    InsertAfter(char),
+    InsertAfter(Insertable),
     /// Remove the node under the cursor
     Delete,
     /// Move the node in a given direction
@@ -131,6 +145,8 @@ pub enum Action {
     Undo,
     /// Redo a change
     Redo,
+    /// Quit Sapling
+    Quit,
 }
 
 impl Action {
@@ -149,6 +165,7 @@ impl Action {
             Action::MoveCursor(Direction::Next) => "move to next sibling".to_string(),
             Action::Undo => "undo a change".to_string(),
             Action::Redo => "redo a change".to_string(),
+            Action::Quit => "quit Sapling".to_string(),
         }
     }
 
@@ -162,20 +179,17 @@ impl Action {
             Action::Delete => Category::Delete,
             Action::MoveCursor(_) => Category::Move,
             Action::Undo | Action::Redo => Category::History,
+            Action::Quit => Category::Quit,
         }
     }
 }
 
-/// The possible results of parsing a command
+type ParseResult<T> = Result<T, ParseErr>;
+
+/// The possible ways a parsing operation could fail
 #[derive(Debug, Clone, Eq, PartialEq)]
-enum ParseResult {
-    /// An [`Action`] that can be executed by a [`Dag`]
-    Action(Action),
-    /// The user wanted to quit Sapling
-    Quit,
-    /// The command was complete but undefined
-    Undefined(String),
-    /// The command has not been finished yet
+enum ParseErr {
+    Invalid,
     Incomplete,
 }
 
@@ -187,37 +201,43 @@ enum ParseResult {
 /// This function is run every time the user types a keystroke character, and so the user would not
 /// be able to input `"q489flshb"` to this function because doing so would require them to first
 /// input every possible prefix of `"q489flshb"`, including `"q"`.
-fn parse_keystroke(keymap: &KeyMap, keystroke: &str) -> ParseResult {
-    parse_keystroke_opt(keymap, keystroke).unwrap_or(ParseResult::Incomplete)
+fn parse_insertable(
+    keystroke_char_iter: &mut impl Iterator<Item = Key>,
+) -> ParseResult<Insertable> {
+    // Consume the next key or claim incompleteness
+    let key = keystroke_char_iter.next().ok_or(ParseErr::Incomplete)?;
+    // If the next keystroke is a `char`, then return it with success otherwise the command is
+    // invalid
+    if let Key::Char(c) = key {
+        Ok(Insertable::CountedNode(1, c))
+    } else {
+        Err(ParseErr::Invalid)
+    }
 }
 
-fn parse_keystroke_opt(keymap: &KeyMap, keystroke: &str) -> Option<ParseResult> {
-    let mut keystroke_char_iter = keystroke.chars();
+fn parse_keystroke(keymap: &KeyMap, keys: &[Key]) -> ParseResult<Action> {
+    let mut key_iter = keys.iter().copied();
 
     // Consume the first char of the keystroke
-    let c = keystroke_char_iter.next()?;
+    let first_key = key_iter.next().ok_or(ParseErr::Incomplete)?;
 
-    Some(ParseResult::Action(match keymap.get(&c) {
+    Ok(match keymap.get(&first_key).ok_or(ParseErr::Invalid)? {
+        KeyStroke::InsertChild => Action::InsertChild(parse_insertable(&mut key_iter)?),
+        KeyStroke::InsertBefore => Action::InsertBefore(parse_insertable(&mut key_iter)?),
+        KeyStroke::InsertAfter => Action::InsertAfter(parse_insertable(&mut key_iter)?),
+        KeyStroke::Delete => Action::Delete,
+        KeyStroke::Replace => Action::Replace(parse_insertable(&mut key_iter)?),
+        KeyStroke::MoveCursor(direction) => Action::MoveCursor(*direction),
+        KeyStroke::Undo => Action::Undo,
+        KeyStroke::Redo => Action::Redo,
         // "q" quits Sapling
-        Some(KeyStroke::Quit) => return Some(ParseResult::Quit),
-        // this pattern is used several times: `keystroke_char_iter.next().map()
-        // This consumes the second char of the iterator and, if it exists, returns
-        // Some(Action::ThisAction(char))
-        Some(KeyStroke::InsertChild) => Action::InsertChild(keystroke_char_iter.next()?),
-        Some(KeyStroke::InsertBefore) => Action::InsertBefore(keystroke_char_iter.next()?),
-        Some(KeyStroke::InsertAfter) => Action::InsertAfter(keystroke_char_iter.next()?),
-        Some(KeyStroke::Delete) => Action::Delete,
-        Some(KeyStroke::Replace) => Action::Replace(keystroke_char_iter.next()?),
-        Some(KeyStroke::MoveCursor(direction)) => Action::MoveCursor(*direction),
-        Some(KeyStroke::Undo) => Action::Undo,
-        Some(KeyStroke::Redo) => Action::Redo,
-        None => return Some(ParseResult::Undefined(keystroke.to_string())),
-    }))
+        KeyStroke::Quit => return Ok(Action::Quit),
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_keystroke, Action, ParseResult};
+    use super::{parse_keystroke, Action, Insertable, ParseErr};
     use crate::config::default_keymap;
     use crate::core::Direction;
     use tuikit::prelude::Key;
@@ -229,37 +249,39 @@ mod tests {
     #[test]
     fn parse_keystroke_valid() {
         let keymap = default_keymap();
-        for (keystroke, expected_effect) in &[
+        for (keystrokes, expected_effect) in &[
             ("x", Action::Delete),
             ("h", Action::MoveCursor(Direction::Prev)),
             ("j", Action::MoveCursor(Direction::Next)),
             ("k", Action::MoveCursor(Direction::Prev)),
             ("l", Action::MoveCursor(Direction::Next)),
             ("pajlbsi", Action::MoveCursor(Direction::Up)),
-            ("ra", Action::Replace('a')),
-            ("rg", Action::Replace('g')),
-            ("oX", Action::InsertChild('X')),
-            ("oP", Action::InsertChild('P')),
+            ("ra", Action::Replace(Insertable::CountedNode(1, 'a'))),
+            ("rg", Action::Replace(Insertable::CountedNode(1, 'g'))),
+            ("oX", Action::InsertChild(Insertable::CountedNode(1, 'X'))),
+            ("oP", Action::InsertChild(Insertable::CountedNode(1, 'P'))),
+            ("a3t", Action::InsertAfter(Insertable::CountedNode(3, 't'))),
+            ("an", Action::InsertAfter(Insertable::CountedNode(1, 'n'))),
+            ("a1n", Action::InsertAfter(Insertable::CountedNode(1, 'n'))),
+            ("i0X", Action::InsertAfter(Insertable::CountedNode(0, 'X'))),
+            ("ii", Action::InsertAfter(Insertable::CountedNode(1, 'i'))),
+            ("a1x", Action::InsertAfter(Insertable::CountedNode(1, 'x'))),
+            ("q", Action::Quit),
         ] {
             assert_eq!(
-                ParseResult::Action(expected_effect.clone())
                 parse_keystroke(&keymap, &to_char_keys(keystrokes)),
+                Ok(expected_effect.clone())
             );
         }
     }
 
     #[test]
-    fn parse_keystroke_quit() {
-        assert_eq!(parse_keystroke(&default_keymap(), "q"), ParseResult::Quit);
-    }
-
-    #[test]
     fn parse_keystroke_invalid() {
         let keymap = default_keymap();
-        for keystroke in &["d", "Pxx", "Qsx"] {
+        for keystroke in &["d", "Pxx", "Qsx", "t", "Y", "X", "1", "3", "\""] {
             assert_eq!(
-                ParseResult::Undefined(keystroke.to_string())
                 parse_keystroke(&keymap, &to_char_keys(keystroke)),
+                Err(ParseErr::Invalid)
             );
         }
     }
@@ -267,10 +289,10 @@ mod tests {
     #[test]
     fn parse_keystroke_incomplete() {
         let keymap = default_keymap();
-        for keystroke in &["", "r", "o"] {
+        for keystroke in &["", "r", "o", "o3", "3", "1o", "a"] {
             assert_eq!(
-                ParseResult::Incomplete
                 parse_keystroke(&keymap, &to_char_keys(keystroke)),
+                Err(ParseErr::Incomplete)
             );
         }
     }
