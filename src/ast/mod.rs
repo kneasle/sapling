@@ -102,6 +102,40 @@ fn write_tree_view_recursive<'arena, Node>(
     }
 }
 
+/// A macro to generate an implementation of [`AstClass`] called `Class` and automatically fill the
+/// required information.
+#[macro_export]
+macro_rules! ast_class {
+    ($( $variant_name: ident => $c: expr, $name: literal );+) => {
+        #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+        #[allow(missing_docs)]
+        pub enum Class {
+            $( $variant_name ),+
+        }
+
+        impl AstClass for Class {
+            fn to_char(self) -> char {
+                match self {
+                    $( Class::$variant_name => $c ),+
+                }
+            }
+
+            fn name(self) -> &'static str {
+                match self {
+                    $( Class::$variant_name => $name ),+
+                }
+            }
+
+            fn from_char(c: char) -> Option<Self> {
+                match c {
+                    $( $c => Some(Class::$variant_name), )+
+                    _ => None,
+                }
+            }
+        }
+    };
+}
+
 /// All the possible types which [`Ast`] nodes can take.
 pub trait AstClass: Copy + std::fmt::Debug + Eq + std::hash::Hash {
     /// Gets the [`char`] that would have been used to create this value
