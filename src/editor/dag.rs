@@ -354,7 +354,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             .skip(steps_above_cursor)
         {
             let mut cloned_node = (*n).clone();
-            cloned_node.children_mut()[*child_index] = node;
+            cloned_node.replace_child(*child_index, node);
             node = self.arena.alloc(cloned_node);
         }
 

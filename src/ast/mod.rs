@@ -204,14 +204,19 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
 
     /* DEBUG VIEW FUNCTIONS */
 
-    /// Get a slice over the direct children of this node.  This operation is expected to be
-    /// cheap - it will be used a lot of times without caching the results.
+    /// Get a slice over the direct children of this node.  This operation is expected to be cheap
+    /// - it will be used a lot of times without caching the results.
     fn children<'s>(&'s self) -> &'s [&'arena Self];
 
     /// Get a mutable slice over the direct children of this node.  Like
-    /// [`children`](Ast::children), this operation is expected to be
-    /// cheap - it will be used a lot of times without caching the results.
+    /// [`children`](Ast::children), this operation is expected to be cheap - it will be used a lot
+    /// of times without caching the results.
     fn children_mut<'s>(&'s mut self) -> &'s mut [&'arena Self];
+
+    /// Replaces the `index`th child of this node with a reference to a `new_node`
+    fn replace_child(&mut self, index: usize, new_node: &'arena Self) {
+        self.children_mut()[index] = new_node;
+    }
 
     /// Removes the child at a given index from the children of this node, if possible.  If the
     /// removal was not possible, then we return a custom error type.
