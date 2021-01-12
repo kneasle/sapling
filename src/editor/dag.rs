@@ -430,41 +430,42 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     /// Updates the internal state so that the tree now contains `new_node` inserted as the last
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
     pub fn insert_child(&mut self, insertable: Insertable) -> EditResult<Node::Class> {
-        let (count, c) = match insertable {
-            Insertable::CountedNode(count, c) => (count, c),
+        let (count, class) = match insertable {
+            Insertable::CountedNode(count, c) => (
+                count,
+                Node::Class::from_char(c).ok_or(EditErr::CharNotANode(c))?,
+            ),
         };
-        let class = Node::Class::from_char(c).ok_or(EditErr::CharNotANode(c))?;
         self.perform_edit(
             |this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
-                log::debug!("Inserting '{}' as a new child.", c);
-                if !cursor.is_valid_child(cursor.children().len(), class) {
-                    log::debug!("New node could not be a valid child of the cursor");
-                    // Short circuit if `c` couldn't be a valid child of the cursor
-                    return Err(EditErr::CannotBeChild {
-                        class,
-                        parent_name: cursor.display_name(),
-                    });
-                }
-                // Create the node to insert
-                let new_node = this.arena.alloc(Node::from_class(class));
-                // Clone the node that currently is the cursor, and add the new child to the end of
-                // its children.
+                log::debug!("Inserting '{}' as a new child.", class.to_char());
+                // Clone the node that currently is the cursor, and add the new nodes to the end of
+                // the child list
                 let mut cloned_cursor = cursor.clone();
-                // Store the new_node's display name before it's consumed by `finish_edit`
-                // Add the new child to the children of the cloned cursor
+                // Add `count` children to the cursor
                 for _ in 0..count {
+                    // Validate the tree at every step
+                    if !cursor.is_valid_child(cursor.children().len(), class) {
+                        log::debug!("New node could not be a valid child of the cursor");
+                        // Short circuit if `c` couldn't be a valid child of the cursor
+                        return Err(EditErr::CannotBeChild {
+                            class,
+                            parent_name: cursor.display_name(),
+                        });
+                    }
+                    // Add the new child to the children of the cloned cursor
                     cloned_cursor.insert_child(
-                        new_node,
+                        this.arena.alloc(Node::from_class(class)),
                         this.arena,
                         cloned_cursor.children().len(),
                     )?;
                 }
-
-                // moves the cursor to the newly added child
-                this.current_cursor_path.push(cursor.children().len());
-
+                // Move the cursor to the last added child
+                this.current_cursor_path
+                    .push(cloned_cursor.children().len() - 1);
+                // Return success
                 Ok((
                     cloned_cursor,
                     EditLocation::Cursor,
@@ -481,11 +482,12 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         insertable: Insertable,
         side: Side,
     ) -> EditResult<Node::Class> {
-        let (count, c) = match insertable {
-            Insertable::CountedNode(count, c) => (count, c),
+        let (count, class) = match insertable {
+            Insertable::CountedNode(count, c) => (
+                count,
+                Node::Class::from_char(c).ok_or(EditErr::CharNotANode(c))?,
+            ),
         };
-        let class = Node::Class::from_char(c).ok_or(EditErr::CharNotANode(c))?;
-
         self.perform_edit(
             |this: &mut Self,
              parent_and_index: Option<(&'arena Node, usize)>,
@@ -493,29 +495,35 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                 // Find (and cache) the parent of the cursor.  If the parent of the cursor doesn't
                 // exist, the cursor must be the root and we can't insert a node next to the root.
                 let (parent, cursor_index) = parent_and_index.ok_or(EditErr::AddSiblingToRoot)?;
-
-                // Short circuit if not an insertable char
-                if !parent.is_valid_child(cursor_index, class) {
-                    return Err(EditErr::CannotBeChild {
-                        class,
-                        parent_name: parent.display_name(),
-                    });
-                }
-
-                let insert_index = cursor_index
+                // Calculate the index of the first child
+                let insert_start_index = cursor_index
                     + match side {
                         Side::Prev => 0,
                         Side::Next => 1,
                     };
+                // Clone the parent, and insert the new nodes to it one by one
                 let mut cloned_parent = parent.clone();
-                // Create the new sibling node according to the given class.
-                let new_node = this.arena.alloc(Node::from_class(class));
-                // Add the new child to the children of the cloned cursor
-                cloned_parent.insert_child(new_node, this.arena, insert_index)?;
-                // move the cursor to the correct location, we can unwrap it here, because we
-                // know we will not insert sibling to root node
-                *this.current_cursor_path.last_mut().unwrap() = insert_index;
-                // Return the success
+                for i in 0..count {
+                    let insert_index = insert_start_index + i;
+                    // Short circuit if not an insertable char
+                    if !parent.is_valid_child(insert_index, class) {
+                        return Err(EditErr::CannotBeChild {
+                            class,
+                            parent_name: parent.display_name(),
+                        });
+                    }
+
+                    // Add the new child to the children of the cloned cursor
+                    cloned_parent.insert_child(
+                        this.arena.alloc(Node::from_class(class)),
+                        this.arena,
+                        insert_index,
+                    )?;
+                }
+
+                // Move the cursor to the last inserted node.  We can unwrap it here, because
+                // inserting siblings to the root would cause an error
+                *this.current_cursor_path.last_mut().unwrap() = insert_start_index + count - 1;
                 Ok((
                     cloned_parent,
                     EditLocation::Parent,
