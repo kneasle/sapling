@@ -102,10 +102,24 @@ fn write_tree_view_recursive<'arena, Node>(
     }
 }
 
+/// All the possible types which [`Ast`] nodes can take.
+pub trait AstClass: Copy + std::fmt::Debug + Eq + std::hash::Hash {
+    /// Gets the [`char`] that would have been used to create this value
+    fn to_char(self) -> char;
+
+    /// Returns the name of this value
+    fn name(self) -> &'static str;
+
+    /// Creates a `AstClass` from a [`char`], returning [`None`] if invalid.
+    fn from_char(c: char) -> Option<Self>;
+}
+
 /// The specification of an AST that sapling can edit
 pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash {
     /// A type parameter that will represent the different ways this AST can be rendered
     type FormatStyle;
+    /// A type parameter that will represent the different node types this AST can use
+    type Class: AstClass;
 
     /* FORMATTING FUNCTIONS */
 
@@ -205,17 +219,12 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
 
     /* AST EDITING FUNCTIONS */
 
-    /// Generate a new node from a [`char`] that a user typed.  If `c` is an element of
-    /// [`valid_chars`](Ast::valid_chars), this must return [`Some`],
-    /// if it isn't, then this should return [`None`].
-    fn from_char(&self, c: char) -> Option<Self>;
-
-    /// Generate an iterator over the possible shorthand [`char`]s for valid  node
-    fn valid_chars() -> Box<dyn Iterator<Item = char>>;
+    /// Generate a new node from a AstClass.
+    fn from_class(node_type: Self::Class) -> Self;
 
     /// Returns whether or not a given index and [`char`] is a valid child
-    fn is_valid_child(&self, index: usize, c: char) -> bool;
+    fn is_valid_child(&self, index: usize, node_type: Self::Class) -> bool;
 
     /// Returns whether or not a give index and ['char'] is a valid root
-    fn is_valid_root(&self, c: char) -> bool;
+    fn is_valid_root(&self, node_type: Self::Class) -> bool;
 }

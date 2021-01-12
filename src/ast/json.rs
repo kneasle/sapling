@@ -1,7 +1,7 @@
 //! A hard-coded specification of JSON ASTs in a format editable by Sapling
 
 use super::display_token::{syntax_category, DisplayToken, RecTok};
-use super::{Ast, DeleteError, InsertError};
+use super::{Ast, AstClass, DeleteError, InsertError};
 use crate::arena::Arena;
 use crate::core::Size;
 
@@ -21,6 +21,55 @@ const CHAR_NULL: char = 'n';
 const CHAR_ARRAY: char = 'a';
 const CHAR_OBJECT: char = 'o';
 const CHAR_STRING: char = 's';
+
+/// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
+/// or 'false', and keys only contain ASCII).
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
+pub enum Class {
+    True,
+    False,
+    Null,
+    Str,
+    Array,
+    Object,
+}
+
+impl AstClass for Class {
+    fn to_char(self) -> char {
+        match self {
+            Class::True => CHAR_TRUE,
+            Class::False => CHAR_FALSE,
+            Class::Null => CHAR_NULL,
+            Class::Array => CHAR_ARRAY,
+            Class::Object => CHAR_OBJECT,
+            Class::Str => CHAR_STRING,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Class::True => "True",
+            Class::False => "False",
+            Class::Null => "Null",
+            Class::Array => "Array",
+            Class::Object => "Object",
+            Class::Str => "String",
+        }
+    }
+
+    fn from_char(c: char) -> Option<Self> {
+        match c {
+            CHAR_TRUE => Some(Class::True),
+            CHAR_FALSE => Some(Class::False),
+            CHAR_NULL => Some(Class::Null),
+            CHAR_ARRAY => Some(Class::Array),
+            CHAR_OBJECT => Some(Class::Object),
+            CHAR_STRING => Some(Class::Str),
+            _ => None,
+        }
+    }
+}
 
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
@@ -47,24 +96,6 @@ pub enum Json<'arena> {
     Str(String),
 }
 
-impl Json<'_> {
-    /// Return an iterator over all the possible chars that could represent JSON nodes
-    fn all_object_chars() -> Box<dyn Iterator<Item = char>> {
-        Box::new(
-            [
-                CHAR_TRUE,
-                CHAR_FALSE,
-                CHAR_NULL,
-                CHAR_ARRAY,
-                CHAR_OBJECT,
-                CHAR_STRING,
-            ]
-            .iter()
-            .copied(),
-        )
-    }
-}
-
 impl Default for Json<'_> {
     fn default() -> Json<'static> {
         Json::Object(vec![])
@@ -73,6 +104,7 @@ impl Default for Json<'_> {
 
 impl<'arena> Ast<'arena> for Json<'arena> {
     type FormatStyle = JsonFormat;
+    type Class = Class;
 
     /* FORMATTING FUNCTIONS */
 
@@ -376,23 +408,18 @@ impl<'arena> Ast<'arena> for Json<'arena> {
 
     /* AST EDITING FUNCTIONS */
 
-    fn from_char(&self, c: char) -> Option<Self> {
-        match c {
-            CHAR_TRUE => Some(Json::True),
-            CHAR_FALSE => Some(Json::False),
-            CHAR_NULL => Some(Json::Null),
-            CHAR_ARRAY => Some(Json::Array(vec![])),
-            CHAR_OBJECT => Some(Json::Object(vec![])),
-            CHAR_STRING => Some(Json::Str("".to_string())),
-            _ => None,
+    fn from_class(node_type: Self::Class) -> Self {
+        match node_type {
+            Class::True => Json::True,
+            Class::False => Json::False,
+            Class::Null => Json::Null,
+            Class::Array => Json::Array(vec![]),
+            Class::Object => Json::Object(vec![]),
+            Class::Str => Json::Str("".to_string()),
         }
     }
 
-    fn valid_chars() -> Box<dyn Iterator<Item = char>> {
-        Self::all_object_chars()
-    }
-
-    fn is_valid_child(&self, index: usize, c: char) -> bool {
+    fn is_valid_child(&self, index: usize, node_type: Self::Class) -> bool {
         match self {
             // values like 'true' and 'false' can never have children
             Json::True | Json::False | Json::Str(_) | Json::Null => false,
@@ -401,7 +428,7 @@ impl<'arena> Ast<'arena> for Json<'arena> {
             // fields must have their left hand side be a string
             Json::Field(_) => {
                 if index == 0 {
-                    c == CHAR_STRING
+                    node_type == Class::Str
                 } else {
                     true
                 }
@@ -409,8 +436,10 @@ impl<'arena> Ast<'arena> for Json<'arena> {
         }
     }
 
-    fn is_valid_root(&self, c: char) -> bool {
-        Self::valid_chars().any(|x| x == c)
+    fn is_valid_root(&self, node_type: Class) -> bool {
+        match node_type {
+            _ => true,
+        }
     }
 }
 

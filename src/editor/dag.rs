@@ -2,7 +2,7 @@
 
 use crate::arena::Arena;
 use crate::ast;
-use crate::ast::Ast;
+use crate::ast::{Ast, AstClass};
 use crate::editor::normal_mode::Action;
 
 use crate::core::{Direction, Path, Side};
@@ -27,17 +27,17 @@ impl EditLocation {
 /// An enum that's returned when any of the 'edit' methods in [`Dag`] are successful.
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum EditSuccess {
+pub enum EditSuccess<C: AstClass> {
     Undo,
     Redo,
     Move(Direction),
-    Replace { c: char, name: String },
-    InsertChild { c: char, name: String },
-    InsertNextToCursor { side: Side, c: char, name: String },
+    Replace(C),
+    InsertChild(C),
+    InsertNextToCursor { side: Side, class: C },
     Delete { name: String },
 }
 
-impl EditSuccess {
+impl<C: AstClass> EditSuccess<C> {
     /// Writes an info message of a successful action using `info!`
     fn log_message(self) {
         match self {
@@ -47,14 +47,20 @@ impl EditSuccess {
             EditSuccess::Move(Direction::Down) => log::info!("Moving down the tree"),
             EditSuccess::Move(Direction::Prev) => log::info!("Moving to previous child"),
             EditSuccess::Move(Direction::Next) => log::info!("Moving to next child"),
-            EditSuccess::Replace { c, name } => log::info!("Replacing with '{}'/{}", c, name),
-            EditSuccess::InsertChild { c, name } => {
-                log::info!("Inserting '{}'/{} as new child", c, name)
+            EditSuccess::Replace(class) => {
+                log::info!("Replacing with '{}'/{}", class.to_char(), class.name())
             }
-            EditSuccess::InsertNextToCursor { side, c, name } => log::info!(
+            EditSuccess::InsertChild(class) => {
+                log::info!(
+                    "Inserting '{}'/{} as new child",
+                    class.to_char(),
+                    class.name()
+                )
+            }
+            EditSuccess::InsertNextToCursor { side, class } => log::info!(
                 "Inserting '{}'/{} {} the cursor",
-                c,
-                name,
+                class.to_char(),
+                class.name(),
                 side.relational_word()
             ),
             EditSuccess::Delete { name } => log::info!("Deleting {}", name),
@@ -64,7 +70,7 @@ impl EditSuccess {
 
 /// An error that represents an error in any of the 'edit' methods in [`Dag`].
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum EditErr {
+pub enum EditErr<C: AstClass> {
     /* MOVEMENT ERRORS */
     /// Trying to move to the child of a node with no children
     MoveToNonexistentChild,
@@ -82,10 +88,12 @@ pub enum EditErr {
     NoChangesToRedo,
     /// The user typed a char that doesn't correspond to any node
     CharNotANode(char),
+    /// Trying to insert a node that cannot be root node
+    CannotBeRoot(C),
     /// Trying to insert a node that cannot be a child of the cursor
     CannotBeChild {
-        /// The [`char`] representing the disallowed child type
-        c: char,
+        /// The class representing the disallowed child type
+        class: C,
         /// The [`display_name`](Ast::display_name) of the parent node
         parent_name: String,
     },
@@ -99,7 +107,7 @@ pub enum EditErr {
     DeletingRoot,
 }
 
-impl EditErr {
+impl<C: AstClass> EditErr<C> {
     /// Writes an warning message of the encountered error using either `warn!` or `error!`,
     /// depending on the severity of the error
     fn log_message(self) {
@@ -117,8 +125,11 @@ impl EditErr {
             EditErr::InsertError(e) => log::warn!("{}", e),
             EditErr::DeleteError(e) => log::warn!("{}", e),
             EditErr::CharNotANode(c) => log::warn!("'{}' doesn't correspond to any node type.", c),
-            EditErr::CannotBeChild { c, parent_name } => {
-                log::warn!("'{}' cannot be a child of {}", c, parent_name)
+            EditErr::CannotBeRoot(c) => {
+                log::warn!("'{}' cannot be root", c.name())
+            }
+            EditErr::CannotBeChild { class, parent_name } => {
+                log::warn!("'{}' cannot be a child of {}", class.name(), parent_name)
             }
             EditErr::AddSiblingToRoot => log::warn!("Can't add siblings to the root."),
             EditErr::DeletingRoot => log::warn!("Can't delete the root."),
@@ -126,20 +137,20 @@ impl EditErr {
     }
 }
 
-impl From<ast::InsertError> for EditErr {
-    fn from(e: ast::InsertError) -> EditErr {
+impl<C: AstClass> From<ast::InsertError> for EditErr<C> {
+    fn from(e: ast::InsertError) -> EditErr<C> {
         EditErr::InsertError(e)
     }
 }
 
-impl From<ast::DeleteError> for EditErr {
-    fn from(e: ast::DeleteError) -> EditErr {
+impl<C: AstClass> From<ast::DeleteError> for EditErr<C> {
+    fn from(e: ast::DeleteError) -> EditErr<C> {
         EditErr::DeleteError(e)
     }
 }
 
 /// An alias for [`Result`] that is the return type of all of [`Dag`]'s edit methods.
-pub type EditResult = Result<EditSuccess, EditErr>;
+pub type EditResult<C> = Result<EditSuccess<C>, EditErr<C>>;
 
 /// A trait-extension that provides a convenient way convert [`EditResult`]s into log messages.
 pub trait LogMessage {
@@ -147,7 +158,7 @@ pub trait LogMessage {
     fn log_message(self);
 }
 
-impl LogMessage for EditResult {
+impl<C: AstClass> LogMessage for EditResult<C> {
     /// Consumes this `EditResult` and logs an appropriate summary report (using `info!` for
     /// [`EditSuccess`]es and `warn!` or `error!` for [`EditErr`]s).
     fn log_message(self) {
@@ -212,7 +223,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
 
     /// Move the cursor in a given direction across the tree.  Returns [`Some`] error string if an
     /// error is found, or [`None`] if the movement was possible.
-    pub fn move_cursor(&mut self, direction: Direction) -> EditResult {
+    pub fn move_cursor(&mut self, direction: Direction) -> EditResult<Node::Class> {
         let (current_cursor, cursor_parent) = self.cursor_and_parent();
         match direction {
             Direction::Down => {
@@ -257,7 +268,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     /* HISTORY METHODS */
 
     /// Move one step back in the tree history
-    pub fn undo(&mut self) -> EditResult {
+    pub fn undo(&mut self) -> EditResult<Node::Class> {
         log::trace!("Performing undo.");
         // Early return if there are no changes to undo
         if self.history_index == 0 {
@@ -274,7 +285,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     }
 
     /// Move one step forward in the tree history
-    pub fn redo(&mut self) -> EditResult {
+    pub fn redo(&mut self) -> EditResult<Node::Class> {
         log::trace!("Performing redo.");
         // Early return if there are no changes to redo
         if self.history_index >= self.root_history.len() - 1 {
@@ -301,8 +312,11 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             Option<(&'arena Node, usize)>,
             // A reference to the node under the cursor
             &'arena Node,
-        ) -> Result<(Node, EditLocation, EditSuccess), EditErr>,
-    ) -> EditResult {
+        ) -> Result<
+            (Node, EditLocation, EditSuccess<Node::Class>),
+            EditErr<Node::Class>,
+        >,
+    ) -> EditResult<Node::Class> {
         // Generate a vec of pointers to the nodes that we will have to clone.  We have to store
         // this as a vec because the iterator that produces them (cursor_path::NodeIter) can only
         // yield values from the root downwards, whereas we need the nodes in the opposite order.
@@ -364,65 +378,56 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     }
 
     /// Replaces the current cursor with a node represented by `c`
-    fn replace_cursor(&mut self, c: char) -> EditResult {
+    fn replace_cursor(&mut self, c: char) -> EditResult<Node::Class> {
+        let class = Node::Class::from_char(c).ok_or(EditErr::CharNotANode(c))?;
         self.perform_edit(
             |_this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
-                // Early return if the `c` can't go in the cursor's location
+                // Early return if the `class` can't go in the cursor's location
                 match _parent_and_index {
                     Some((parent, cursor_index)) => {
-                        if !parent.is_valid_child(cursor_index, c) {
+                        if !parent.is_valid_child(cursor_index, class) {
                             return Err(EditErr::CannotBeChild {
-                                c,
+                                class,
                                 parent_name: _parent_and_index
                                     .map_or("<root>".to_owned(), |(p, _)| p.display_name()),
                             });
                         }
                     }
                     None => {
-                        if !cursor.is_valid_root(c) {
-                            return Err(EditErr::CharNotANode(c));
+                        if !cursor.is_valid_root(class) {
+                            return Err(EditErr::CannotBeRoot(class));
                         }
                     }
                 }
 
-                // Create the node to replace.  We can use unwrap here, because 'c' is always one
-                // of valid chars.
-                let new_node = cursor.from_char(c).unwrap();
-                let new_node_name = new_node.display_name();
-                Ok((
-                    new_node,
-                    EditLocation::Cursor,
-                    EditSuccess::Replace {
-                        c,
-                        name: new_node_name,
-                    },
-                ))
+                // Create the node to replace.
+                let new_node = Node::from_class(class);
+                Ok((new_node, EditLocation::Cursor, EditSuccess::Replace(class)))
             },
         )
     }
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the last
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
-    fn insert_child(&mut self, c: char) -> EditResult {
+    fn insert_child(&mut self, c: char) -> EditResult<Node::Class> {
+        let class = Node::Class::from_char(c).ok_or(EditErr::CharNotANode(c))?;
         self.perform_edit(
             |this: &mut Self,
              _parent_and_index: Option<(&'arena Node, usize)>,
              cursor: &'arena Node| {
                 log::debug!("Inserting '{}' as a new child.", c);
-                if !cursor.is_valid_child(cursor.children().len(), c) {
+                if !cursor.is_valid_child(cursor.children().len(), class) {
                     log::debug!("New node could not be a valid child of the cursor");
                     // Short circuit if `c` couldn't be a valid child of the cursor
                     return Err(EditErr::CannotBeChild {
-                        c,
+                        class,
                         parent_name: cursor.display_name(),
                     });
                 }
                 // Create the node to insert
-                // we can use unwrap here, because 'c' is always one of valid chars.
-                let new_node = this.arena.alloc(cursor.from_char(c).unwrap());
-                let new_node_name = new_node.display_name();
+                let new_node = this.arena.alloc(Node::from_class(class));
                 // Clone the node that currently is the cursor, and add the new child to the end of its
                 // children.
                 let mut cloned_cursor = cursor.clone();
@@ -436,10 +441,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                 Ok((
                     cloned_cursor,
                     EditLocation::Cursor,
-                    EditSuccess::InsertChild {
-                        c,
-                        name: new_node_name,
-                    },
+                    EditSuccess::InsertChild(class),
                 ))
             },
         )
@@ -447,7 +449,8 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
 
     /// Updates the internal state so that the tree now contains `new_node` inserted as the first
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
-    fn insert_next_to_cursor(&mut self, c: char, side: Side) -> EditResult {
+    fn insert_next_to_cursor(&mut self, c: char, side: Side) -> EditResult<Node::Class> {
+        let class = Node::Class::from_char(c).ok_or(EditErr::CharNotANode(c))?;
         self.perform_edit(
             |this: &mut Self,
              parent_and_index: Option<(&'arena Node, usize)>,
@@ -457,9 +460,9 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                 let (parent, cursor_index) = parent_and_index.ok_or(EditErr::AddSiblingToRoot)?;
 
                 // Short circuit if not an insertable char
-                if !parent.is_valid_child(cursor_index, c) {
+                if !parent.is_valid_child(cursor_index, class) {
                     return Err(EditErr::CannotBeChild {
-                        c,
+                        class,
                         parent_name: parent.display_name(),
                     });
                 }
@@ -470,12 +473,8 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                         Side::Next => 1,
                     };
                 let mut cloned_parent = parent.clone();
-                // Create the new sibling node according to the given char.
-                let new_node = this
-                    .arena
-                    .alloc(cloned_parent.from_char(c).ok_or(EditErr::CharNotANode(c))?);
-                // Store the new_node's display name before it's consumed by `insert_child`
-                let new_node_name = new_node.display_name();
+                // Create the new sibling node according to the given class.
+                let new_node = this.arena.alloc(Node::from_class(class));
                 // Add the new child to the children of the cloned cursor
                 cloned_parent.insert_child(new_node, this.arena, insert_index)?;
                 // move the cursor to the correct location, we can unwrap it here, because we
@@ -485,17 +484,13 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                 Ok((
                     cloned_parent,
                     EditLocation::Parent,
-                    EditSuccess::InsertNextToCursor {
-                        side,
-                        c,
-                        name: new_node_name,
-                    },
+                    EditSuccess::InsertNextToCursor { side, class },
                 ))
             },
         )
     }
 
-    fn delete_cursor(&mut self) -> EditResult {
+    fn delete_cursor(&mut self) -> EditResult<Node::Class> {
         self.perform_edit(
             |this: &mut Self,
              parent_and_index: Option<(&'arena Node, usize)>,
@@ -532,7 +527,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     }
 
     /// Execute an [`Action`] generated by some keystrokes from the user.
-    pub fn execute_action(&mut self, action: Action) -> EditResult {
+    pub fn execute_action(&mut self, action: Action) -> EditResult<Node::Class> {
         match action {
             // History keystrokes
             Action::Undo => self.undo(),
@@ -567,7 +562,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
 mod tests {
     use super::{EditErr, EditSuccess};
     use crate::arena::Arena;
-    use crate::ast::json::Json;
+    use crate::ast::json::{Class, Json};
     use crate::ast::test_json::TestJson;
     use crate::core::{Direction, Path, Side};
     use crate::editor::{normal_mode::Action, Dag};
@@ -576,7 +571,7 @@ mod tests {
         start_tree: TestJson,
         start_cursor_location: Path,
         action: Action,
-        expected_edit_success: EditSuccess,
+        expected_edit_success: EditSuccess<Class>,
         expected_tree: TestJson,
         expected_cursor_location: Path,
     ) {
@@ -600,7 +595,7 @@ mod tests {
         start_tree: TestJson,
         start_cursor_location: Path,
         action: Action,
-        expected_edit_err: EditErr,
+        expected_edit_err: EditErr<Class>,
     ) {
         let arena: Arena<Json> = Arena::new();
         let root = start_tree.clone().add_to_arena(&arena);
@@ -624,10 +619,7 @@ mod tests {
             TestJson::Array(vec![]),
             Path::root(),
             Action::InsertChild('f'),
-            EditSuccess::InsertChild {
-                c: 'f',
-                name: "false".to_string(),
-            },
+            EditSuccess::InsertChild(Class::False),
             TestJson::Array(vec![TestJson::False]),
             Path::from_vec(vec![0]),
         );
@@ -638,10 +630,7 @@ mod tests {
             TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
             Path::root(),
             Action::InsertChild('n'),
-            EditSuccess::InsertChild {
-                c: 'n',
-                name: "null".to_string(),
-            },
+            EditSuccess::InsertChild(Class::Null),
             TestJson::Array(vec![
                 TestJson::Array(vec![]),
                 TestJson::True,
@@ -693,10 +682,7 @@ mod tests {
             TestJson::Array(vec![]),
             Path::root(),
             Action::Replace('f'),
-            EditSuccess::Replace {
-                c: 'f',
-                name: "false".to_string(),
-            },
+            EditSuccess::Replace(Class::False),
             TestJson::False,
             Path::root(),
         );
@@ -714,10 +700,7 @@ mod tests {
             TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
             Path::root(),
             Action::Replace('n'),
-            EditSuccess::Replace {
-                c: 'n',
-                name: "null".to_string(),
-            },
+            EditSuccess::Replace(Class::Null),
             TestJson::Null,
             Path::root(),
         );
@@ -804,10 +787,7 @@ mod tests {
 
         // We start with an empty Json array (`[]`), and we replace it with `false`
         assert_eq!(
-            Ok(EditSuccess::Replace {
-                c: 'f',
-                name: "false".to_string(),
-            }),
+            Ok(EditSuccess::Replace(Class::False)),
             editable_tree.execute_action(Action::Replace('f')),
             "Not equal in action result"
         );
@@ -881,10 +861,7 @@ mod tests {
         let mut editable_tree = Dag::new(&arena, root, Path::root());
 
         assert_eq!(
-            Ok(EditSuccess::Replace {
-                c: 'o',
-                name: "object".to_string(),
-            }),
+            Ok(EditSuccess::Replace(Class::Object)),
             editable_tree.execute_action(Action::Replace('o')),
             "Not equal in action result"
         );
@@ -985,10 +962,7 @@ mod tests {
             TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
             Path::from_vec(vec![0]),
             Action::InsertChild('f'),
-            EditSuccess::InsertChild {
-                c: 'f',
-                name: "false".to_string(),
-            },
+            EditSuccess::InsertChild(Class::False),
             TestJson::Array(vec![TestJson::Array(vec![TestJson::False]), TestJson::True]),
             Path::from_vec(vec![0, 0]),
         );
@@ -1002,8 +976,7 @@ mod tests {
             Action::InsertAfter('f'),
             EditSuccess::InsertNextToCursor {
                 side: Side::Next,
-                c: 'f',
-                name: "false".to_string(),
+                class: Class::False,
             },
             TestJson::Array(vec![TestJson::True, TestJson::True, TestJson::False]),
             Path::from_vec(vec![2]),
@@ -1019,8 +992,7 @@ mod tests {
             Action::InsertAfter('f'),
             EditSuccess::InsertNextToCursor {
                 side: Side::Next,
-                c: 'f',
-                name: "false".to_string(),
+                class: Class::False,
             },
             TestJson::Array(vec![
                 TestJson::Array(vec![TestJson::Null, TestJson::True]),
@@ -1039,8 +1011,7 @@ mod tests {
             Action::InsertBefore('f'),
             EditSuccess::InsertNextToCursor {
                 side: Side::Prev,
-                c: 'f',
-                name: "false".to_string(),
+                class: Class::False,
             },
             TestJson::Array(vec![
                 TestJson::False,
@@ -1060,8 +1031,7 @@ mod tests {
             Action::InsertBefore('f'),
             EditSuccess::InsertNextToCursor {
                 side: Side::Prev,
-                c: 'f',
-                name: "false".to_string(),
+                class: Class::False,
             },
             TestJson::Array(vec![
                 TestJson::Array(vec![TestJson::Null, TestJson::True]),
@@ -1103,10 +1073,7 @@ mod tests {
             TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
             Path::from_vec(vec![1]),
             Action::Replace('n'),
-            EditSuccess::Replace {
-                c: 'n',
-                name: "null".to_string(),
-            },
+            EditSuccess::Replace(Class::Null),
             TestJson::Array(vec![TestJson::True, TestJson::Null]),
             Path::from_vec(vec![1]),
         );
@@ -1118,10 +1085,7 @@ mod tests {
             ]),
             Path::from_vec(vec![1, 1]),
             Action::Replace('n'),
-            EditSuccess::Replace {
-                c: 'n',
-                name: "null".to_string(),
-            },
+            EditSuccess::Replace(Class::Null),
             TestJson::Object(vec![
                 ("key-1".to_string(), TestJson::False),
                 ("key-2".to_string(), TestJson::Null),
@@ -1137,7 +1101,7 @@ mod tests {
             Path::from_vec(vec![1, 0]),
             Action::Replace('n'),
             EditErr::CannotBeChild {
-                c: 'n',
+                class: Class::Null,
                 parent_name: ("field".to_string()),
             },
         );
@@ -1169,10 +1133,7 @@ mod tests {
         // Step 1: Replace root with `false`
         println!("Inserting `false`");
         assert_eq!(
-            Ok(EditSuccess::Replace {
-                c: 'f',
-                name: "false".to_string(),
-            }),
+            Ok(EditSuccess::Replace(Class::False)),
             editable_tree.execute_action(Action::Replace('f')),
             "Not equal in action result."
         );
@@ -1339,7 +1300,6 @@ mod tests {
     /// This is a regression test for issue #68, where Sapling crashes if an invalid char is used
     /// to insert into any node
     #[test]
-    #[ignore]
     fn invalid_insert_crash() {
         // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
         // the `null`)
@@ -1369,7 +1329,6 @@ mod tests {
     /// This is a regression test for issue #68, where Sapling crashes if an invalid char is used
     /// to insert into any node
     #[test]
-    #[ignore]
     fn invalid_replace_crash() {
         // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
         // the `null`)
