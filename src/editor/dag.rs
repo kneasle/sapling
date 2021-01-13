@@ -1354,4 +1354,22 @@ mod tests {
             editable_tree.execute_action(Action::Replace('x'))
         );
     }
+
+    /// This is a regression test for issue #78, where directly replacing a field results in an
+    /// invalid tree.
+    #[test]
+    #[ignore]
+    fn incorrect_field_replace() {
+        run_test_ok(
+            // We are selecting the field, not the contained value
+            TestJson::Object(vec![("key".to_owned(), TestJson::True)]),
+            Path::from_vec(vec![0]),
+            Action::Replace(Insertable::CountedNode(1, 'f')),
+            EditSuccess::Replace(Class::False),
+            // We'd **expect** a new field to implicitly be created, but that is not the case.
+            // Instead the resulting JSON will be `{false}`, which is invalid
+            TestJson::Object(vec![("".to_owned(), TestJson::False)]),
+            Path::from_vec(vec![0]),
+        );
+    }
 }
