@@ -29,7 +29,7 @@ impl EditLocation {
 pub enum EditSuccess<C: AstClass> {
     Undo,
     Redo,
-    Move(Direction),
+    Move(usize, Direction),
     Replace(C),
     InsertChild(C),
     InsertNextToCursor { side: Side, class: C },
@@ -42,10 +42,14 @@ impl<C: AstClass> EditSuccess<C> {
         match self {
             EditSuccess::Undo => log::info!("Undoing one change"),
             EditSuccess::Redo => log::info!("Redoing one change"),
-            EditSuccess::Move(Direction::Up) => log::info!("Moving up the tree"),
-            EditSuccess::Move(Direction::Down) => log::info!("Moving down the tree"),
-            EditSuccess::Move(Direction::Prev) => log::info!("Moving to previous child"),
-            EditSuccess::Move(Direction::Next) => log::info!("Moving to next child"),
+            EditSuccess::Move(n, Direction::Up) => log::info!("Moving {} levels up the tree", n),
+            EditSuccess::Move(n, Direction::Down) => {
+                log::info!("Moving {} levels down the tree", n)
+            }
+            EditSuccess::Move(n, Direction::Prev) => {
+                log::info!("Moving to {}th previous sibling", n)
+            }
+            EditSuccess::Move(n, Direction::Next) => log::info!("Moving to {}th next sibling", n),
             EditSuccess::Replace(class) => {
                 log::info!("Replacing with '{}'/{}", class.to_char(), class.name())
             }
@@ -71,12 +75,6 @@ impl<C: AstClass> EditSuccess<C> {
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum EditErr<C: AstClass> {
     /* MOVEMENT ERRORS */
-    /// Trying to move to the child of a node with no children
-    MoveToNonexistentChild,
-    /// Trying to move to the parent of the root
-    MoveToParentOfRoot,
-    /// Trying to move to a sibling that doesn't exist
-    MoveToNonexistentSibling,
     /// Trying to move to a sibling of the root
     MoveToSiblingOfRoot,
 
@@ -111,13 +109,6 @@ impl<C: AstClass> EditErr<C> {
     /// depending on the severity of the error
     fn log_message(self) {
         match self {
-            EditErr::MoveToNonexistentChild => {
-                log::warn!("Can't move down if the cursor has no children.")
-            }
-            EditErr::MoveToNonexistentSibling => {
-                log::warn!("Can't move to a non-existent sibling.")
-            }
-            EditErr::MoveToParentOfRoot => log::warn!("Can't move to the parent of the root."),
             EditErr::MoveToSiblingOfRoot => log::warn!("Can't move to a sibling of the root."),
             EditErr::NoChangesToUndo => log::warn!("No changes to undo."),
             EditErr::NoChangesToRedo => log::warn!("No changes to redo."),
@@ -235,48 +226,58 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         self.current_cursor_path.cursor(self.root())
     }
 
-    /// Move the cursor in a given direction across the tree.  Returns [`Some`] error string if an
-    /// error is found, or [`None`] if the movement was possible.
-    pub fn move_cursor(&mut self, direction: Direction) -> EditResult<Node::Class> {
-        let (current_cursor, cursor_parent) = self.cursor_and_parent();
-        match direction {
+    /// Move the cursor a given `distance` in a given [`Direction`] across the tree.
+    pub fn move_cursor(
+        &mut self,
+        distance: usize,
+        direction: Direction,
+    ) -> EditResult<Node::Class> {
+        let (mut current_cursor, cursor_parent) = self.cursor_and_parent();
+        let successful_distance = match direction {
             Direction::Down => {
-                if current_cursor.children().is_empty() {
-                    return Err(EditErr::MoveToNonexistentChild);
+                let mut successful_distance = 0usize;
+                while !current_cursor.children().is_empty() && successful_distance < distance {
+                    self.current_cursor_path.push(0);
+                    current_cursor = current_cursor.children()[0];
+                    successful_distance += 1;
                 }
-                self.current_cursor_path.push(0);
+                successful_distance
             }
             Direction::Up => {
-                if self.current_cursor_path.is_root() {
-                    return Err(EditErr::MoveToParentOfRoot);
+                let mut successful_distance = 0usize;
+                while !self.current_cursor_path.is_root() && successful_distance < distance {
+                    self.current_cursor_path.pop();
+                    successful_distance += 1;
                 }
-                self.current_cursor_path.pop();
+                successful_distance
             }
             Direction::Prev => {
                 let index = self
                     .current_cursor_path
                     .last_mut()
                     .ok_or(EditErr::MoveToSiblingOfRoot)?;
-                if *index == 0 {
-                    return Err(EditErr::MoveToNonexistentSibling);
-                }
-                *index -= 1;
+                let last_index = *index;
+                *index = last_index.checked_sub(distance).unwrap_or(0);
+                // Return the distance that we actually moved
+                last_index - *index
             }
             Direction::Next => {
-                let last_index = self
+                let index = self
                     .current_cursor_path
                     .last_mut()
                     .ok_or(EditErr::MoveToSiblingOfRoot)?;
+                let last_index = *index;
                 // We can unwrap here, because the only way for a node to not have a parent is
-                // if it's the root.  And if the cursor is at the root, then the `if let` would
-                // have failed and this code would not be run.
-                if *last_index + 1 >= cursor_parent.unwrap().children().len() {
-                    return Err(EditErr::MoveToNonexistentSibling);
-                }
-                *last_index += 1;
+                // if it's the root.  And if the cursor is at the root, then the ? in the last line
+                // would have caught the error.  The subtraction also cannot overflow because the
+                // parent of the cursor must have at least the cursor as a child.
+                let max_index = cursor_parent.unwrap().children().len() - 1;
+                *index = (*index + distance).min(max_index);
+                // Return the distance we travelled
+                *index - last_index
             }
-        }
-        Ok(EditSuccess::Move(direction))
+        };
+        Ok(EditSuccess::Move(successful_distance, direction))
     }
 
     /* HISTORY METHODS */
@@ -639,15 +640,19 @@ mod tests {
     use crate::editor::normal_mode::Action;
 
     trait ExecuteAction {
-        fn execute_action(&mut self, action: Action) -> EditResult<Class>;
+        fn execute_action_once(&mut self, action: Action) -> EditResult<Class> {
+            self.execute_action(1, action)
+        }
+
+        fn execute_action(&mut self, count: usize, action: Action) -> EditResult<Class>;
     }
 
     impl<'arena> ExecuteAction for Dag<'arena, Json<'arena>> {
-        fn execute_action(&mut self, action: Action) -> EditResult<Class> {
+        fn execute_action(&mut self, count: usize, action: Action) -> EditResult<Class> {
             match action {
                 Action::Undo => self.undo(),
                 Action::Redo => self.redo(),
-                Action::MoveCursor(direction) => self.move_cursor(direction),
+                Action::MoveCursor(direction) => self.move_cursor(count, direction),
                 Action::Replace(c) => self.replace_cursor(c),
                 Action::InsertChild(c) => self.insert_child(c),
                 Action::InsertBefore(c) => self.insert_next_to_cursor(c, Side::Prev),
@@ -658,9 +663,10 @@ mod tests {
         }
     }
 
-    fn run_test_ok(
+    fn run_test_ok_count(
         start_tree: TestJson,
         start_cursor_location: Path,
+        count: usize,
         action: Action,
         expected_edit_success: EditSuccess<Class>,
         expected_tree: TestJson,
@@ -672,10 +678,72 @@ mod tests {
 
         assert_eq!(
             Ok(expected_edit_success),
-            dag.execute_action(action),
+            dag.execute_action(count, action),
             "Not equal in action result"
         );
         assert_eq!(expected_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(
+            expected_cursor_location, dag.current_cursor_path,
+            "Not equal in cursor location."
+        );
+    }
+
+    fn run_test_ok(
+        start_tree: TestJson,
+        start_cursor_location: Path,
+        action: Action,
+        expected_edit_success: EditSuccess<Class>,
+        expected_tree: TestJson,
+        expected_cursor_location: Path,
+    ) {
+        run_test_ok_count(
+            start_tree,
+            start_cursor_location,
+            1,
+            action,
+            expected_edit_success,
+            expected_tree,
+            expected_cursor_location,
+        );
+    }
+
+    /// Helper function for successfully moving the cursor the full specified distance
+    fn test_movement(
+        start_tree: TestJson,
+        start_cursor_location: Path,
+        count: usize,
+        direction: Direction,
+        expected_cursor_location: Path,
+    ) {
+        test_capped_movement(
+            start_tree,
+            start_cursor_location,
+            count,
+            direction,
+            count,
+            expected_cursor_location,
+        );
+    }
+
+    /// Helper function for when the specified distance is not necessarily the distance covered.
+    fn test_capped_movement(
+        start_tree: TestJson,
+        start_cursor_location: Path,
+        distance: usize,
+        direction: Direction,
+        actual_distance: usize,
+        expected_cursor_location: Path,
+    ) {
+        let arena: Arena<Json> = Arena::new();
+        let root = start_tree.clone().add_to_arena(&arena);
+        let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
+
+        assert_eq!(
+            Ok(EditSuccess::Move(actual_distance, direction)),
+            dag.move_cursor(distance, direction),
+            "Not equal in action result"
+        );
+        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
             expected_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
@@ -694,7 +762,7 @@ mod tests {
 
         assert_eq!(
             Err(expected_edit_err),
-            dag.execute_action(action),
+            dag.execute_action_once(action),
             "Not equal in action result"
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree.");
@@ -838,7 +906,7 @@ mod tests {
     }
 
     #[test]
-    fn root_movecursor() {
+    fn move_sideways() {
         // move to previous sibling node of root
         run_test_err(
             TestJson::Array(vec![]),
@@ -853,35 +921,145 @@ mod tests {
             Action::MoveCursor(Direction::Next),
             EditErr::MoveToSiblingOfRoot,
         );
-        // move to parent node of root
-        run_test_err(
-            TestJson::Array(vec![]),
-            Path::root(),
-            Action::MoveCursor(Direction::Up),
-            EditErr::MoveToParentOfRoot,
+        // move sideways in an array, not reaching the end
+        test_movement(
+            TestJson::Array(vec![TestJson::True, TestJson::Null, TestJson::False]),
+            Path::from_vec(vec![0]),
+            1,
+            Direction::Next,
+            Path::from_vec(vec![1]),
         );
-        // move to nonexistent child node of root
-        run_test_err(
-            TestJson::Array(vec![]),
-            Path::root(),
-            Action::MoveCursor(Direction::Down),
-            EditErr::MoveToNonexistentChild,
+        // move twice sideways in an array, just reaching the end
+        test_movement(
+            TestJson::Array(vec![TestJson::True, TestJson::Null, TestJson::False]),
+            Path::from_vec(vec![0]),
+            2,
+            Direction::Next,
+            Path::from_vec(vec![2]),
         );
+        // move twice sideways in an array, just overshooting the end
+        test_capped_movement(
+            TestJson::Array(vec![TestJson::True, TestJson::Null, TestJson::False]),
+            Path::from_vec(vec![0]),
+            5,
+            Direction::Next,
+            2,
+            Path::from_vec(vec![2]),
+        );
+    }
 
+    #[test]
+    fn move_down() {
         // move to nonexistent child node of root
-        run_test_err(
+        test_capped_movement(
             TestJson::Array(vec![]),
             Path::root(),
-            Action::MoveCursor(Direction::Down),
-            EditErr::MoveToNonexistentChild,
+            1,
+            Direction::Down,
+            0,
+            Path::root(),
+        );
+        // Move down the tree once
+        test_movement(
+            TestJson::Array(vec![TestJson::True, TestJson::Object(vec![])]),
+            Path::root(),
+            1,
+            Direction::Down,
+            Path::from_vec(vec![0]),
+        );
+        // Move down the tree to a field.  JSON is '{"key": null}'
+        test_movement(
+            TestJson::Object(vec![("key".to_owned(), TestJson::Null)]),
+            Path::root(),
+            1,
+            Direction::Down,
+            Path::from_vec(vec![0; 1]),
+        );
+        // Move down the tree multiple times.  JSON is '[[{"key": null}, true], true, {}]'
+        test_movement(
+            TestJson::Array(vec![
+                TestJson::Array(vec![
+                    TestJson::Object(vec![("key".to_owned(), TestJson::Null)]),
+                    TestJson::True,
+                ]),
+                TestJson::True,
+                TestJson::Object(vec![]),
+            ]),
+            Path::root(),
+            4,
+            Direction::Down,
+            Path::from_vec(vec![0; 4]),
+        );
+        // Move down the tree multiple times, but not as many times as specified.  JSON is
+        // '[[true, {"key": null}], true, {}]'
+        test_capped_movement(
+            TestJson::Array(vec![
+                TestJson::Array(vec![
+                    TestJson::True,
+                    TestJson::Object(vec![("key".to_owned(), TestJson::Null)]),
+                ]),
+                TestJson::True,
+                TestJson::Object(vec![]),
+            ]),
+            Path::root(),
+            4,
+            Direction::Down,
+            2,
+            Path::from_vec(vec![0; 2]),
+        );
+    }
+
+    #[test]
+    fn move_up() {
+        // move to parent node of root
+        test_capped_movement(
+            TestJson::Array(vec![]),
+            Path::root(),
+            1,
+            Direction::Up,
+            0,
+            Path::root(),
         );
         // move to root from child
-        run_test_ok(
+        test_movement(
             TestJson::Array(vec![TestJson::False, TestJson::True]),
             Path::from_vec(vec![1]),
-            Action::MoveCursor(Direction::Up),
-            EditSuccess::Move(Direction::Up),
-            TestJson::Array(vec![TestJson::False, TestJson::True]),
+            1,
+            Direction::Up,
+            Path::root(),
+        );
+        // move from child not to root
+        test_movement(
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::Array(vec![TestJson::False, TestJson::Null]),
+            ]),
+            Path::from_vec(vec![1, 0]),
+            1,
+            Direction::Up,
+            Path::from_vec(vec![1]),
+        );
+        // move from child to root, multiple times
+        test_movement(
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::Array(vec![TestJson::False, TestJson::Null]),
+            ]),
+            Path::from_vec(vec![1, 0]),
+            2,
+            Direction::Up,
+            Path::root(),
+        );
+        // move to root from child, multiple times (but only 2 of 3 moves are actually possible)
+        test_capped_movement(
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::Array(vec![TestJson::False, TestJson::Null]),
+            ]),
+            Path::from_vec(vec![1, 0]),
+            3,
+            Direction::Up,
+            2,
             Path::root(),
         );
     }
@@ -933,8 +1111,8 @@ mod tests {
         let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
-            Ok(EditSuccess::Move(Direction::Down)),
-            dag.move_cursor(Direction::Down),
+            Ok(EditSuccess::Move(1, Direction::Down)),
+            dag.move_cursor(1, Direction::Down),
             "Not equal in action result (move 0)."
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree (move 0).");
@@ -1014,8 +1192,8 @@ mod tests {
         let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
-            Ok(EditSuccess::Move(Direction::Down)),
-            dag.move_cursor(Direction::Down),
+            Ok(EditSuccess::Move(1, Direction::Down)),
+            dag.move_cursor(1, Direction::Down),
             "Not equal in action result (move 0)."
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree (move 0).");
@@ -1256,18 +1434,6 @@ mod tests {
     }
 
     #[test]
-    fn level_1_movecursor() {
-        run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Object(vec![])]),
-            Path::root(),
-            Action::MoveCursor(Direction::Down),
-            EditSuccess::Move(Direction::Down),
-            TestJson::Array(vec![TestJson::True, TestJson::Object(vec![])]),
-            Path::from_vec(vec![0]),
-        );
-    }
-
-    #[test]
     fn level_1_undo_and_redo() {
         // The original snapshot of the tree
         let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
@@ -1453,8 +1619,8 @@ mod tests {
 
         // Move the cursor to the 'null'
         assert_eq!(
-            Ok(EditSuccess::Move(Direction::Down)),
-            dag.move_cursor(Direction::Down)
+            Ok(EditSuccess::Move(1, Direction::Down)),
+            dag.move_cursor(1, Direction::Down)
         );
 
         // Inserting an invalid char into the array should error gracefully
@@ -1482,8 +1648,8 @@ mod tests {
 
         // Move the cursor to the 'null'
         assert_eq!(
-            Ok(EditSuccess::Move(Direction::Down)),
-            dag.move_cursor(Direction::Down)
+            Ok(EditSuccess::Move(1, Direction::Down)),
+            dag.move_cursor(1, Direction::Down)
         );
 
         // Inserting an invalid char into the array should error gracefully

@@ -62,7 +62,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
                     // `EditResult`, which is logged outside the `match`
                     Action::Undo => tree.undo(),
                     Action::Redo => tree.redo(),
-                    Action::MoveCursor(direction) => tree.move_cursor(direction),
+                    Action::MoveCursor(direction) => tree.move_cursor(count, direction),
                     Action::Replace(c) => tree.replace_cursor(c),
                     Action::InsertChild(c) => tree.insert_child(c),
                     Action::InsertBefore(c) => tree.insert_next_to_cursor(c, Side::Prev),
