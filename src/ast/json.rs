@@ -3,6 +3,7 @@
 use super::display_token::{syntax_category, DisplayToken, RecTok};
 use super::{Ast, AstClass, DeleteError, InsertError};
 use crate::arena::Arena;
+use crate::ast_class;
 use crate::core::Size;
 
 /// An enum to hold the different ways that a JSON AST can be formatted
@@ -15,61 +16,14 @@ pub enum JsonFormat {
     Pretty,
 }
 
-const CHAR_TRUE: char = 't';
-const CHAR_FALSE: char = 'f';
-const CHAR_NULL: char = 'n';
-const CHAR_ARRAY: char = 'a';
-const CHAR_OBJECT: char = 'o';
-const CHAR_STRING: char = 's';
-
-/// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
-/// or 'false', and keys only contain ASCII).
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-#[allow(missing_docs)]
-pub enum Class {
-    True,
-    False,
-    Null,
-    Str,
-    Array,
-    Object,
-}
-
-impl AstClass for Class {
-    fn to_char(self) -> char {
-        match self {
-            Class::True => CHAR_TRUE,
-            Class::False => CHAR_FALSE,
-            Class::Null => CHAR_NULL,
-            Class::Array => CHAR_ARRAY,
-            Class::Object => CHAR_OBJECT,
-            Class::Str => CHAR_STRING,
-        }
-    }
-
-    fn name(self) -> &'static str {
-        match self {
-            Class::True => "True",
-            Class::False => "False",
-            Class::Null => "Null",
-            Class::Array => "Array",
-            Class::Object => "Object",
-            Class::Str => "String",
-        }
-    }
-
-    fn from_char(c: char) -> Option<Self> {
-        match c {
-            CHAR_TRUE => Some(Class::True),
-            CHAR_FALSE => Some(Class::False),
-            CHAR_NULL => Some(Class::Null),
-            CHAR_ARRAY => Some(Class::Array),
-            CHAR_OBJECT => Some(Class::Object),
-            CHAR_STRING => Some(Class::Str),
-            _ => None,
-        }
-    }
-}
+ast_class!(
+    True => 't', "true";
+    False => 'f', "false";
+    Null => 'n', "null";
+    Array => 'a', "array";
+    Object => 'o', "object";
+    Str => 's', "string"
+);
 
 /// The sapling representation of the AST for a subset of JSON (where all values are either 'true'
 /// or 'false', and keys only contain ASCII).
