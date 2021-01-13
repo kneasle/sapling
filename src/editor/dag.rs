@@ -393,8 +393,12 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     }
 
     /// Replaces the current cursor with a node represented by `c`
-    pub fn replace_cursor(&mut self, insertable: Insertable) -> EditResult<Node::Class> {
-        let (count, class) = match insertable {
+    pub fn replace_cursor(
+        &mut self,
+        prefix_count: usize,
+        insertable: Insertable,
+    ) -> EditResult<Node::Class> {
+        let (node_count, class) = match insertable {
             Insertable::CountedNode(count, c) => (
                 count,
                 Node::Class::from_char(c).ok_or(EditErr::CharNotANode(c))?,
@@ -406,7 +410,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         // would fix at least one existing bug with replacement in JSON objects), but that is not
         // possible in the current architecture because nodes like Json::Field cannot have their
         // children deleted.
-        if count == 0 {
+        if node_count == 0 {
             self.delete_cursor()?;
             return Ok(EditSuccess::Replace(class));
         }
@@ -416,32 +420,49 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
              cursor: &'arena Node| {
                 // Early return if the `class` can't go in the cursor's location
                 match _parent_and_index {
-                    Some((parent, cursor_index)) => {
+                    Some((parent, _cursor_index)) => {
                         let mut cloned_parent = parent.clone();
-                        for i in 0..count {
-                            let insert_index = cursor_index + i;
-                            // Check that the new node would be valid in the insert location, and
-                            // return if so
-                            if !cloned_parent.is_valid_child(insert_index, class) {
-                                return Err(EditErr::CannotBeChild {
-                                    class,
-                                    parent_name: parent.display_name(),
-                                });
+                        // We can unwrap here, because we know that the cursor is not at the
+                        // root and therefore there is at least one segment of the Path.
+                        let next_cursor_index = this.current_cursor_path.last_mut().unwrap();
+                        // Loop over the prefix count, so that the correct number of nodes get
+                        // replaced
+                        for _ in 0..prefix_count {
+                            // Each time a node gets replaced, replace it with the nodes specified
+                            // by the Insertable
+                            for j in 0..node_count {
+                                let insert_index = *next_cursor_index + j;
+                                // Check that the new node would be valid in the insert location,
+                                // and return if so
+                                if !cloned_parent.is_valid_child(insert_index, class) {
+                                    return Err(EditErr::CannotBeChild {
+                                        class,
+                                        parent_name: parent.display_name(),
+                                    });
+                                }
+                                let new_node = this.arena.alloc(Node::from_class(class));
+                                // Because of the short-circuit deletion rule, we know that there
+                                // must be at least one node to insert.  Therefore, we can use the
+                                // first of these to replace the cursor and treat the rest as
+                                // insertions.
+                                if j == 0 {
+                                    cloned_parent.replace_child(insert_index, new_node);
+                                } else {
+                                    cloned_parent.insert_child(
+                                        new_node,
+                                        &this.arena,
+                                        insert_index,
+                                    )?;
+                                }
                             }
-                            let new_node = this.arena.alloc(Node::from_class(class));
-                            // Because of the short-circuit deletion rule, we know that there must be
-                            // at least one node to insert.  Therefore, we can use the first of these
-                            // to replace the cursor and treat the rest as insertions.
-                            if i == 0 {
-                                cloned_parent.replace_child(insert_index, new_node);
-                            } else {
-                                cloned_parent.insert_child(new_node, &this.arena, insert_index)?;
-                            }
+                            // Move the cursor to **one past** the last node.  This is so that the
+                            // next loop iteration starts replacing the next node, and this effect
+                            // is corrected by subtracting one after the loop.
+                            *next_cursor_index += node_count;
                         }
-                        // Move the cursor and return success.  We can unwrap here, because we know
-                        // that the cursor is not at the root and therefore there is at least one
-                        // segment of the Path.
-                        *this.current_cursor_path.last_mut().unwrap() += count - 1;
+                        // This will not underflow unless node_count == 0, in which case the
+                        // delete short-circuit would stop this code executing
+                        *next_cursor_index -= 1;
                         Ok((
                             cloned_parent,
                             EditLocation::Parent,
@@ -449,7 +470,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                         ))
                     }
                     None => {
-                        match (count, cursor.is_valid_root(class)) {
+                        match (prefix_count * node_count, cursor.is_valid_root(class)) {
                             // This path is unreachable because its condition would trigger the
                             // short-circuiting call to delete
                             (0, _) => unreachable!(),
@@ -657,7 +678,7 @@ mod tests {
                 Action::Undo => self.undo(),
                 Action::Redo => self.redo(),
                 Action::MoveCursor(direction) => self.move_cursor(count, direction),
-                Action::Replace(c) => self.replace_cursor(c),
+                Action::Replace(c) => self.replace_cursor(count, c),
                 Action::InsertChild(c) => self.insert_child(c),
                 Action::InsertBefore(c) => self.insert_next_to_cursor(count, c, Side::Prev),
                 Action::InsertAfter(c) => self.insert_next_to_cursor(count, c, Side::Next),
@@ -754,6 +775,29 @@ mod tests {
         );
     }
 
+    fn run_test_err_count(
+        start_tree: TestJson,
+        start_cursor_location: Path,
+        count: usize,
+        action: Action,
+        expected_edit_err: EditErr<Class>,
+    ) {
+        let arena: Arena<Json> = Arena::new();
+        let root = start_tree.clone().add_to_arena(&arena);
+        let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
+
+        assert_eq!(
+            Err(expected_edit_err),
+            dag.execute_action(count, action),
+            "Not equal in action result"
+        );
+        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(
+            start_cursor_location, dag.current_cursor_path,
+            "Not equal in cursor location."
+        );
+    }
+
     fn run_test_err(
         start_tree: TestJson,
         start_cursor_location: Path,
@@ -839,17 +883,99 @@ mod tests {
         );
     }
 
-    #[test]
-    fn root_replace() {
-        // Replace root with one valid char
+    /// Helper function specifically to run a replace test
+    fn test_single_replace_ok(
+        start_tree: TestJson,
+        cursor: Path,
+        node: char,
+        class: Class,
+        end_tree: TestJson,
+    ) {
         run_test_ok(
+            start_tree,
+            cursor.clone(),
+            Action::Replace(Insertable::CountedNode(1, node)),
+            EditSuccess::Replace(class),
+            end_tree,
+            cursor,
+        );
+    }
+
+    /// Tests the behaviour of replacing with one single node (e.g. `rt` replacing the cursor with
+    /// just `true`).
+    #[test]
+    fn replace_single() {
+        // Replace root with one valid char
+        test_single_replace_ok(
             TestJson::Array(vec![TestJson::True, TestJson::Null]),
             Path::root(),
-            Action::Replace(Insertable::CountedNode(1, 'f')),
-            EditSuccess::Replace(Class::False),
+            'f',
+            Class::False,
+            TestJson::False,
+        );
+        // Replace the root with a char this doesn't correspond to a node
+        run_test_err(
             TestJson::False,
             Path::root(),
+            Action::Replace(Insertable::CountedNode(1, 'm')),
+            EditErr::CharNotANode('m'),
         );
+        // It doesn't matter how big the branch you're replacing is
+        test_single_replace_ok(
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            Path::root(),
+            'n',
+            Class::Null,
+            TestJson::Null,
+        );
+        // Explicitly replacing just the RHS of fields with one node should just be fine
+        test_single_replace_ok(
+            TestJson::Object(vec![
+                ("key-1".to_string(), TestJson::False),
+                ("key-2".to_string(), TestJson::True),
+            ]),
+            Path::from_vec(vec![1, 1]),
+            'n',
+            Class::Null,
+            TestJson::Object(vec![
+                ("key-1".to_string(), TestJson::False),
+                ("key-2".to_string(), TestJson::Null),
+            ]),
+        );
+        // Replacing the key with a single string is fine (but clears the key's string)
+        test_single_replace_ok(
+            TestJson::Object(vec![
+                ("key-1".to_string(), TestJson::False),
+                ("key-2".to_string(), TestJson::True),
+            ]),
+            Path::from_vec(vec![1, 0]),
+            's',
+            Class::Str,
+            TestJson::Object(vec![
+                ("key-1".to_string(), TestJson::False),
+                ("".to_string(), TestJson::True),
+            ]),
+        );
+        // Replacing a key with an invalid node is not OK
+        run_test_err(
+            TestJson::Object(vec![
+                ("key-1".to_string(), TestJson::False),
+                ("key-2".to_string(), TestJson::True),
+            ]),
+            Path::from_vec(vec![1, 0]),
+            Action::Replace(Insertable::CountedNode(1, 'n')),
+            EditErr::CannotBeChild {
+                class: Class::Null,
+                parent_name: ("field".to_string()),
+            },
+        );
+    }
+
+    /// This tests the behaviour of inserting using a count specifier with the node (i.e. `r3a`).
+    /// In this example, it should have the effect of deleting the cursor and then inserting 3
+    /// empty arrays in its place.
+    #[test]
+    fn replace_nodecounts() {
         // Replace root with too many nodes, of an invalid type
         run_test_err(
             TestJson::False,
@@ -871,23 +997,114 @@ mod tests {
             Action::Replace(Insertable::CountedNode(0, 's')),
             EditErr::DeletingRoot,
         );
-
-        // Char not a node
-        run_test_err(
-            TestJson::False,
-            Path::root(),
-            Action::Replace(Insertable::CountedNode(1, 'm')),
-            EditErr::CharNotANode('m'),
-        );
-
-        // tree level == 1
+        // Replacing with 0 nodes should be the same as deletion
         run_test_ok(
             TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
-            Path::root(),
+            Path::from_vec(vec![1]),
+            Action::Replace(Insertable::CountedNode(0, 'n')),
+            EditSuccess::Replace(Class::Null),
+            TestJson::Array(vec![TestJson::True]),
+            Path::from_vec(vec![0]),
+        );
+        // Replacing with exactly one valid node
+        run_test_ok(
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            Path::from_vec(vec![1]),
             Action::Replace(Insertable::CountedNode(1, 'n')),
             EditSuccess::Replace(Class::Null),
-            TestJson::Null,
+            TestJson::Array(vec![TestJson::True, TestJson::Null]),
+            Path::from_vec(vec![1]),
+        );
+        // Replacing with multiple valid nodes should replace the cursor with several nodes
+        // (perhaps not the best action).
+        run_test_ok(
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            Path::from_vec(vec![1]),
+            Action::Replace(Insertable::CountedNode(4, 'n')),
+            EditSuccess::Replace(Class::Null),
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::Null,
+                TestJson::Null,
+                TestJson::Null,
+                TestJson::Null,
+            ]),
+            Path::from_vec(vec![4]),
+        );
+        // Replacing a key with too many strings is not OK
+        run_test_err(
+            TestJson::Object(vec![
+                ("key-1".to_string(), TestJson::False),
+                ("key-2".to_string(), TestJson::True),
+            ]),
+            Path::from_vec(vec![1, 0]),
+            Action::Replace(Insertable::CountedNode(3, 'n')),
+            EditErr::CannotBeChild {
+                class: Class::Null,
+                parent_name: ("field".to_string()),
+            },
+        );
+    }
+
+    /// This tests the behaviour of putting counts **in front** of the replace: e.g. `3rt` will
+    /// replace the 3 nodes starting with the cursor with `true`:
+    /// `[<false>, "", null, null]` goes to `[true, true, <true>, null]`
+    #[test]
+    fn replace_precount() {
+        // `3rt` causes `[<true>, [], "", null]` going to `[true, true, <true>, null]`
+        run_test_ok_count(
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::Array(vec![]),
+                TestJson::Str("".to_owned()),
+                TestJson::Null,
+            ]),
+            Path::from_vec(vec![0]),
+            3,
+            Action::Replace(Insertable::CountedNode(1, 't')),
+            EditSuccess::Replace(Class::True),
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::True,
+                TestJson::True,
+                TestJson::Null,
+            ]),
+            Path::from_vec(vec![2]),
+        );
+        // `2r2t` causes `[<true>, [], "", null]` going to `[true, true, true, <true>, "", null]`
+        run_test_ok_count(
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::Array(vec![]),
+                TestJson::Str("".to_owned()),
+                TestJson::Null,
+            ]),
+            Path::from_vec(vec![0]),
+            2,
+            Action::Replace(Insertable::CountedNode(2, 't')),
+            EditSuccess::Replace(Class::True),
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::True,
+                TestJson::True,
+                TestJson::True,
+                TestJson::Str("".to_owned()),
+                TestJson::Null,
+            ]),
+            Path::from_vec(vec![3]),
+        );
+        // `2r2t` causes the root to gain siblings, which is not allowed
+        run_test_err_count(
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::Array(vec![]),
+                TestJson::Str("".to_owned()),
+                TestJson::Null,
+            ]),
             Path::root(),
+            2,
+            Action::Replace(Insertable::CountedNode(2, 't')),
+            EditErr::AddSiblingToRoot,
         );
     }
 
@@ -1083,7 +1300,7 @@ mod tests {
         // We start with an empty Json array (`[]`), and we replace it with `false`
         assert_eq!(
             Ok(EditSuccess::Replace(Class::False)),
-            dag.replace_cursor(Insertable::CountedNode(1, 'f')),
+            dag.replace_cursor(1, Insertable::CountedNode(1, 'f')),
             "Not equal in action result"
         );
         assert_eq!(end_tree, dag.root(), "Not equal in tree.");
@@ -1149,7 +1366,7 @@ mod tests {
 
         assert_eq!(
             Ok(EditSuccess::Replace(Class::Object)),
-            dag.replace_cursor(Insertable::CountedNode(1, 'o')),
+            dag.replace_cursor(1, Insertable::CountedNode(1, 'o')),
             "Not equal in action result"
         );
         assert_eq!(end_tree, dag.root(), "Not equal in tree.");
@@ -1343,101 +1560,6 @@ mod tests {
     }
 
     #[test]
-    fn level_1_replace() {
-        // Replacing with 0 nodes should be the same as deletion
-        run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
-            Path::from_vec(vec![1]),
-            Action::Replace(Insertable::CountedNode(0, 'n')),
-            EditSuccess::Replace(Class::Null),
-            TestJson::Array(vec![TestJson::True]),
-            Path::from_vec(vec![0]),
-        );
-        // Replacing with exactly one valid node
-        run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
-            Path::from_vec(vec![1]),
-            Action::Replace(Insertable::CountedNode(1, 'n')),
-            EditSuccess::Replace(Class::Null),
-            TestJson::Array(vec![TestJson::True, TestJson::Null]),
-            Path::from_vec(vec![1]),
-        );
-        // Replacing with multiple valid nodes should replace the cursor with several nodes
-        // (perhaps not the best action).
-        run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
-            Path::from_vec(vec![1]),
-            Action::Replace(Insertable::CountedNode(4, 'n')),
-            EditSuccess::Replace(Class::Null),
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Null,
-                TestJson::Null,
-                TestJson::Null,
-                TestJson::Null,
-            ]),
-            Path::from_vec(vec![4]),
-        );
-
-        run_test_ok(
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::True),
-            ]),
-            Path::from_vec(vec![1, 1]),
-            Action::Replace(Insertable::CountedNode(1, 'n')),
-            EditSuccess::Replace(Class::Null),
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::Null),
-            ]),
-            Path::from_vec(vec![1, 1]),
-        );
-
-        // Replacing the key with a single string is fine (but clears the key's string)
-        run_test_ok(
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::True),
-            ]),
-            Path::from_vec(vec![1, 0]),
-            Action::Replace(Insertable::CountedNode(1, 's')),
-            EditSuccess::Replace(Class::Str),
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("".to_string(), TestJson::True),
-            ]),
-            Path::from_vec(vec![1, 0]),
-        );
-        // Replacing a key with too many strings is not OK
-        run_test_err(
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::True),
-            ]),
-            Path::from_vec(vec![1, 0]),
-            Action::Replace(Insertable::CountedNode(3, 'n')),
-            EditErr::CannotBeChild {
-                class: Class::Null,
-                parent_name: ("field".to_string()),
-            },
-        );
-        // Replacing a key with an invalid node is not OK
-        run_test_err(
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::True),
-            ]),
-            Path::from_vec(vec![1, 0]),
-            Action::Replace(Insertable::CountedNode(1, 'n')),
-            EditErr::CannotBeChild {
-                class: Class::Null,
-                parent_name: ("field".to_string()),
-            },
-        );
-    }
-
-    #[test]
     fn level_1_undo_and_redo() {
         // The original snapshot of the tree
         let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
@@ -1452,7 +1574,7 @@ mod tests {
         println!("Inserting `false`");
         assert_eq!(
             Ok(EditSuccess::Replace(Class::False)),
-            dag.replace_cursor(Insertable::CountedNode(1, 'f')),
+            dag.replace_cursor(1, Insertable::CountedNode(1, 'f')),
             "Not equal in action result."
         );
         assert_eq!(end_tree, dag.root(), "Not equal in tree.");
@@ -1647,7 +1769,7 @@ mod tests {
         // Inserting an invalid char into the array should error gracefully
         assert_eq!(
             Err(EditErr::CharNotANode('x')),
-            dag.replace_cursor(Insertable::CountedNode(1, 'x'))
+            dag.replace_cursor(1, Insertable::CountedNode(1, 'x'))
         );
 
         // Move the cursor to the 'null'
@@ -1659,7 +1781,7 @@ mod tests {
         // Inserting an invalid char into the array should error gracefully
         assert_eq!(
             Err(EditErr::CharNotANode('x')),
-            dag.replace_cursor(Insertable::CountedNode(1, 'x'))
+            dag.replace_cursor(1, Insertable::CountedNode(1, 'x'))
         );
     }
 
