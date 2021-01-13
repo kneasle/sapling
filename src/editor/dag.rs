@@ -525,15 +525,19 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     /// child of the selected node.  Also moves the cursor so that the new node is selected.
     pub fn insert_next_to_cursor(
         &mut self,
+        prefix_count: usize,
         insertable: Insertable,
         side: Side,
     ) -> EditResult<Node::Class> {
-        let (count, class) = match insertable {
+        let (second_count, class) = match insertable {
             Insertable::CountedNode(count, c) => (
                 count,
                 Node::Class::from_char(c).ok_or(EditErr::CharNotANode(c))?,
             ),
         };
+        // For inserting next to the cursor, we can simply multiply the two counts together to form
+        // one single count
+        let count = prefix_count * second_count;
         self.perform_edit(
             |this: &mut Self,
              parent_and_index: Option<(&'arena Node, usize)>,
@@ -655,8 +659,8 @@ mod tests {
                 Action::MoveCursor(direction) => self.move_cursor(count, direction),
                 Action::Replace(c) => self.replace_cursor(c),
                 Action::InsertChild(c) => self.insert_child(c),
-                Action::InsertBefore(c) => self.insert_next_to_cursor(c, Side::Prev),
-                Action::InsertAfter(c) => self.insert_next_to_cursor(c, Side::Next),
+                Action::InsertBefore(c) => self.insert_next_to_cursor(count, c, Side::Prev),
+                Action::InsertAfter(c) => self.insert_next_to_cursor(count, c, Side::Next),
                 Action::Delete => self.delete_cursor(),
                 Action::Quit => unreachable!(),
             }
