@@ -42,10 +42,16 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
         let log_entry = match parse_command(&config.keymap, &self.keystroke_buffer) {
             // If the command buffer is a valid and complete command, then we execute the resulting
             // 'action'
-            Ok(action) => {
+            Ok((count, action)) => {
+                // If the count is 0, then the command does not execute.  So we short-circuit in
+                // this case
+                if count == 0 {
+                    return (self, Some(("no action".to_owned(), Category::Undefined)));
+                }
                 match action {
                     // If the command was a 'quit', then immediately make a state transition to the
-                    // 'Quitted' state
+                    // 'Quitted' state.  It doesn't matter what the count is, because quitting is
+                    // idempotent
                     Action::Quit => {
                         return (
                             Box::new(state::Quit),
@@ -209,25 +215,31 @@ enum ParseErr {
 /// user types a keystroke character, so the user would not be able to input `"q489flshb"` in one
 /// go because doing so would require them to first input every possible prefix of `"q489flshb"`,
 /// including `"q"`.
-fn parse_command(keymap: &KeyMap, keys: &[Key]) -> ParseResult<Action> {
+fn parse_command(keymap: &KeyMap, keys: &[Key]) -> ParseResult<(usize, Action)> {
     // Generate an iterator of keystrokes, which are treated similar to tokens by the parser.
     let mut key_iter = keys.iter().copied().peekable();
 
-    // The first keystroke represents the command name.  No keystrokes is an incomplete command.
+    // Parse a count off the front of the command
+    let count = parse_count(&mut key_iter);
+    // The first non-count keystroke represents the command name.  No keystrokes is an incomplete
+    // command.
     let first_key = key_iter.next().ok_or(ParseErr::Incomplete)?;
 
-    Ok(match keymap.get(&first_key).ok_or(ParseErr::Invalid)? {
-        CmdType::InsertChild => Action::InsertChild(parse_insertable(&mut key_iter)?),
-        CmdType::InsertBefore => Action::InsertBefore(parse_insertable(&mut key_iter)?),
-        CmdType::InsertAfter => Action::InsertAfter(parse_insertable(&mut key_iter)?),
-        CmdType::Delete => Action::Delete,
-        CmdType::Replace => Action::Replace(parse_insertable(&mut key_iter)?),
-        CmdType::MoveCursor(direction) => Action::MoveCursor(*direction),
-        CmdType::Undo => Action::Undo,
-        CmdType::Redo => Action::Redo,
-        // "q" quits Sapling
-        CmdType::Quit => Action::Quit,
-    })
+    Ok((
+        count,
+        match keymap.get(&first_key).ok_or(ParseErr::Invalid)? {
+            CmdType::InsertChild => Action::InsertChild(parse_insertable(&mut key_iter)?),
+            CmdType::InsertBefore => Action::InsertBefore(parse_insertable(&mut key_iter)?),
+            CmdType::InsertAfter => Action::InsertAfter(parse_insertable(&mut key_iter)?),
+            CmdType::Delete => Action::Delete,
+            CmdType::Replace => Action::Replace(parse_insertable(&mut key_iter)?),
+            CmdType::MoveCursor(direction) => Action::MoveCursor(*direction),
+            CmdType::Undo => Action::Undo,
+            CmdType::Redo => Action::Redo,
+            // "q" quits Sapling
+            CmdType::Quit => Action::Quit,
+        },
+    ))
 }
 
 /// Attempt to parse a sequence of [`Key`]strokes into an [`Insertable`].
@@ -317,7 +329,26 @@ mod tests {
         ] {
             assert_eq!(
                 parse_command(&keymap, &to_char_keys(keystrokes)),
-                Ok(expected_effect.clone())
+                Ok((1, expected_effect.clone()))
+            );
+        }
+    }
+
+    #[test]
+    fn parse_counted_command() {
+        let keymap = default_keymap();
+        for (keystrokes, exp_count, exp_action) in &[
+            ("1x", 1, Action::Delete),
+            ("0ra", 0, Action::Replace(Insertable::CountedNode(1, 'a'))),
+            (
+                "12o5p",
+                12,
+                Action::InsertChild(Insertable::CountedNode(5, 'p')),
+            ),
+        ] {
+            assert_eq!(
+                parse_command(&keymap, &to_char_keys(keystrokes)),
+                Ok((*exp_count, exp_action.clone()))
             );
         }
     }
@@ -325,7 +356,7 @@ mod tests {
     #[test]
     fn parse_keystroke_invalid() {
         let keymap = default_keymap();
-        for keystroke in &["d", "Pxx", "Qsx", "t", "Y", "X", "1", "3", "\""] {
+        for keystroke in &["d", "Pxx", "Qsx", "t", "Y", "X", "\""] {
             println!("Testing {}", keystroke);
             assert_eq!(
                 parse_command(&keymap, &to_char_keys(keystroke)),
@@ -337,7 +368,9 @@ mod tests {
     #[test]
     fn parse_keystroke_incomplete() {
         let keymap = default_keymap();
-        for keystroke in &["", "r", "o", "a", "i", "o3", "i34" /*, "3", "1o" */] {
+        for keystroke in &[
+            "", "r", "o", "a", "i", "o3", "i34", "3", "1o", "0o3", "41523",
+        ] {
             println!("Testing {}", keystroke);
             assert_eq!(
                 parse_command(&keymap, &to_char_keys(keystroke)),
