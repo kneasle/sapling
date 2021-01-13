@@ -3,7 +3,7 @@
 
 use crate::ast::display_token::{syntax_category::*, SyntaxCategory};
 use crate::core::Direction;
-use crate::editor::normal_mode::KeyStroke;
+use crate::editor::normal_mode::CmdType;
 
 use tuikit::prelude::{Color, Key};
 
@@ -41,25 +41,25 @@ pub fn default_color_scheme() -> ColorScheme {
 
 /// Mapping of keys to keystrokes.
 /// Shortcut definition, also allows us to change the type if needed.
-pub type KeyMap = std::collections::HashMap<Key, KeyStroke>;
+pub type KeyMap = std::collections::HashMap<Key, CmdType>;
 
 /// Generates a 'canonical' [`KeyMap`].  These keybindings will be very similar to those of Vim.
 pub fn default_keymap() -> KeyMap {
     hmap::hmap! {
-        Key::Char('q') => KeyStroke::Quit,
-        Key::Char('i') => KeyStroke::InsertBefore,
-        Key::Char('a') => KeyStroke::InsertAfter,
-        Key::Char('o') => KeyStroke::InsertChild,
-        Key::Char('r') => KeyStroke::Replace,
-        Key::Char('x') => KeyStroke::Delete,
-        Key::Char('c') => KeyStroke::MoveCursor(Direction::Down),
-        Key::Char('p') => KeyStroke::MoveCursor(Direction::Up),
-        Key::Char('h') => KeyStroke::MoveCursor(Direction::Prev),
-        Key::Char('j') => KeyStroke::MoveCursor(Direction::Next),
-        Key::Char('k') => KeyStroke::MoveCursor(Direction::Prev),
-        Key::Char('l') => KeyStroke::MoveCursor(Direction::Next),
-        Key::Char('u') => KeyStroke::Undo,
-        Key::Char('R') => KeyStroke::Redo
+        Key::Char('q') => CmdType::Quit,
+        Key::Char('i') => CmdType::InsertBefore,
+        Key::Char('a') => CmdType::InsertAfter,
+        Key::Char('o') => CmdType::InsertChild,
+        Key::Char('r') => CmdType::Replace,
+        Key::Char('x') => CmdType::Delete,
+        Key::Char('c') => CmdType::MoveCursor(Direction::Down),
+        Key::Char('p') => CmdType::MoveCursor(Direction::Up),
+        Key::Char('h') => CmdType::MoveCursor(Direction::Prev),
+        Key::Char('j') => CmdType::MoveCursor(Direction::Next),
+        Key::Char('k') => CmdType::MoveCursor(Direction::Prev),
+        Key::Char('l') => CmdType::MoveCursor(Direction::Next),
+        Key::Char('u') => CmdType::Undo,
+        Key::Char('R') => CmdType::Redo
     }
 }
 
@@ -68,7 +68,7 @@ pub fn default_keymap() -> KeyMap {
 /// A struct to hold the entire run-time configuration of Sapling
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// A mapping between [`char`]s and [`KeyStroke`]s
+    /// A mapping between [`char`]s and [`CmdType`]s
     pub keymap: KeyMap,
     /// The current [`ColorScheme`] of Sapling
     pub color_scheme: ColorScheme,

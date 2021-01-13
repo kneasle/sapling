@@ -90,7 +90,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
 /// The possible keystroke typed by user without any parameters.  Each `KeyStroke` can be mapped to
 /// an individual [`char`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub enum KeyStroke {
+pub enum CmdType {
     /// Quit Sapling
     Quit,
     /// Replace the selected node, expects an argument
@@ -112,22 +112,22 @@ pub enum KeyStroke {
     Redo,
 }
 
-impl KeyStroke {
+impl CmdType {
     /// Returns a lower-case summary string of the given keystroke
     pub fn summary_string(&self) -> &'static str {
         match self {
-            KeyStroke::Quit => "quit",
-            KeyStroke::Replace => "replace",
-            KeyStroke::InsertChild => "insert child",
-            KeyStroke::InsertBefore => "insert before",
-            KeyStroke::InsertAfter => "insert after",
-            KeyStroke::Delete => "delete",
-            KeyStroke::MoveCursor(Direction::Down) => "move to first child",
-            KeyStroke::MoveCursor(Direction::Up) => "move to parent",
-            KeyStroke::MoveCursor(Direction::Prev) => "move to previous sibling",
-            KeyStroke::MoveCursor(Direction::Next) => "move to next sibling",
-            KeyStroke::Undo => "undo",
-            KeyStroke::Redo => "redo",
+            CmdType::Quit => "quit",
+            CmdType::Replace => "replace",
+            CmdType::InsertChild => "insert child",
+            CmdType::InsertBefore => "insert before",
+            CmdType::InsertAfter => "insert after",
+            CmdType::Delete => "delete",
+            CmdType::MoveCursor(Direction::Down) => "move to first child",
+            CmdType::MoveCursor(Direction::Up) => "move to parent",
+            CmdType::MoveCursor(Direction::Prev) => "move to previous sibling",
+            CmdType::MoveCursor(Direction::Next) => "move to next sibling",
+            CmdType::Undo => "undo",
+            CmdType::Redo => "redo",
         }
     }
 }
@@ -217,16 +217,16 @@ fn parse_command(keymap: &KeyMap, keys: &[Key]) -> ParseResult<Action> {
     let first_key = key_iter.next().ok_or(ParseErr::Incomplete)?;
 
     Ok(match keymap.get(&first_key).ok_or(ParseErr::Invalid)? {
-        KeyStroke::InsertChild => Action::InsertChild(parse_insertable(&mut key_iter)?),
-        KeyStroke::InsertBefore => Action::InsertBefore(parse_insertable(&mut key_iter)?),
-        KeyStroke::InsertAfter => Action::InsertAfter(parse_insertable(&mut key_iter)?),
-        KeyStroke::Delete => Action::Delete,
-        KeyStroke::Replace => Action::Replace(parse_insertable(&mut key_iter)?),
-        KeyStroke::MoveCursor(direction) => Action::MoveCursor(*direction),
-        KeyStroke::Undo => Action::Undo,
-        KeyStroke::Redo => Action::Redo,
+        CmdType::InsertChild => Action::InsertChild(parse_insertable(&mut key_iter)?),
+        CmdType::InsertBefore => Action::InsertBefore(parse_insertable(&mut key_iter)?),
+        CmdType::InsertAfter => Action::InsertAfter(parse_insertable(&mut key_iter)?),
+        CmdType::Delete => Action::Delete,
+        CmdType::Replace => Action::Replace(parse_insertable(&mut key_iter)?),
+        CmdType::MoveCursor(direction) => Action::MoveCursor(*direction),
+        CmdType::Undo => Action::Undo,
+        CmdType::Redo => Action::Redo,
         // "q" quits Sapling
-        KeyStroke::Quit => return Ok(Action::Quit),
+        CmdType::Quit => Action::Quit,
     })
 }
 
@@ -291,7 +291,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_keystroke_valid() {
+    fn parse_single_cmd_valid() {
         let keymap = default_keymap();
         for (keystrokes, expected_effect) in &[
             ("x", Action::Delete),
