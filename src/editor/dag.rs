@@ -411,7 +411,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         // possible in the current architecture because nodes like Json::Field cannot have their
         // children deleted.
         if node_count == 0 {
-            self.delete_cursor()?;
+            self.delete_cursor(prefix_count)?;
             return Ok(EditSuccess::Replace(class));
         }
         self.perform_edit(
@@ -603,8 +603,8 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         )
     }
 
-    /// Deletes the node underneath the cursor
-    pub fn delete_cursor(&mut self) -> EditResult<Node::Class> {
+    /// Deletes up to `count` nodes after the cursor
+    pub fn delete_cursor(&mut self, count: usize) -> EditResult<Node::Class> {
         self.perform_edit(
             |this: &mut Self,
              parent_and_index: Option<(&'arena Node, usize)>,
@@ -616,7 +616,18 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                 let deleted_node_name = cursor.display_name();
 
                 let mut cloned_parent = parent.clone();
-                cloned_parent.delete_child(cursor_index)?;
+                // Delete the node under the cursor `count` many times, or until we run off the end
+                // of the children
+                for _ in 0..count {
+                    let res = cloned_parent.delete_child(cursor_index);
+                    // If we've run off the end of the children, this is not an error - we just
+                    // break the loop and stop
+                    if let Err(ast::DeleteError::IndexOutOfRange { .. }) = res {
+                        break;
+                    }
+                    // Any other errors are hard errors, so we should stop in those cases
+                    res?;
+                }
 
                 let new_parents_child_count = cloned_parent.children().len();
                 if new_parents_child_count == 0 {
@@ -682,7 +693,7 @@ mod tests {
                 Action::InsertChild(c) => self.insert_child(c),
                 Action::InsertBefore(c) => self.insert_next_to_cursor(count, c, Side::Prev),
                 Action::InsertAfter(c) => self.insert_next_to_cursor(count, c, Side::Next),
-                Action::Delete => self.delete_cursor(),
+                Action::Delete => self.delete_cursor(count),
                 Action::Quit => unreachable!(),
             }
         }
@@ -1109,7 +1120,7 @@ mod tests {
     }
 
     #[test]
-    fn root_delete() {
+    fn delete_root_err() {
         run_test_err(
             TestJson::Array(vec![]),
             Path::root(),
@@ -1123,6 +1134,95 @@ mod tests {
             Path::root(),
             Action::Delete,
             EditErr::DeletingRoot,
+        );
+    }
+
+    #[test]
+    fn delete_cursor_move() {
+        // If the cursor has later siblings, then deletion won't move the cursor
+        run_test_ok(
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            Path::from_vec(vec![0]),
+            Action::Delete,
+            EditSuccess::Delete {
+                name: "true".to_string(),
+            },
+            TestJson::Array(vec![TestJson::Array(vec![])]),
+            Path::from_vec(vec![0]),
+        );
+        // Cursor should move backwards if we deleted the highest-indexed sibling
+        run_test_ok(
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            Path::from_vec(vec![1]),
+            Action::Delete,
+            EditSuccess::Delete {
+                name: "array".to_string(),
+            },
+            TestJson::Array(vec![TestJson::True]),
+            Path::from_vec(vec![0]),
+        );
+        // Cursor should move up a level if we've deleted the last child
+        run_test_ok(
+            TestJson::Array(vec![TestJson::True]),
+            Path::from_vec(vec![0]),
+            Action::Delete,
+            EditSuccess::Delete {
+                name: "true".to_string(),
+            },
+            TestJson::Array(vec![]),
+            Path::root(),
+        );
+    }
+
+    #[test]
+    fn delete_counts() {
+        // Deleting all of the children in one shot should move the cursor up
+        run_test_ok_count(
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            Path::from_vec(vec![0]),
+            2,
+            Action::Delete,
+            EditSuccess::Delete {
+                name: "true".to_string(),
+            },
+            TestJson::Array(vec![]),
+            Path::root(),
+        );
+        // Test deleting exactly the right number of nodes out of the middle of an array
+        run_test_ok_count(
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::Null,
+                TestJson::False,
+                TestJson::Array(vec![]),
+            ]),
+            Path::from_vec(vec![1]),
+            2,
+            Action::Delete,
+            EditSuccess::Delete {
+                name: "null".to_string(),
+            },
+            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            Path::from_vec(vec![1]),
+        );
+        // Trying to delete more nodes than there are siblings after the cursor is not an error,
+        // but it should not continue deleting backwards (this makes `5x` subtly different from
+        // `xxxxx`).
+        run_test_ok_count(
+            TestJson::Array(vec![
+                TestJson::True,
+                TestJson::Null,
+                TestJson::False,
+                TestJson::Array(vec![]),
+            ]),
+            Path::from_vec(vec![2]),
+            4,
+            Action::Delete,
+            EditSuccess::Delete {
+                name: "false".to_string(),
+            },
+            TestJson::Array(vec![TestJson::True, TestJson::Null]),
+            Path::from_vec(vec![1]),
         );
     }
 
@@ -1535,31 +1635,6 @@ mod tests {
     }
 
     #[test]
-    fn level_1_delete() {
-        run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
-            Path::from_vec(vec![1]),
-            Action::Delete,
-            EditSuccess::Delete {
-                name: "array".to_string(),
-            },
-            TestJson::Array(vec![TestJson::True]),
-            Path::from_vec(vec![0]),
-        );
-
-        run_test_ok(
-            TestJson::Array(vec![TestJson::True]),
-            Path::from_vec(vec![0]),
-            Action::Delete,
-            EditSuccess::Delete {
-                name: "true".to_string(),
-            },
-            TestJson::Array(vec![]),
-            Path::root(),
-        );
-    }
-
-    #[test]
     fn level_1_undo_and_redo() {
         // The original snapshot of the tree
         let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
@@ -1672,7 +1747,7 @@ mod tests {
             Ok(EditSuccess::Delete {
                 name: "field".to_string()
             }),
-            dag.delete_cursor(),
+            dag.delete_cursor(1),
             "Not equal in action result."
         );
         assert_eq!(expected_tree, dag.root(), "Not equal in tree.");
@@ -1814,7 +1889,7 @@ mod tests {
             Ok(EditSuccess::Delete {
                 name: "null".to_string()
             }),
-            dag.delete_cursor(),
+            dag.delete_cursor(1),
         );
         assert_eq!(dag.current_cursor_path, Path::root());
 

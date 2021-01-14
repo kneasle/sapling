@@ -67,7 +67,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
                     Action::InsertChild(c) => tree.insert_child(c),
                     Action::InsertBefore(c) => tree.insert_next_to_cursor(count, c, Side::Prev),
                     Action::InsertAfter(c) => tree.insert_next_to_cursor(count, c, Side::Next),
-                    Action::Delete => tree.delete_cursor(),
+                    Action::Delete => tree.delete_cursor(count),
                 }
                 .log_message();
                 (action.description(), action.category())
