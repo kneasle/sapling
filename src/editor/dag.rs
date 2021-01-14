@@ -687,6 +687,8 @@ mod tests {
     use crate::core::{Direction, Path, Side};
     use crate::editor::normal_mode::Action;
 
+    /// Extension trait used to add the `execute_action` and `execute_action_once` methods to Dag
+    /// (`execute_action` was removed but is incredibly helpful for unit testing).
     trait ExecuteAction {
         fn execute_action_once(&mut self, action: Action) -> EditResult<Class> {
             self.execute_action(1, action)
@@ -1691,7 +1693,7 @@ mod tests {
     /* INSERT CHILD */
 
     #[test]
-    fn insert_single_child() {
+    fn insert_child_single() {
         run_test_ok(
             TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
             Path::from_vec(vec![0]),
@@ -1726,6 +1728,87 @@ mod tests {
         )
     }
 
+    #[test]
+    fn insert_child_nodecount() {
+        run_test_ok(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::from_vec(vec![0]),
+            Action::InsertChild(Insertable::CountedNode(3, 'f')),
+            EditSuccess::InsertChild(Class::False),
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::False; 3]),
+                TestJson::True,
+            ]),
+            Path::from_vec(vec![0, 2]),
+        );
+
+        run_test_ok(
+            TestJson::Array(vec![]),
+            Path::root(),
+            Action::InsertChild(Insertable::CountedNode(2, 'f')),
+            EditSuccess::InsertChild(Class::False),
+            TestJson::Array(vec![TestJson::False, TestJson::False]),
+            Path::from_vec(vec![1]),
+        );
+
+        // Dag level == 1
+
+        run_test_err(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::root(),
+            Action::InsertChild(Insertable::CountedNode(0, 'n')),
+            EditErr::NoNodesToInsert,
+        )
+    }
+
+    #[test]
+    fn insert_child_precount() {
+        run_test_ok_count(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::from_vec(vec![0]),
+            3,
+            Action::InsertChild(Insertable::CountedNode(1, 'f')),
+            EditSuccess::InsertChild(Class::False),
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::False; 3]),
+                TestJson::True,
+            ]),
+            Path::from_vec(vec![0, 2]),
+        );
+
+        run_test_ok_count(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::from_vec(vec![0]),
+            2,
+            Action::InsertChild(Insertable::CountedNode(2, 'f')),
+            EditSuccess::InsertChild(Class::False),
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::False; 4]),
+                TestJson::True,
+            ]),
+            Path::from_vec(vec![0, 3]),
+        );
+
+        run_test_ok_count(
+            TestJson::Array(vec![]),
+            Path::root(),
+            2,
+            Action::InsertChild(Insertable::CountedNode(1, 'f')),
+            EditSuccess::InsertChild(Class::False),
+            TestJson::Array(vec![TestJson::False, TestJson::False]),
+            Path::from_vec(vec![1]),
+        );
+
+        // Dag level == 1
+
+        run_test_err_count(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::root(),
+            10,
+            Action::InsertChild(Insertable::CountedNode(0, 'n')),
+            EditErr::NoNodesToInsert,
+        )
+    }
     /* INSERT SIBLING */
 
     #[test]
