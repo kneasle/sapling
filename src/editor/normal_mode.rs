@@ -60,8 +60,8 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
                     }
                     // Otherwise, we perform the action on the `Dag`.  This returns the
                     // `EditResult`, which is logged outside the `match`
-                    Action::Undo => tree.undo(),
-                    Action::Redo => tree.redo(),
+                    Action::Undo => tree.undo(count),
+                    Action::Redo => tree.redo(count),
                     Action::MoveCursor(direction) => tree.move_cursor(count, direction),
                     Action::Replace(c) => tree.replace_cursor(count, c),
                     Action::InsertChild(c) => tree.insert_child(c),

@@ -283,14 +283,14 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     /* HISTORY METHODS */
 
     /// Move one step back in the tree history
-    pub fn undo(&mut self) -> EditResult<Node::Class> {
+    pub fn undo(&mut self, steps: usize) -> EditResult<Node::Class> {
         log::trace!("Performing undo.");
         // Early return if there are no changes to undo
         if self.history_index == 0 {
             return Err(EditErr::NoChangesToUndo);
         }
         // Move the history index back by one to perform the undo
-        self.history_index -= 1;
+        self.history_index = self.history_index.checked_sub(steps).unwrap_or(0);
         // Follow the behaviour of other text editors and update the location of the cursor
         // with its location in the snapshot we are going forward to
         self.current_cursor_path
@@ -300,14 +300,14 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     }
 
     /// Move one step forward in the tree history
-    pub fn redo(&mut self) -> EditResult<Node::Class> {
+    pub fn redo(&mut self, steps: usize) -> EditResult<Node::Class> {
         log::trace!("Performing redo.");
         // Early return if there are no changes to redo
         if self.history_index >= self.root_history.len() - 1 {
             return Err(EditErr::NoChangesToRedo);
         }
         // Move the history index forward by one to perform the redo
-        self.history_index += 1;
+        self.history_index = (self.history_index + steps).min(self.root_history.len() - 1);
         // Follow the behaviour of other text editors and update the location of the cursor
         // with its location in the snapshot we are going back to
         self.current_cursor_path
@@ -675,8 +675,8 @@ mod tests {
     impl<'arena> ExecuteAction for Dag<'arena, Json<'arena>> {
         fn execute_action(&mut self, count: usize, action: Action) -> EditResult<Class> {
             match action {
-                Action::Undo => self.undo(),
-                Action::Redo => self.redo(),
+                Action::Undo => self.undo(count),
+                Action::Redo => self.redo(count),
                 Action::MoveCursor(direction) => self.move_cursor(count, direction),
                 Action::Replace(c) => self.replace_cursor(count, c),
                 Action::InsertChild(c) => self.insert_child(c),
@@ -1312,7 +1312,7 @@ mod tests {
         // Undo the change
         assert_eq!(
             Ok(EditSuccess::Undo),
-            dag.undo(),
+            dag.undo(1),
             "Not equal in action result"
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree.");
@@ -1345,7 +1345,7 @@ mod tests {
         // undo
         assert_eq!(
             Err(EditErr::NoChangesToUndo),
-            dag.undo(),
+            dag.undo(1),
             "Not equal in action result (move 1)"
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree (move 1).");
@@ -1379,7 +1379,7 @@ mod tests {
         // undo
         assert_eq!(
             Ok(EditSuccess::Undo),
-            dag.undo(),
+            dag.undo(1),
             "Not equal in action result"
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree.");
@@ -1392,7 +1392,7 @@ mod tests {
         // redo
         assert_eq!(
             Ok(EditSuccess::Redo),
-            dag.redo(),
+            dag.redo(1),
             "Not equal in action result"
         );
         assert_eq!(end_tree, dag.root(), "Not equal in tree.");
@@ -1426,7 +1426,7 @@ mod tests {
         // undo
         assert_eq!(
             Err(EditErr::NoChangesToUndo),
-            dag.undo(),
+            dag.undo(1),
             "Not equal in action result (move 1)."
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree (move 1).");
@@ -1438,7 +1438,7 @@ mod tests {
         // redo
         assert_eq!(
             Err(EditErr::NoChangesToRedo),
-            dag.redo(),
+            dag.redo(1),
             "Not equal in action result (move 2)."
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree (move 2).");
@@ -1588,7 +1588,7 @@ mod tests {
         println!("Performing first undo");
         assert_eq!(
             Ok(EditSuccess::Undo),
-            dag.undo(),
+            dag.undo(1),
             "Not equal in action result"
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree.");
@@ -1602,7 +1602,7 @@ mod tests {
         println!("Performing the 2nd undo");
         assert_eq!(
             Err(EditErr::NoChangesToUndo),
-            dag.undo(),
+            dag.undo(1),
             "Not equal in action result"
         );
         assert_eq!(start_tree, dag.root(), "Failed undo modified the tree");
@@ -1616,7 +1616,7 @@ mod tests {
         println!("Performing the 1st redo");
         assert_eq!(
             Ok(EditSuccess::Redo),
-            dag.redo(),
+            dag.redo(1),
             "Not equal in action result"
         );
         assert_eq!(end_tree, dag.root(), "Not equal in tree.");
@@ -1630,7 +1630,7 @@ mod tests {
         println!("Performing the 2nd redo");
         assert_eq!(
             Err(EditErr::NoChangesToRedo),
-            dag.redo(),
+            dag.redo(1),
             "Not equal in action result"
         );
         assert_eq!(end_tree, dag.root(), "Not equal in tree.");
@@ -1685,7 +1685,7 @@ mod tests {
         println!("Performing undo");
         assert_eq!(
             Ok(EditSuccess::Undo),
-            dag.undo(),
+            dag.undo(1),
             "Not equal in action result"
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree.");
@@ -1694,6 +1694,107 @@ mod tests {
             dag.current_cursor_path,
             "Not equal in cursor location."
         );
+    }
+
+    #[test]
+    fn multiple_undo_redo() {
+        // Step 0: Set up a Dag which stores the JSON `<[]>`
+        let tree_0 = TestJson::Array(vec![]);
+        let arena: Arena<Json> = Arena::new();
+        let mut dag = Dag::new(&arena, tree_0.add_to_arena(&arena), Path::root());
+
+        /* Perform some actions on the tree */
+
+        // Step 1: Insert two trues, so we end up with `[true, <true>]`
+        let tree_1 = TestJson::Array(vec![TestJson::True; 2]);
+        assert_eq!(
+            dag.insert_child(Insertable::CountedNode(2, 't')),
+            Ok(EditSuccess::InsertChild(Class::True))
+        );
+        // Move cursor back a step to `[<true>, true]` (this shouldn't contribute to the history)
+        assert_eq!(
+            dag.move_cursor(1, Direction::Prev),
+            Ok(EditSuccess::Move(1, Direction::Prev))
+        );
+        // Step 2: Replace the cursor with an object: `[<{}>, true]`
+        let tree_2 = TestJson::Array(vec![TestJson::Object(vec![]), TestJson::True]);
+        assert_eq!(
+            dag.replace_cursor(1, Insertable::CountedNode(1, 'o')),
+            Ok(EditSuccess::Replace(Class::Object))
+        );
+        // Step 3: Insert null into the object: `[{<"": null>}, true]`
+        let tree_3 = TestJson::Array(vec![
+            TestJson::Object(vec![("".to_owned(), TestJson::Null)]),
+            TestJson::True,
+        ]);
+        assert_eq!(
+            dag.insert_child(Insertable::CountedNode(1, 'n')),
+            Ok(EditSuccess::InsertChild(Class::Null))
+        );
+        // Move to the null: `[{"": <null>}, true]`
+        assert_eq!(
+            dag.move_cursor(1, Direction::Down),
+            Ok(EditSuccess::Move(1, Direction::Down))
+        );
+        assert_eq!(
+            dag.move_cursor(1, Direction::Next),
+            Ok(EditSuccess::Move(1, Direction::Next))
+        );
+        // Step 4: Replace the null with false: `[{"": <false>}, true]`
+        let tree_4 = TestJson::Array(vec![
+            TestJson::Object(vec![("".to_owned(), TestJson::False)]),
+            TestJson::True,
+        ]);
+        assert_eq!(
+            dag.replace_cursor(1, Insertable::CountedNode(1, 'f')),
+            Ok(EditSuccess::Replace(Class::False))
+        );
+        // Move back to the field: `[{<"": false>}, true]`
+        assert_eq!(
+            dag.move_cursor(1, Direction::Up),
+            Ok(EditSuccess::Move(1, Direction::Up))
+        );
+        // Step 5: Insert a string after the cursor: `[{"": null, <"": "">}, true]`
+        let tree_5 = TestJson::Array(vec![
+            TestJson::Object(vec![
+                ("".to_owned(), TestJson::False),
+                ("".to_owned(), TestJson::Str("".to_owned())),
+            ]),
+            TestJson::True,
+        ]);
+        assert_eq!(
+            dag.insert_next_to_cursor(1, Insertable::CountedNode(1, 's'), Side::Next),
+            Ok(EditSuccess::InsertNextToCursor {
+                side: Side::Next,
+                class: Class::Str
+            })
+        );
+        // Check that the tree is as we expect
+        assert_eq!(tree_5, dag.root());
+        // 5 - 3 = 2
+        assert_eq!(dag.undo(3), Ok(EditSuccess::Undo));
+        assert_eq!(tree_2, dag.root());
+        // 2 + 2 = 4
+        assert_eq!(dag.redo(2), Ok(EditSuccess::Redo));
+        assert_eq!(tree_4, dag.root());
+        // 2 + 5 caps out at 5
+        assert_eq!(dag.redo(5), Ok(EditSuccess::Redo));
+        assert_eq!(tree_5, dag.root());
+        // 5 - 1 = 4
+        assert_eq!(dag.undo(1), Ok(EditSuccess::Undo));
+        assert_eq!(tree_4, dag.root());
+        // 4 - 1 = 3
+        assert_eq!(dag.undo(1), Ok(EditSuccess::Undo));
+        assert_eq!(tree_3, dag.root());
+        // 3 - 2 = 1
+        assert_eq!(dag.undo(2), Ok(EditSuccess::Undo));
+        assert_eq!(tree_1, dag.root());
+        // 1 - 2 caps out at 0
+        assert_eq!(dag.undo(2), Ok(EditSuccess::Undo));
+        assert_eq!(tree_0, dag.root());
+        // 0 + 5 = 5
+        assert_eq!(dag.redo(5), Ok(EditSuccess::Redo));
+        assert_eq!(tree_5, dag.root());
     }
 
     /// This is a regression test for issue #51 (fixed in PR #53), where Sapling crashes if:
@@ -1718,11 +1819,11 @@ mod tests {
         assert_eq!(dag.current_cursor_path, Path::root());
 
         // Undo this change, causing the cursor to move back to `null`
-        assert_eq!(Ok(EditSuccess::Undo), dag.undo());
+        assert_eq!(Ok(EditSuccess::Undo), dag.undo(1));
 
         // Redo the change.  It's not really important what the tree is here, so long as the Dag
         // doesn't panic when the cursor is generated
-        assert_eq!(Ok(EditSuccess::Redo), dag.redo());
+        assert_eq!(Ok(EditSuccess::Redo), dag.redo(1));
 
         let _cursor = dag.cursor();
     }
