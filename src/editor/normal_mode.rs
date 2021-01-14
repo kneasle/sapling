@@ -64,7 +64,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
                     Action::Redo => tree.redo(count),
                     Action::MoveCursor(direction) => tree.move_cursor(count, direction),
                     Action::Replace(c) => tree.replace_cursor(count, c),
-                    Action::InsertChild(c) => tree.insert_child(c),
+                    Action::InsertChild(c) => tree.insert_child(count, c),
                     Action::InsertBefore(c) => tree.insert_next_to_cursor(count, c, Side::Prev),
                     Action::InsertAfter(c) => tree.insert_next_to_cursor(count, c, Side::Next),
                     Action::Delete => tree.delete_cursor(count),
