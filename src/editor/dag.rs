@@ -843,68 +843,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn root_insertchild() {
-        run_test_ok(
-            TestJson::Array(vec![]),
-            Path::root(),
-            Action::InsertChild(Insertable::CountedNode(1, 'f')),
-            EditSuccess::InsertChild(Class::False),
-            TestJson::Array(vec![TestJson::False]),
-            Path::from_vec(vec![0]),
-        );
-
-        // Dag level == 1
-
-        run_test_ok(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
-            Path::root(),
-            Action::InsertChild(Insertable::CountedNode(1, 'n')),
-            EditSuccess::InsertChild(Class::Null),
-            TestJson::Array(vec![
-                TestJson::Array(vec![]),
-                TestJson::True,
-                TestJson::Null,
-            ]),
-            Path::from_vec(vec![2]),
-        )
-    }
-
-    #[test]
-    fn root_insertbefore() {
-        run_test_err(
-            TestJson::Array(vec![]),
-            Path::root(),
-            Action::InsertBefore(Insertable::CountedNode(1, 'f')),
-            EditErr::AddSiblingToRoot,
-        );
-
-        // tree level == 1
-        run_test_err(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
-            Path::root(),
-            Action::InsertBefore(Insertable::CountedNode(1, 'f')),
-            EditErr::AddSiblingToRoot,
-        );
-    }
-
-    #[test]
-    fn root_insertafter() {
-        run_test_err(
-            TestJson::Array(vec![]),
-            Path::root(),
-            Action::InsertAfter(Insertable::CountedNode(1, 'f')),
-            EditErr::AddSiblingToRoot,
-        );
-
-        // tree level == 1
-        run_test_err(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
-            Path::root(),
-            Action::InsertAfter(Insertable::CountedNode(1, 'f')),
-            EditErr::AddSiblingToRoot,
-        );
-    }
+    /* REPLACE */
 
     /// Helper function specifically to run a replace test
     fn test_single_replace_ok(
@@ -1131,6 +1070,8 @@ mod tests {
         );
     }
 
+    /* DELETE */
+
     #[test]
     fn delete_root_err() {
         run_test_err(
@@ -1237,6 +1178,8 @@ mod tests {
             Path::from_vec(vec![1]),
         );
     }
+
+    /* MOVEMENT */
 
     #[test]
     fn move_sideways() {
@@ -1397,8 +1340,10 @@ mod tests {
         );
     }
 
+    /* UNDO/REDO */
+
     #[test]
-    fn root_undo() {
+    fn undo_root() {
         let start_tree = TestJson::Array(vec![]);
         let start_cursor_location = Path::root();
         let end_tree = TestJson::False;
@@ -1433,7 +1378,7 @@ mod tests {
             "Not equal in cursor location."
         );
 
-        //  Dag level == 1
+        // Dag level == 1
         let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
         let start_cursor_location = Path::root();
         // We move the cursor so we expect the cursor to move but no change to occur to the tree
@@ -1468,7 +1413,7 @@ mod tests {
     }
 
     #[test]
-    fn root_redo() {
+    fn redo_root() {
         let start_tree = TestJson::Array(vec![]);
         let end_tree = TestJson::Object(vec![]);
 
@@ -1561,93 +1506,7 @@ mod tests {
     }
 
     #[test]
-    fn level_1_insertchild() {
-        run_test_ok(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
-            Path::from_vec(vec![0]),
-            Action::InsertChild(Insertable::CountedNode(1, 'f')),
-            EditSuccess::InsertChild(Class::False),
-            TestJson::Array(vec![TestJson::Array(vec![TestJson::False]), TestJson::True]),
-            Path::from_vec(vec![0, 0]),
-        );
-    }
-
-    #[test]
-    fn level_1_insertafter() {
-        run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::True]),
-            Path::from_vec(vec![1]),
-            Action::InsertAfter(Insertable::CountedNode(1, 'f')),
-            EditSuccess::InsertNextToCursor {
-                side: Side::Next,
-                class: Class::False,
-            },
-            TestJson::Array(vec![TestJson::True, TestJson::True, TestJson::False]),
-            Path::from_vec(vec![2]),
-        );
-
-        // Dag level == 2
-        run_test_ok(
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::Null, TestJson::True]),
-                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-            ]),
-            Path::from_vec(vec![1]),
-            Action::InsertAfter(Insertable::CountedNode(1, 'f')),
-            EditSuccess::InsertNextToCursor {
-                side: Side::Next,
-                class: Class::False,
-            },
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::Null, TestJson::True]),
-                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-                TestJson::False,
-            ]),
-            Path::from_vec(vec![2]),
-        );
-    }
-
-    #[test]
-    fn level_1_insertbefore() {
-        run_test_ok(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
-            Path::from_vec(vec![0]),
-            Action::InsertBefore(Insertable::CountedNode(1, 'f')),
-            EditSuccess::InsertNextToCursor {
-                side: Side::Prev,
-                class: Class::False,
-            },
-            TestJson::Array(vec![
-                TestJson::False,
-                TestJson::Array(vec![]),
-                TestJson::True,
-            ]),
-            Path::from_vec(vec![0]),
-        );
-
-        // Dag level == 2
-        run_test_ok(
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::Null, TestJson::True]),
-                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-            ]),
-            Path::from_vec(vec![1]),
-            Action::InsertBefore(Insertable::CountedNode(1, 'f')),
-            EditSuccess::InsertNextToCursor {
-                side: Side::Prev,
-                class: Class::False,
-            },
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::Null, TestJson::True]),
-                TestJson::False,
-                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-            ]),
-            Path::from_vec(vec![1]),
-        );
-    }
-
-    #[test]
-    fn level_1_undo_and_redo() {
+    fn undo_redo() {
         // The original snapshot of the tree
         let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
         let end_tree = TestJson::False;
@@ -1729,61 +1588,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
-    // This is the test cases for issue 27
-    fn level_2_undo() {
-        // The original snapshot of the tree
-
-        let start_tree = TestJson::Array(vec![
-            TestJson::Null,
-            TestJson::Object(vec![("key".to_string(), TestJson::True)]),
-            TestJson::False,
-        ]);
-
-        let expected_tree = TestJson::Array(vec![
-            TestJson::Null,
-            TestJson::Object(vec![]),
-            TestJson::False,
-        ]);
-
-        // Create and initialise Dag to test
-        let arena: Arena<Json> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
-        let start_cursor_location = Path::from_vec(vec![1, 0]);
-        let expected_cursor_location = Path::from_vec(vec![1]);
-        let mut dag = Dag::new(&arena, root, start_cursor_location);
-
-        // Step 1: Delete TestJson::object's child
-        println!("Delete `key-value` pair");
-        assert_eq!(
-            Ok(EditSuccess::Delete {
-                name: "field".to_string()
-            }),
-            dag.delete_cursor(1),
-            "Not equal in action result."
-        );
-        assert_eq!(expected_tree, dag.root(), "Not equal in tree.");
-        assert_eq!(
-            expected_cursor_location, dag.current_cursor_path,
-            "Not equal in cursor location."
-        );
-
-        // Perform one undo.
-        println!("Performing undo");
-        assert_eq!(
-            Ok(EditSuccess::Undo),
-            dag.undo(1),
-            "Not equal in action result"
-        );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
-        assert_eq!(
-            Path::root(),
-            dag.current_cursor_path,
-            "Not equal in cursor location."
-        );
-    }
-
-    #[test]
     fn multiple_undo_redo() {
         // Step 0: Set up a Dag which stores the JSON `<[]>`
         let tree_0 = TestJson::Array(vec![]);
@@ -1795,7 +1599,7 @@ mod tests {
         // Step 1: Insert two trues, so we end up with `[true, <true>]`
         let tree_1 = TestJson::Array(vec![TestJson::True; 2]);
         assert_eq!(
-            dag.insert_child(Insertable::CountedNode(2, 't')),
+            dag.insert_child(1, Insertable::CountedNode(2, 't')),
             Ok(EditSuccess::InsertChild(Class::True))
         );
         // Move cursor back a step to `[<true>, true]` (this shouldn't contribute to the history)
@@ -1815,7 +1619,7 @@ mod tests {
             TestJson::True,
         ]);
         assert_eq!(
-            dag.insert_child(Insertable::CountedNode(1, 'n')),
+            dag.insert_child(1, Insertable::CountedNode(1, 'n')),
             Ok(EditSuccess::InsertChild(Class::Null))
         );
         // Move to the null: `[{"": <null>}, true]`
@@ -1884,110 +1688,314 @@ mod tests {
         assert_eq!(tree_5, dag.root());
     }
 
-    /// This is a regression test for issue #51 (fixed in PR #53), where Sapling crashes if:
-    /// 1. The user deletes the cursor when the cursor is the last child of its parent
-    /// 2. The user undoes this edit
-    /// 3. The user redoes this edit
+    /* INSERT CHILD */
+
     #[test]
-    fn delete_cursor_crash_bug() {
-        // Create and initialise Dag to test (start with Json `[null]` with the cursor selecting
-        // the `null`)
-        let arena: Arena<Json> = Arena::new();
-        let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
-        let mut dag = Dag::new(&arena, root, Path::from_vec(vec![0]));
-
-        // Delete the node under the cursor, causing the cursor to move to the root
-        assert_eq!(
-            Ok(EditSuccess::Delete {
-                name: "null".to_string()
-            }),
-            dag.delete_cursor(1),
+    fn insert_single_child() {
+        run_test_ok(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::from_vec(vec![0]),
+            Action::InsertChild(Insertable::CountedNode(1, 'f')),
+            EditSuccess::InsertChild(Class::False),
+            TestJson::Array(vec![TestJson::Array(vec![TestJson::False]), TestJson::True]),
+            Path::from_vec(vec![0, 0]),
         );
-        assert_eq!(dag.current_cursor_path, Path::root());
 
-        // Undo this change, causing the cursor to move back to `null`
-        assert_eq!(Ok(EditSuccess::Undo), dag.undo(1));
+        run_test_ok(
+            TestJson::Array(vec![]),
+            Path::root(),
+            Action::InsertChild(Insertable::CountedNode(1, 'f')),
+            EditSuccess::InsertChild(Class::False),
+            TestJson::Array(vec![TestJson::False]),
+            Path::from_vec(vec![0]),
+        );
 
-        // Redo the change.  It's not really important what the tree is here, so long as the Dag
-        // doesn't panic when the cursor is generated
-        assert_eq!(Ok(EditSuccess::Redo), dag.redo(1));
+        // Dag level == 1
 
-        let _cursor = dag.cursor();
+        run_test_ok(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::root(),
+            Action::InsertChild(Insertable::CountedNode(1, 'n')),
+            EditSuccess::InsertChild(Class::Null),
+            TestJson::Array(vec![
+                TestJson::Array(vec![]),
+                TestJson::True,
+                TestJson::Null,
+            ]),
+            Path::from_vec(vec![2]),
+        )
     }
 
-    /// This is a regression test for issue #68, where Sapling crashes if an invalid char is used
-    /// to insert into any node
+    /* INSERT SIBLING */
+
     #[test]
-    fn invalid_insert_crash() {
-        // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
-        // the `null`)
-        let arena: Arena<Json> = Arena::new();
-        let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
-        let mut dag = Dag::new(&arena, root, Path::root());
-
-        // Inserting an invalid char into the array should error gracefully
-        assert_eq!(
-            Err(EditErr::CharNotANode('x')),
-            dag.insert_child(Insertable::CountedNode(1, 'x'))
+    fn insert_after() {
+        run_test_err(
+            TestJson::Array(vec![]),
+            Path::root(),
+            Action::InsertAfter(Insertable::CountedNode(1, 'f')),
+            EditErr::AddSiblingToRoot,
         );
 
-        // Move the cursor to the 'null'
-        assert_eq!(
-            Ok(EditSuccess::Move(1, Direction::Down)),
-            dag.move_cursor(1, Direction::Down)
+        // tree level == 1
+        run_test_err(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::root(),
+            Action::InsertAfter(Insertable::CountedNode(1, 'f')),
+            EditErr::AddSiblingToRoot,
         );
 
-        // Inserting an invalid char into the array should error gracefully
-        assert_eq!(
-            Err(EditErr::CharNotANode('x')),
-            dag.insert_child(Insertable::CountedNode(1, 'x'))
+        run_test_ok(
+            TestJson::Array(vec![TestJson::True, TestJson::True]),
+            Path::from_vec(vec![1]),
+            Action::InsertAfter(Insertable::CountedNode(1, 'f')),
+            EditSuccess::InsertNextToCursor {
+                side: Side::Next,
+                class: Class::False,
+            },
+            TestJson::Array(vec![TestJson::True, TestJson::True, TestJson::False]),
+            Path::from_vec(vec![2]),
+        );
+
+        // Dag level == 2
+        run_test_ok(
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::Null, TestJson::True]),
+                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
+            ]),
+            Path::from_vec(vec![1]),
+            Action::InsertAfter(Insertable::CountedNode(1, 'f')),
+            EditSuccess::InsertNextToCursor {
+                side: Side::Next,
+                class: Class::False,
+            },
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::Null, TestJson::True]),
+                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
+                TestJson::False,
+            ]),
+            Path::from_vec(vec![2]),
         );
     }
 
-    /// This is a regression test for issue #68, where Sapling crashes if an invalid char is used
-    /// to insert into any node
     #[test]
-    fn invalid_replace_crash() {
-        // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
-        // the `null`)
-        let arena: Arena<Json> = Arena::new();
-        let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
-        let mut dag = Dag::new(&arena, root, Path::root());
-
-        // Inserting an invalid char into the array should error gracefully
-        assert_eq!(
-            Err(EditErr::CharNotANode('x')),
-            dag.replace_cursor(1, Insertable::CountedNode(1, 'x'))
+    fn insert_before() {
+        run_test_err(
+            TestJson::Array(vec![]),
+            Path::root(),
+            Action::InsertBefore(Insertable::CountedNode(1, 'f')),
+            EditErr::AddSiblingToRoot,
         );
 
-        // Move the cursor to the 'null'
-        assert_eq!(
-            Ok(EditSuccess::Move(1, Direction::Down)),
-            dag.move_cursor(1, Direction::Down)
+        // tree level == 1
+        run_test_err(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::root(),
+            Action::InsertBefore(Insertable::CountedNode(1, 'f')),
+            EditErr::AddSiblingToRoot,
         );
 
-        // Inserting an invalid char into the array should error gracefully
-        assert_eq!(
-            Err(EditErr::CharNotANode('x')),
-            dag.replace_cursor(1, Insertable::CountedNode(1, 'x'))
+        run_test_ok(
+            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            Path::from_vec(vec![0]),
+            Action::InsertBefore(Insertable::CountedNode(1, 'f')),
+            EditSuccess::InsertNextToCursor {
+                side: Side::Prev,
+                class: Class::False,
+            },
+            TestJson::Array(vec![
+                TestJson::False,
+                TestJson::Array(vec![]),
+                TestJson::True,
+            ]),
+            Path::from_vec(vec![0]),
+        );
+
+        // Dag level == 2
+        run_test_ok(
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::Null, TestJson::True]),
+                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
+            ]),
+            Path::from_vec(vec![1]),
+            Action::InsertBefore(Insertable::CountedNode(1, 'f')),
+            EditSuccess::InsertNextToCursor {
+                side: Side::Prev,
+                class: Class::False,
+            },
+            TestJson::Array(vec![
+                TestJson::Array(vec![TestJson::Null, TestJson::True]),
+                TestJson::False,
+                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
+            ]),
+            Path::from_vec(vec![1]),
         );
     }
 
-    /// This is a regression test for issue #78, where directly replacing a field results in an
-    /// invalid tree.
     #[test]
     #[ignore]
-    fn incorrect_field_replace() {
-        run_test_ok(
-            // We are selecting the field, not the contained value
-            TestJson::Object(vec![("key".to_owned(), TestJson::True)]),
-            Path::from_vec(vec![0]),
-            Action::Replace(Insertable::CountedNode(1, 'f')),
-            EditSuccess::Replace(Class::False),
-            // We'd **expect** a new field to implicitly be created, but that is not the case.
-            // Instead the resulting JSON will be `{false}`, which is invalid
-            TestJson::Object(vec![("".to_owned(), TestJson::False)]),
-            Path::from_vec(vec![0]),
+    // This is the test cases for issue 27
+    fn level_2_undo() {
+        // The original snapshot of the tree
+
+        let start_tree = TestJson::Array(vec![
+            TestJson::Null,
+            TestJson::Object(vec![("key".to_string(), TestJson::True)]),
+            TestJson::False,
+        ]);
+
+        let expected_tree = TestJson::Array(vec![
+            TestJson::Null,
+            TestJson::Object(vec![]),
+            TestJson::False,
+        ]);
+
+        // Create and initialise Dag to test
+        let arena: Arena<Json> = Arena::new();
+        let root = start_tree.add_to_arena(&arena);
+        let start_cursor_location = Path::from_vec(vec![1, 0]);
+        let expected_cursor_location = Path::from_vec(vec![1]);
+        let mut dag = Dag::new(&arena, root, start_cursor_location);
+
+        // Step 1: Delete TestJson::object's child
+        println!("Delete `key-value` pair");
+        assert_eq!(
+            Ok(EditSuccess::Delete {
+                name: "field".to_string()
+            }),
+            dag.delete_cursor(1),
+            "Not equal in action result."
         );
+        assert_eq!(expected_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(
+            expected_cursor_location, dag.current_cursor_path,
+            "Not equal in cursor location."
+        );
+
+        // Perform one undo.
+        println!("Performing undo");
+        assert_eq!(
+            Ok(EditSuccess::Undo),
+            dag.undo(1),
+            "Not equal in action result"
+        );
+        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(
+            Path::root(),
+            dag.current_cursor_path,
+            "Not equal in cursor location."
+        );
+    }
+
+    /// Regression tests for previous bugs
+    mod reg {
+        use super::*;
+
+        /// This is a regression test for issue #51 (fixed in PR #53), where Sapling crashes if:
+        /// 1. The user deletes the cursor when the cursor is the last child of its parent
+        /// 2. The user undoes this edit
+        /// 3. The user redoes this edit
+        #[test]
+        fn i_51_delete_cursor_crash_bug() {
+            // Create and initialise Dag to test (start with Json `[null]` with the cursor selecting
+            // the `null`)
+            let arena: Arena<Json> = Arena::new();
+            let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+            let mut dag = Dag::new(&arena, root, Path::from_vec(vec![0]));
+
+            // Delete the node under the cursor, causing the cursor to move to the root
+            assert_eq!(
+                Ok(EditSuccess::Delete {
+                    name: "null".to_string()
+                }),
+                dag.delete_cursor(1),
+            );
+            assert_eq!(dag.current_cursor_path, Path::root());
+
+            // Undo this change, causing the cursor to move back to `null`
+            assert_eq!(Ok(EditSuccess::Undo), dag.undo(1));
+
+            // Redo the change.  It's not really important what the tree is here, so long as the Dag
+            // doesn't panic when the cursor is generated
+            assert_eq!(Ok(EditSuccess::Redo), dag.redo(1));
+
+            let _cursor = dag.cursor();
+        }
+
+        /// This is a regression test for issue #68, where Sapling crashes if an invalid char is
+        /// used to insert into any node
+        #[test]
+        fn i_68_invalid_insert_crash() {
+            // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
+            // the `null`)
+            let arena: Arena<Json> = Arena::new();
+            let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+            let mut dag = Dag::new(&arena, root, Path::root());
+
+            // Inserting an invalid char into the array should error gracefully
+            assert_eq!(
+                Err(EditErr::CharNotANode('x')),
+                dag.insert_child(1, Insertable::CountedNode(1, 'x'))
+            );
+
+            // Move the cursor to the 'null'
+            assert_eq!(
+                Ok(EditSuccess::Move(1, Direction::Down)),
+                dag.move_cursor(1, Direction::Down)
+            );
+
+            // Inserting an invalid char into the array should error gracefully
+            assert_eq!(
+                Err(EditErr::CharNotANode('x')),
+                dag.insert_child(1, Insertable::CountedNode(1, 'x'))
+            );
+        }
+
+        /// This is a regression test for issue #68, where Sapling crashes if an invalid char is
+        /// used to insert into any node
+        #[test]
+        fn i_68_invalid_replace_crash() {
+            // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
+            // the `null`)
+            let arena: Arena<Json> = Arena::new();
+            let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+            let mut dag = Dag::new(&arena, root, Path::root());
+
+            // Inserting an invalid char into the array should error gracefully
+            assert_eq!(
+                Err(EditErr::CharNotANode('x')),
+                dag.replace_cursor(1, Insertable::CountedNode(1, 'x'))
+            );
+
+            // Move the cursor to the 'null'
+            assert_eq!(
+                Ok(EditSuccess::Move(1, Direction::Down)),
+                dag.move_cursor(1, Direction::Down)
+            );
+
+            // Inserting an invalid char into the array should error gracefully
+            assert_eq!(
+                Err(EditErr::CharNotANode('x')),
+                dag.replace_cursor(1, Insertable::CountedNode(1, 'x'))
+            );
+        }
+
+        /// This is a regression test for issue #78, where directly replacing a field results in an
+        /// invalid tree.
+        #[test]
+        #[ignore]
+        fn i_78_incorrect_field_replace() {
+            run_test_ok(
+                // We are selecting the field, not the contained value
+                TestJson::Object(vec![("key".to_owned(), TestJson::True)]),
+                Path::from_vec(vec![0]),
+                Action::Replace(Insertable::CountedNode(1, 'f')),
+                EditSuccess::Replace(Class::False),
+                // We'd **expect** a new field to implicitly be created, but that is not the case.
+                // Instead the resulting JSON will be `{false}`, which is invalid
+                TestJson::Object(vec![("".to_owned(), TestJson::False)]),
+                Path::from_vec(vec![0]),
+            );
+        }
     }
 }
