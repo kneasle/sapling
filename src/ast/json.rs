@@ -377,7 +377,8 @@ impl<'arena> Ast<'arena> for Json<'arena> {
         match self {
             // values like 'true' and 'false' can never have children
             Json::True | Json::False | Json::Str(_) | Json::Null => false,
-            // arrays and objects can have any children (except `field` inside `array`, which can't be inserted)
+            // arrays and objects can have any children (except `field` inside `array`, which can't
+            // be inserted)
             Json::Array(_) | Json::Object(_) => true,
             // fields must have their left hand side be a string
             Json::Field(_) => {
@@ -390,10 +391,8 @@ impl<'arena> Ast<'arena> for Json<'arena> {
         }
     }
 
-    fn is_valid_root(&self, node_type: Class) -> bool {
-        match node_type {
-            _ => true,
-        }
+    fn is_valid_root(&self, _node_type: Class) -> bool {
+        true
     }
 }
 

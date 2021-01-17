@@ -92,17 +92,19 @@ These goals are roughly in order of importance, with the most important first:
 
 ### Installation
 
-Sapling is not yet on [crates.io](crates.io) and is very much still in early development, but if you want to
-play around with Sapling as it currently stands, the best way is to clone the repository and build
-from source (you'll need [Rust](https://www.rust-lang.org/learn/get-started) installed in order to do this):
+Sapling is not yet on [crates.io](crates.io) and is very much still in early development, but if you
+want to play around with Sapling as it currently stands, the best way is to clone the repository and
+build from source (you'll need [Rust](https://www.rust-lang.org/learn/get-started) installed in
+order to do this):
 ```bash
 git clone https://github.com/kneasle/sapling.git
 cargo run 2> log
 ```
 
-Note that Sapling will not compile for Windows.  Windows support is absolutely intended, but Sapling currently uses
-[tuikit](https://github.com/lotabout/tuikit) as a terminal abstraction, which does not yet have Windows support.  PRs to
-Sapling or `tuikit` to add support for Windows would be very much appreciated.
+Note that Sapling will not compile for Windows.  Windows support is absolutely intended, but Sapling
+currently uses [tuikit](https://github.com/lotabout/tuikit) as a terminal abstraction, which does
+not yet have Windows support.  PRs to Sapling or `tuikit` to add support for Windows would be very
+much appreciated.
 
 ### Current Keybindings
 
@@ -125,8 +127,15 @@ Sapling or `tuikit` to add support for Windows would be very much appreciated.
 - `o*`: Insert a new node represented by `*` as a **child** of the cursor
 - `a*`/`i*`: Insert a new node represented by `*` before or after the cursor respectively
 
-Sapling can currently only edit JSON, with the following keys: `[a]rray`, `[o]bject`, `[t]rue`,
-`[f]alse`, `[n]ull`, `[s]tring`.  There is currently no way to insert text into a string.
+As with Vim, all commands can be repeated by inserting a count before them.  For example, `3u` will
+undo 3 steps in one go.
+
+Sapling can currently only edit JSON with the following keys: `[a]rray`, `[o]bject`, `[t]rue`,
+`[f]alse`, `[n]ull`, `[s]tring`.  There is currently no way to insert text into a string or to open
+and close files (yet!).
+
+Sapling handle multiple nodes in one go by adding a count before the node name, for example `i3t`
+will insert 3 `true`s before the cursor.
 
 ## Pros of AST-based editing
 

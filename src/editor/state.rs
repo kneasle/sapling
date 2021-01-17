@@ -45,7 +45,7 @@ pub trait State<'arena, Node: Ast<'arena>>: std::fmt::Debug {
 
     /// Return the keystroke buffer that should be displayed in the bottom right corner of the
     /// screen
-    fn keystroke_buffer<'s>(&'s self) -> Cow<'s, str> {
+    fn keystroke_buffer(&self) -> Cow<'_, str> {
         Cow::from("")
     }
 
