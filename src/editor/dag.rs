@@ -260,7 +260,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                     .last_mut()
                     .ok_or(EditErr::MoveToSiblingOfRoot)?;
                 let last_index = *index;
-                *index = last_index.checked_sub(distance).unwrap_or(0);
+                *index = last_index.saturating_sub(distance);
                 // Return the distance that we actually moved
                 last_index - *index
             }
@@ -293,7 +293,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             return Err(EditErr::NoChangesToUndo);
         }
         // Move the history index back by one to perform the undo
-        self.history_index = self.history_index.checked_sub(steps).unwrap_or(0);
+        self.history_index = self.history_index.saturating_sub(steps);
         // Follow the behaviour of other text editors and update the location of the cursor
         // with its location in the snapshot we are going forward to
         self.current_cursor_path

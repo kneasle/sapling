@@ -391,10 +391,8 @@ impl<'arena> Ast<'arena> for Json<'arena> {
         }
     }
 
-    fn is_valid_root(&self, node_type: Class) -> bool {
-        match node_type {
-            _ => true,
-        }
+    fn is_valid_root(&self, _node_type: Class) -> bool {
+        true
     }
 }
 

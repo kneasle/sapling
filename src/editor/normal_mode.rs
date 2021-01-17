@@ -88,7 +88,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
         (self, Some(log_entry))
     }
 
-    fn keystroke_buffer<'s>(&'s self) -> Cow<'s, str> {
+    fn keystroke_buffer(&self) -> Cow<'_, str> {
         Cow::from(format!("{:?}", self.keystroke_buffer))
     }
 }

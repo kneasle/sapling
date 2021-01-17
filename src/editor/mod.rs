@@ -46,7 +46,7 @@ impl<'arena, Node: Ast<'arena>> State<'arena, Node> for IntermediateState {
         panic!("Invalid state should never exist except during state transitions.");
     }
 
-    fn keystroke_buffer<'s>(&'s self) -> Cow<'s, str> {
+    fn keystroke_buffer(&self) -> Cow<'_, str> {
         panic!("Invalid state should never exist except during state transitions.");
     }
 }
