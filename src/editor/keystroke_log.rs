@@ -1,7 +1,7 @@
 //! A utility datastructure to store and render a log of keystrokes.  This is mostly used to give
 //! the viewers of my streams feedback for what I'm typing.
 
-use crate::core::KeyDisplay;
+use crate::core::keystrokes_to_string;
 
 #[allow(unused_imports)] // used solely for doc-comments
 use super::normal_mode::Action;
@@ -56,11 +56,7 @@ struct Entry {
 
 impl Entry {
     fn keystroke_string(&self) -> String {
-        let mut string = String::new();
-        for k in &self.keystrokes {
-            string.push_str(&k.compact_string());
-        }
-        string
+        keystrokes_to_string(&self.keystrokes)
     }
 }
 

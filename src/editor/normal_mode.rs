@@ -4,7 +4,7 @@ use super::dag::{Dag, Insertable, LogMessage};
 use super::{keystroke_log::Category, state};
 use crate::ast::Ast;
 use crate::config::{Config, KeyMap};
-use crate::core::{Direction, Side};
+use crate::core::{keystrokes_to_string, Direction, Side};
 
 use std::borrow::Cow;
 use std::iter::Peekable;
@@ -77,7 +77,10 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
             Err(ParseErr::Incomplete) => return (self, None),
             // If the command is invalid, we report the invalid command as a log message
             Err(ParseErr::Invalid) => (
-                format!("Undefined command '{:?}'", self.keystroke_buffer),
+                format!(
+                    "Undefined command '{}'",
+                    keystrokes_to_string(&self.keystroke_buffer)
+                ),
                 Category::Undefined,
             ),
         };
@@ -89,7 +92,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
     }
 
     fn keystroke_buffer(&self) -> Cow<'_, str> {
-        Cow::from(format!("{:?}", self.keystroke_buffer))
+        Cow::from(keystrokes_to_string(&self.keystroke_buffer))
     }
 }
 

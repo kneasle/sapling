@@ -7,6 +7,8 @@ mod path;
 pub use key_display::KeyDisplay;
 pub use path::Path;
 
+use tuikit::prelude::Key;
+
 /// The possible ways you can move the cursor
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum Direction {
@@ -132,6 +134,14 @@ impl std::ops::AddAssign for Size {
             self.last_line_length = other.last_line_length;
         }
     }
+}
+
+/// converts a `Key`s keystroke_buffer into a `String`
+pub fn keystrokes_to_string(keystroke_buffer: &[Key]) -> String {
+    keystroke_buffer
+        .iter()
+        .map(|x| x.compact_string())
+        .collect()
 }
 
 #[cfg(test)]
