@@ -311,6 +311,15 @@ impl<'arena> Ast<'arena> for Json<'arena> {
         }
     }
 
+    fn replace_child(&mut self, new_node: &'arena Self, arena: &'arena Arena<Self>, index: usize) {
+        match self.children_mut()[index] {
+            Json::Field([s, _v]) => {
+                self.children_mut()[index] = arena.alloc(Json::Field([s, new_node]));
+            }
+            _ => self.children_mut()[index] = new_node,
+        }
+    }
+
     fn delete_child(&mut self, index: usize) -> Result<(), DeleteError> {
         match self {
             Json::True | Json::False | Json::Null | Json::Str(_) => {

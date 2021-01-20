@@ -372,7 +372,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             .skip(steps_above_cursor)
         {
             let mut cloned_node = (*n).clone();
-            cloned_node.replace_child(*child_index, node);
+            cloned_node.replace_child(node, self.arena, *child_index);
             node = self.arena.alloc(cloned_node);
         }
 
@@ -449,7 +449,8 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                                 // first of these to replace the cursor and treat the rest as
                                 // insertions.
                                 if j == 0 {
-                                    cloned_parent.replace_child(insert_index, new_node);
+                                    log::debug!("j=1, closure");
+                                    cloned_parent.replace_child(new_node, this.arena, insert_index);
                                 } else {
                                     cloned_parent.insert_child(
                                         new_node,

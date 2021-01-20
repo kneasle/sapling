@@ -214,9 +214,7 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
     fn children_mut<'s>(&'s mut self) -> &'s mut [&'arena Self];
 
     /// Replaces the `index`th child of this node with a reference to a `new_node`
-    fn replace_child(&mut self, index: usize, new_node: &'arena Self) {
-        self.children_mut()[index] = new_node;
-    }
+    fn replace_child(&mut self, new_node: &'arena Self, arena: &'arena Arena<Self>, index: usize);
 
     /// Removes the child at a given index from the children of this node, if possible.  If the
     /// removal was not possible, then we return a custom error type.
