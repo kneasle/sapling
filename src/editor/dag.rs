@@ -177,6 +177,23 @@ impl std::fmt::Display for Insertable {
     }
 }
 
+/// A representation of a single edit, along with the cursor locations around it
+struct Snapshot<'arena, Node: Ast<'arena>> {
+    cursor_before: Path,
+    root: &'arena Node,
+    cursor_after: Path,
+}
+
+impl<'arena, Node: Ast<'arena>> Snapshot<'arena, Node> {
+    fn new(cursor_before: Path, root: &'arena Node, cursor_after: Path) -> Self {
+        Snapshot {
+            cursor_before,
+            root,
+            cursor_after,
+        }
+    }
+}
+
 /// A datastructure that stores the history of a tree as a Dag (Directed Acyclic Graph) of
 /// **immutable** nodes.
 ///
@@ -192,7 +209,7 @@ pub struct Dag<'arena, Node: Ast<'arena>> {
     arena: &'arena Arena<Node>,
     /// A [`Vec`] containing a reference to the root node at every edit in the undo history.  This
     /// is required to always have length at least one.
-    root_history: Vec<(&'arena Node, Path)>,
+    root_history: Vec<Snapshot<'arena, Node>>,
     /// An index into [`root_history`](Dag::root_history) of the current edit.  This is required to
     /// be in `0..root_history.len()`.
     history_index: usize,
@@ -204,7 +221,11 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     pub fn new(arena: &'arena Arena<Node>, root: &'arena Node, cursor_path: Path) -> Self {
         Dag {
             arena,
-            root_history: vec![(root, cursor_path.clone())],
+            root_history: vec![Snapshot::new(
+                cursor_path.clone(),
+                root,
+                cursor_path.clone(),
+            )],
             history_index: 0,
             current_cursor_path: cursor_path,
         }
@@ -216,7 +237,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
     pub fn root(&self) -> &'arena Node {
         // This indexing shouldn't panic because we require that `self.history_index` is a valid
         // index into `self.root_history`, and `self.root_history` has at least one element
-        self.root_history[self.history_index].0
+        self.root_history[self.history_index].root
     }
 
     /// Returns the cursor node and its direct parent (if such a parent exists)
@@ -297,7 +318,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         // Follow the behaviour of other text editors and update the location of the cursor
         // with its location in the snapshot we are going forward to
         self.current_cursor_path
-            .clone_from(&self.root_history[self.history_index].1);
+            .clone_from(&self.root_history[self.history_index + 1].cursor_before);
         log::debug!("Setting cursor path to {:?}", self.current_cursor_path);
         Ok(EditSuccess::Undo)
     }
@@ -314,7 +335,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         // Follow the behaviour of other text editors and update the location of the cursor
         // with its location in the snapshot we are going back to
         self.current_cursor_path
-            .clone_from(&self.root_history[self.history_index].1);
+            .clone_from(&self.root_history[self.history_index].cursor_after);
         log::debug!("Setting cursor path to {:?}", self.current_cursor_path);
         Ok(EditSuccess::Redo)
     }
@@ -386,8 +407,13 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         }
         // At this point, `node` contains a reference to the root of the new tree, so we just add
         // this to the history, along with the cursor path.
-        self.root_history
-            .push((node, self.current_cursor_path.clone()));
+
+        log::debug!("current_cursor_path {:?}", self.current_cursor_path);
+        self.root_history.push(Snapshot::new(
+            old_cursor_path.clone(),
+            node,
+            self.current_cursor_path.clone(),
+        ));
         // Move the history index on by one so that we are pointing at the latest change
         self.history_index = self.root_history.len() - 1;
 
@@ -1916,7 +1942,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     // This is the test cases for issue 27
     fn level_2_undo() {
         // The original snapshot of the tree
@@ -1938,7 +1963,7 @@ mod tests {
         let root = start_tree.add_to_arena(&arena);
         let start_cursor_location = Path::from_vec(vec![1, 0]);
         let expected_cursor_location = Path::from_vec(vec![1]);
-        let mut dag = Dag::new(&arena, root, start_cursor_location);
+        let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
 
         // Step 1: Delete TestJson::object's child
         println!("Delete `key-value` pair");
@@ -1964,7 +1989,7 @@ mod tests {
         );
         assert_eq!(start_tree, dag.root(), "Not equal in tree.");
         assert_eq!(
-            Path::root(),
+            start_cursor_location.clone(),
             dag.current_cursor_path,
             "Not equal in cursor location."
         );
@@ -2079,6 +2104,26 @@ mod tests {
                 TestJson::Object(vec![("".to_owned(), TestJson::False)]),
                 Path::from_vec(vec![0]),
             );
+        }
+
+        /// this is a regression test for pull request #81.
+        #[test]
+        fn pr_81_undo_add_child_crash() {
+            let arena: Arena<Json> = Arena::new();
+            let root = TestJson::Array(vec![TestJson::True]).add_to_arena(&arena);
+            let mut dag = Dag::new(&arena, root, Path::from_vec(vec![0]));
+
+            // Replace the root with an array
+            dag.delete_cursor(1).unwrap();
+            // Add a new child to the cursor/root
+            dag.insert_child(1, Insertable::CountedNode(1, 't'))
+                .unwrap();
+            // Undo this change, which should move us back to the root
+            dag.undo(1).unwrap();
+            // If the wrong Path for the cursor is loaded, then a non-existent node will be referenced
+            // and the code will panic.  It doesn't matter what the cursor is, just so long as the code
+            // doesn't panic
+            dag.cursor();
         }
     }
 }
