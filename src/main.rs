@@ -33,9 +33,24 @@ fn main() {
         .init();
     log::info!("Starting up...");
 
-    let file_path = PathBuf::from("thing.json");
-    let initial_json =
-        serde_json::from_reader::<_, Value>(std::fs::File::open(&file_path).unwrap()).unwrap();
+    // Read a file name as the CLI argument
+    let (file_path, initial_json) = if let Some(first_arg) = std::env::args().skip(1).next() {
+        let path = PathBuf::from(first_arg);
+        let file = match std::fs::File::open(&path) {
+            Ok(x) => x,
+            Err(e) => {
+                eprintln!("Error opening {:?}: {}", path, e);
+                return;
+            }
+        };
+        (
+            Some(path),
+            serde_json::from_reader::<_, Value>(file).unwrap(),
+        )
+    } else {
+        log::warn!("Expected a file-name as an argument.  Using default JSON instead.");
+        (None, serde_json::json!([true, false, { "value": false }]))
+    };
 
     // Create an empty arena for Sapling to use
     log::trace!("Creating arena");

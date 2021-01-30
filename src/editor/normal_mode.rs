@@ -61,10 +61,15 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
                         );
                     }
                     Action::Write => {
-                        let mut file = std::fs::File::create(&editor.file_path).unwrap();
-                        let content = tree.to_text(&editor.format_style);
-                        file.write_all(content.as_bytes()).unwrap();
-
+                        if let Some(path) = &editor.file_path {
+                            // If the editor was given a file-path, then write to it
+                            let mut file = std::fs::File::create(path).unwrap();
+                            let content = tree.to_text(&editor.format_style);
+                            file.write_all(content.as_bytes()).unwrap();
+                        } else {
+                            // Otherwise, log a warning and do nothing
+                            log::warn!("No file to write to!");
+                        }
                         // If we haven't returned yet, then clear the buffer
                         self.keystroke_buffer.clear();
                         return (self, Some((action.description(), action.category())));

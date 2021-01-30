@@ -65,7 +65,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     config: Config,
     /// A list of the keystrokes that have been executed, along with a summary of what they mean
     keystroke_log: KeyStrokeLog,
-    file_path: PathBuf,
+    file_path: Option<PathBuf>,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
@@ -74,7 +74,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         tree: &'arena mut Dag<'arena, Node>,
         format_style: Node::FormatStyle,
         config: Config,
-        file_path: PathBuf,
+        file_path: Option<PathBuf>,
     ) -> Editor<'arena, Node> {
         let term = Term::new().unwrap();
         Editor {
