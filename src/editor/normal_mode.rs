@@ -64,7 +64,12 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
                         if let Some(path) = &editor.file_path {
                             // If the editor was given a file-path, then write to it
                             let mut file = std::fs::File::create(path).unwrap();
-                            let content = tree.to_text(&editor.format_style);
+                            let mut content = tree.to_text(&editor.format_style);
+                            // Force the file to finish with a newline.  BTW, <str>.chars().last()
+                            // is O(1), regardless of the length of the string.
+                            if content.chars().last() != Some('\n') {
+                                content.push('\n');
+                            }
                             file.write_all(content.as_bytes()).unwrap();
                         } else {
                             // Otherwise, log a warning and do nothing
