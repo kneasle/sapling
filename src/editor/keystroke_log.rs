@@ -23,6 +23,8 @@ pub enum Category {
     Delete,
     /// The action of the keystrokes is that Sapling should quit
     Quit,
+    /// An [`Action`] that handles reading and writing from disk
+    IO,
     /// The keystrokes did not correspond to a well-defined action
     Undefined,
 }
@@ -40,6 +42,7 @@ impl Category {
             Category::Replace => Color::CYAN,
             Category::Delete => Color::RED,
             Category::Quit => Color::MAGENTA,
+            Category::IO => Color::GREEN,
             Category::Undefined => Color::LIGHT_RED,
         }
     }

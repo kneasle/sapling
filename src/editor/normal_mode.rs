@@ -1,12 +1,13 @@
 //! The code for 'normal-mode', similar to that of Vim
 
-use super::dag::{Dag, Insertable, LogMessage};
-use super::{keystroke_log::Category, state};
+use super::dag::{Insertable, LogMessage};
+use super::{keystroke_log::Category, state, Editor};
 use crate::ast::Ast;
-use crate::config::{Config, KeyMap};
+use crate::config::KeyMap;
 use crate::core::{keystrokes_to_string, Direction, Side};
 
 use std::borrow::Cow;
+use std::io::prelude::*;
 use std::iter::Peekable;
 
 use tuikit::prelude::Key;
@@ -31,15 +32,16 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
     fn transition(
         mut self: Box<Self>,
         key: Key,
-        config: &Config,
-        tree: &mut Dag<'arena, Node>,
+        editor: &mut Editor<'arena, Node>,
     ) -> (
         Box<dyn state::State<'arena, Node>>,
         Option<(String, Category)>,
     ) {
         self.keystroke_buffer.push(key);
 
-        let log_entry = match parse_command(&config.keymap, &self.keystroke_buffer) {
+        let tree = &mut editor.tree;
+
+        let log_entry = match parse_command(&editor.config.keymap, &self.keystroke_buffer) {
             // If the command buffer is a valid and complete command, then we execute the resulting
             // 'action'
             Ok((count, action)) => {
@@ -56,7 +58,16 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
                         return (
                             Box::new(state::Quit),
                             Some((action.description(), action.category())),
-                        )
+                        );
+                    }
+                    Action::Write => {
+                        let mut file = std::fs::File::create(&editor.file_path).unwrap();
+                        let content = tree.to_text(&editor.format_style);
+                        file.write_all(content.as_bytes()).unwrap();
+
+                        // If we haven't returned yet, then clear the buffer
+                        self.keystroke_buffer.clear();
+                        return (self, Some((action.description(), action.category())));
                     }
                     // Otherwise, we perform the action on the `Dag`.  This returns the
                     // `EditResult`, which is logged outside the `match`
@@ -87,7 +98,6 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
 
         // If we haven't returned yet, then clear the buffer
         self.keystroke_buffer.clear();
-
         (self, Some(log_entry))
     }
 
@@ -102,6 +112,8 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
 pub enum CmdType {
     /// Quit Sapling
     Quit,
+    /// Write current buffer to disk
+    Write,
     /// Replace the selected node, expects an argument
     Replace,
     /// Insert a new node as the last child of the cursor, expects an argument
@@ -126,6 +138,7 @@ impl CmdType {
     pub fn summary_string(&self) -> &'static str {
         match self {
             CmdType::Quit => "quit",
+            CmdType::Write => "write",
             CmdType::Replace => "replace",
             CmdType::InsertChild => "insert child",
             CmdType::InsertBefore => "insert before",
@@ -162,6 +175,8 @@ pub enum Action {
     Redo,
     /// Quit Sapling
     Quit,
+    /// Write current buffer to disk
+    Write,
 }
 
 impl Action {
@@ -181,6 +196,7 @@ impl Action {
             Action::Undo => "undo a change".to_string(),
             Action::Redo => "redo a change".to_string(),
             Action::Quit => "quit Sapling".to_string(),
+            Action::Write => "write to disk".to_string(),
         }
     }
 
@@ -195,6 +211,7 @@ impl Action {
             Action::MoveCursor(_) => Category::Move,
             Action::Undo | Action::Redo => Category::History,
             Action::Quit => Category::Quit,
+            Action::Write => Category::IO,
         }
     }
 }
@@ -241,6 +258,7 @@ fn parse_command(keymap: &KeyMap, keys: &[Key]) -> ParseResult<(usize, Action)> 
             CmdType::Redo => Action::Redo,
             // "q" quits Sapling
             CmdType::Quit => Action::Quit,
+            CmdType::Write => Action::Write,
         },
     ))
 }

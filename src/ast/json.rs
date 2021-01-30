@@ -6,6 +6,40 @@ use crate::arena::Arena;
 use crate::ast_class;
 use crate::core::Size;
 
+use serde_json::Value;
+
+/// Converts a [`serde_json::Value`] tree into a [`Json`] tree, whilst allocating the nodes into a
+/// given arena.
+pub fn add_value_to_arena<'arena>(
+    json: Value,
+    arena: &'arena Arena<Json<'arena>>,
+) -> &'arena Json<'arena> {
+    match json {
+        Value::Null => arena.alloc(Json::Null),
+        Value::Bool(true) => arena.alloc(Json::True),
+        Value::Bool(false) => arena.alloc(Json::False),
+        Value::Number(_) => unimplemented!(),
+        Value::String(s) => arena.alloc(Json::Str(s)),
+        Value::Array(children) => arena.alloc(Json::Array(
+            children
+                .into_iter()
+                .map(|c| add_value_to_arena(c, arena))
+                .collect(),
+        )),
+        Value::Object(fields) => arena.alloc(Json::Object(
+            fields
+                .into_iter()
+                .map(|(key, value)| {
+                    arena.alloc(Json::Field([
+                        arena.alloc(Json::Str(key)),
+                        add_value_to_arena(value, arena),
+                    ]))
+                })
+                .collect(),
+        )),
+    }
+}
+
 /// An enum to hold the different ways that a JSON AST can be formatted
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub enum JsonFormat {
@@ -59,6 +93,7 @@ impl Default for Json<'_> {
 impl<'arena> Ast<'arena> for Json<'arena> {
     type FormatStyle = JsonFormat;
     type Class = Class;
+    type ParseErr = serde_json::Error;
 
     /* FORMATTING FUNCTIONS */
 
@@ -157,6 +192,14 @@ impl<'arena> Ast<'arena> for Json<'arena> {
                 tokens
             }
         }
+    }
+
+    fn parse_to_arena(
+        text: impl std::io::Read,
+        arena: &'arena mut Arena<Self>,
+    ) -> Result<&'arena Self, Self::ParseErr> {
+        let value = serde_json::from_reader::<_, Value>(text)?;
+        Ok(add_value_to_arena(value, arena))
     }
 
     fn size(&self, format_style: &Self::FormatStyle) -> Size {

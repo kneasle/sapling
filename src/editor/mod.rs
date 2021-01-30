@@ -17,6 +17,7 @@ use state::State;
 use std::borrow::{Borrow, Cow};
 use std::collections::{hash_map::DefaultHasher, HashSet};
 use std::hash::Hasher;
+use std::path::PathBuf;
 
 use tuikit::prelude::*;
 
@@ -33,8 +34,7 @@ impl<'arena, Node: Ast<'arena>> State<'arena, Node> for IntermediateState {
     fn transition(
         self: Box<Self>,
         _key: Key,
-        _config: &Config,
-        _tree: &mut Dag<'arena, Node>,
+        _tree: &mut Editor<'arena, Node>,
     ) -> (
         Box<dyn State<'arena, Node>>,
         Option<(String, keystroke_log::Category)>,
@@ -65,6 +65,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     config: Config,
     /// A list of the keystrokes that have been executed, along with a summary of what they mean
     keystroke_log: KeyStrokeLog,
+    file_path: PathBuf,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
@@ -73,6 +74,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         tree: &'arena mut Dag<'arena, Node>,
         format_style: Node::FormatStyle,
         config: Config,
+        file_path: PathBuf,
     ) -> Editor<'arena, Node> {
         let term = Term::new().unwrap();
         Editor {
@@ -82,6 +84,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             state: Box::new(normal_mode::State::default()),
             config,
             keystroke_log: KeyStrokeLog::new(10),
+            file_path,
         }
     }
 
@@ -245,8 +248,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                         Box::new(IntermediateState) as Box<dyn State<'arena, Node>>,
                     ),
                     key,
-                    &self.config,
-                    &mut self.tree,
+                    self,
                 );
 
                 self.state = new_state;
