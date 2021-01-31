@@ -1,9 +1,7 @@
 //! Definition of the state machine of Sapling's editor modes
 
-use super::dag::Dag;
-use super::keystroke_log::Category;
+use super::{keystroke_log::Category, Editor};
 use crate::ast::Ast;
-use crate::config::Config;
 
 use std::borrow::Cow;
 
@@ -17,8 +15,7 @@ impl<'arena, Node: Ast<'arena>> State<'arena, Node> for Quit {
     fn transition(
         self: Box<Self>,
         _key: Key,
-        _config: &Config,
-        _tree: &mut Dag<'arena, Node>,
+        _editor: &mut Editor<'arena, Node>,
     ) -> (Box<dyn State<'arena, Node>>, Option<(String, Category)>) {
         (self, None)
     }
@@ -39,8 +36,7 @@ pub trait State<'arena, Node: Ast<'arena>>: std::fmt::Debug {
     fn transition(
         self: Box<Self>,
         key: Key,
-        config: &Config,
-        tree: &mut Dag<'arena, Node>,
+        editor: &mut Editor<'arena, Node>,
     ) -> (Box<dyn State<'arena, Node>>, Option<(String, Category)>);
 
     /// Return the keystroke buffer that should be displayed in the bottom right corner of the

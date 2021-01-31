@@ -47,6 +47,7 @@ pub type KeyMap = std::collections::HashMap<Key, CmdType>;
 pub fn default_keymap() -> KeyMap {
     hmap::hmap! {
         Key::Char('q') => CmdType::Quit,
+        Key::Char('w') => CmdType::Write,
         Key::Char('i') => CmdType::InsertBefore,
         Key::Char('a') => CmdType::InsertAfter,
         Key::Char('o') => CmdType::InsertChild,

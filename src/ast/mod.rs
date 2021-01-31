@@ -154,6 +154,8 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
     type FormatStyle;
     /// A type parameter that will represent the different node types this AST can use
     type Class: AstClass;
+    /// The error type for ways that parsing can fail
+    type ParseErr: std::error::Error;
 
     /* FORMATTING FUNCTIONS */
 
@@ -163,6 +165,12 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
         &'arena self,
         format_style: &Self::FormatStyle,
     ) -> Vec<RecTok<'arena, Self>>;
+
+    /// Parses from text and adds to an arena, return a pointer to the allocated root node.
+    fn parse_to_arena(
+        text: impl std::io::Read,
+        arena: &'arena mut Arena<Self>,
+    ) -> Result<&'arena Self, Self::ParseErr>;
 
     /// Uses [`display_tokens_rec`](Self::display_tokens_rec) to build a stream of
     /// [`DisplayToken`]s representing this node, but where each [`DisplayToken`] is paired with a
