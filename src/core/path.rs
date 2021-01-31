@@ -176,7 +176,10 @@ impl<'arena, Node: Ast<'arena>> std::iter::FusedIterator for NodeIter<'arena, '_
 mod tests {
     use super::Path;
     use crate::arena::Arena;
-    use crate::ast::{json::Json, test_json::TestJson, Ast};
+    use crate::ast::json::{add_value_to_arena, Json};
+    use crate::ast::Ast;
+
+    use serde_json::json;
 
     #[test]
     fn is_root() {
@@ -248,12 +251,7 @@ mod tests {
     fn node_iter() {
         // Create some test Json and add it to an arena
         let arena = Arena::new();
-        let root = TestJson::Array(vec![
-            TestJson::True,
-            TestJson::False,
-            TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-        ])
-        .add_to_arena(&arena);
+        let root = add_value_to_arena(json!([true, false, { "value": true }]), &arena);
         // Create a path to the root, and test properties of it
         let mut path = Path::root();
         assert_eq!(path.node_iter(root).collect::<Vec<&Json<'_>>>(), [root]);
@@ -306,12 +304,7 @@ mod tests {
     fn cursor() {
         // Create some test Json and add it to an arena
         let arena = Arena::new();
-        let root = TestJson::Array(vec![
-            TestJson::True,
-            TestJson::False,
-            TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-        ])
-        .add_to_arena(&arena);
+        let root = add_value_to_arena(json!([true, false, { "value": true }]), &arena);
         // Create a path to the root, and check that the cursor is the root
         let mut path = Path::root();
         assert!(std::ptr::eq(path.cursor(root), root));
@@ -331,12 +324,7 @@ mod tests {
     fn cursor_and_parent() {
         // Create some test Json and add it to an arena
         let arena = Arena::new();
-        let root = TestJson::Array(vec![
-            TestJson::True,
-            TestJson::False,
-            TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-        ])
-        .add_to_arena(&arena);
+        let root = add_value_to_arena(json!([true, false, { "value": true }]), &arena);
         // Create a path to the root.  The root has no parent
         let mut path = Path::root();
         assert_eq!(path.cursor_and_parent(root), (root, None));

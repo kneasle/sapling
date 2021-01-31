@@ -439,23 +439,59 @@ impl<'arena> Ast<'arena> for Json<'arena> {
     }
 }
 
+// Allow JSON to be compared to `serde_json::Value`s
+impl PartialEq<Value> for Json<'_> {
+    fn eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Json::True, Value::Bool(true))
+            | (Json::False, Value::Bool(false))
+            | (Json::Null, Value::Null) => true,
+            (Json::Str(s1), Value::String(s2)) => s1 == s2,
+            (Json::Array(cs1), Value::Array(cs2)) => {
+                cs1.iter().zip(cs2.iter()).all(|(a, b)| *a == b)
+            }
+            (Json::Object(fields), Value::Object(map)) => {
+                if fields.len() != map.len() {
+                    return false;
+                }
+                for &f in fields {
+                    if let Json::Field([Json::Str(key), value]) = f {
+                        if let Some(v) = map.get(key) {
+                            if value != &v {
+                                return false;
+                            }
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                true
+            }
+            // Fields cannot be made into a `serde_json::Value`
+            (Json::Field(_), _) => false,
+            _ => false,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::super::test_json::TestJson;
-    use super::JsonFormat;
+    use super::{add_value_to_arena, JsonFormat};
     use crate::arena::Arena;
     use crate::ast::Ast;
     use crate::core::Size;
 
+    use serde_json::json;
+
     #[test]
     fn to_text() {
         for (tree, expected_compact_string, expected_pretty_string, tree_string) in &[
-            (TestJson::True, "true", "true", "true"),
-            (TestJson::False, "false", "false", "false"),
-            (TestJson::Array(vec![]), "[]", "[]", "array"),
-            (TestJson::Object(vec![]), "{}", "{}", "object"),
+            (json!(true), "true", "true", "true"),
+            (json!(false), "false", "false", "false"),
+            (json!([]), "[]", "[]", "array"),
+            (json!({}), "{}", "{}", "object"),
             (
-                TestJson::Array(vec![TestJson::True, TestJson::False]),
+                json!([true, false]),
                 "[true, false]",
                 "[
     true,
@@ -466,10 +502,7 @@ mod tests {
   false",
             ),
             (
-                TestJson::Object(vec![
-                    ("foo".to_string(), TestJson::True),
-                    ("bar".to_string(), TestJson::False),
-                ]),
+                json!({"foo": true, "bar": false}),
                 r#"{"foo": true, "bar": false}"#,
                 r#"{
     "foo": true,
@@ -484,16 +517,7 @@ mod tests {
     false"#,
             ),
             (
-                TestJson::Array(vec![
-                    TestJson::Object(vec![
-                        (
-                            "foos".to_string(),
-                            TestJson::Array(vec![TestJson::False, TestJson::True, TestJson::False]),
-                        ),
-                        ("bar".to_string(), TestJson::False),
-                    ]),
-                    TestJson::True,
-                ]),
+                json!([{"foos": [false, true, false], "bar": false}, true]),
                 r#"[{"foos": [false, true, false], "bar": false}, true]"#,
                 r#"[
     {
@@ -523,7 +547,7 @@ mod tests {
             println!("Testing {}", expected_compact_string);
 
             let arena = Arena::new();
-            let root = tree.add_to_arena(&arena);
+            let root = add_value_to_arena(tree.clone(), &arena);
             // Test compact string
             let compact_string = root.to_text(&JsonFormat::Compact);
             assert_eq!(compact_string, *expected_compact_string);
