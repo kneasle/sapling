@@ -5,6 +5,7 @@ use crate::ast;
 use crate::ast::{Ast, AstClass};
 
 use crate::core::{Direction, Path, Side};
+use std::{collections::HashMap, hash::Hash};
 
 /// The two possible locations where an edit could cause nodes to be replaced
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -701,6 +702,62 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         let mut s = String::new();
         self.write_text(&mut s, format);
         s
+    }
+
+    ///  Generate `.dot` code of the internal state of the `Dag`
+    pub fn to_dot_code(&self) -> String {
+        /// Helper function that recursively builds dot code for the entire subtree of a given node
+        fn add_to_graph<'arena, Node: Ast<'arena>>(
+            node: &'arena Node,
+            digraph_edges: &mut String,
+            hmap_nodes: &mut HashMap<usize, String>,
+        ) {
+            let name = node as *const Node as usize;
+            if hmap_nodes.get(&name).is_some() {
+                return;
+            }
+            hmap_nodes.insert(
+                name,
+                format!("node{} [label={:?}]\n", name, node.debug_name()),
+            );
+
+            if node.children().len() > 0 {
+                for &child in node.children() {
+                    add_to_graph(child, digraph_edges, hmap_nodes);
+                }
+
+                let edge = format!("node{} -> ", name);
+                digraph_edges.push_str(&edge);
+
+                for i in 0..node.children().len() {
+                    let child_name = node.children()[i] as *const Node as usize;
+                    if i != node.children().len() - 1 {
+                        digraph_edges.push_str(&format!("node{}, ", child_name));
+                    } else {
+                        digraph_edges.push_str(&format!("node{}", child_name));
+                    }
+                }
+                digraph_edges.push_str("\n");
+            }
+        }
+
+        let mut hmap_nodes = HashMap::<usize, String>::new();
+        let mut dot_buffer = "digraph G {\nnode [ordering=out]\n".to_owned();
+        let mut digraph_edges = "\n".to_owned();
+        let digraph_tail = "\n}";
+
+        for snapshot in &self.root_history {
+            add_to_graph(snapshot.root, &mut digraph_edges, &mut hmap_nodes);
+        }
+        for value in hmap_nodes.values() {
+            dot_buffer.push_str(&value);
+        }
+        dot_buffer.push_str("\n");
+
+        dot_buffer.push_str(&digraph_edges);
+        dot_buffer.push_str(&digraph_tail);
+
+        dot_buffer
     }
 }
 
