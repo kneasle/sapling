@@ -708,10 +708,12 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
 mod tests {
     use super::{Dag, EditErr, EditResult, EditSuccess, Insertable};
     use crate::arena::Arena;
-    use crate::ast::json::{Class, Json};
-    use crate::ast::test_json::TestJson;
+    use crate::ast::json::{add_value_to_arena, Class, Json, JsonFormat};
+    use crate::ast::Ast;
     use crate::core::{Direction, Path, Side};
     use crate::editor::normal_mode::Action;
+
+    use serde_json::{json, Value};
 
     /// Extension trait used to add the `execute_action` and `execute_action_once` methods to Dag
     /// (`execute_action` was removed but is incredibly helpful for unit testing).
@@ -740,16 +742,16 @@ mod tests {
     }
 
     fn run_test_ok_count(
-        start_tree: TestJson,
+        start_tree: Value,
         start_cursor_location: Path,
         count: usize,
         action: Action,
         expected_edit_success: EditSuccess<Class>,
-        expected_tree: TestJson,
+        expected_tree: Value,
         expected_cursor_location: Path,
     ) {
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree, &arena);
         let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
@@ -757,7 +759,7 @@ mod tests {
             dag.execute_action(count, action),
             "Not equal in action result"
         );
-        assert_eq!(expected_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), expected_tree, "Not equal in tree.");
         assert_eq!(
             expected_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
@@ -765,11 +767,11 @@ mod tests {
     }
 
     fn run_test_ok(
-        start_tree: TestJson,
+        start_tree: Value,
         start_cursor_location: Path,
         action: Action,
         expected_edit_success: EditSuccess<Class>,
-        expected_tree: TestJson,
+        expected_tree: Value,
         expected_cursor_location: Path,
     ) {
         run_test_ok_count(
@@ -785,7 +787,7 @@ mod tests {
 
     /// Helper function for successfully moving the cursor the full specified distance
     fn test_movement(
-        start_tree: TestJson,
+        start_tree: Value,
         start_cursor_location: Path,
         count: usize,
         direction: Direction,
@@ -803,7 +805,7 @@ mod tests {
 
     /// Helper function for when the specified distance is not necessarily the distance covered.
     fn test_capped_movement(
-        start_tree: TestJson,
+        start_tree: Value,
         start_cursor_location: Path,
         distance: usize,
         direction: Direction,
@@ -811,7 +813,7 @@ mod tests {
         expected_cursor_location: Path,
     ) {
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.clone().add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree.clone(), &arena);
         let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
 
         assert_eq!(
@@ -819,7 +821,7 @@ mod tests {
             dag.move_cursor(distance, direction),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree.");
         assert_eq!(
             expected_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
@@ -827,14 +829,14 @@ mod tests {
     }
 
     fn run_test_err_count(
-        start_tree: TestJson,
+        start_tree: Value,
         start_cursor_location: Path,
         count: usize,
         action: Action,
         expected_edit_err: EditErr<Class>,
     ) {
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.clone().add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree.clone(), &arena);
         let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
 
         assert_eq!(
@@ -842,7 +844,7 @@ mod tests {
             dag.execute_action(count, action),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree.");
         assert_eq!(
             start_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
@@ -850,13 +852,13 @@ mod tests {
     }
 
     fn run_test_err(
-        start_tree: TestJson,
+        start_tree: Value,
         start_cursor_location: Path,
         action: Action,
         expected_edit_err: EditErr<Class>,
     ) {
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.clone().add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree.clone(), &arena);
         let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
 
         assert_eq!(
@@ -864,7 +866,7 @@ mod tests {
             dag.execute_action_once(action),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree.");
         assert_eq!(
             start_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
@@ -875,11 +877,11 @@ mod tests {
 
     /// Helper function specifically to run a replace test
     fn test_single_replace_ok(
-        start_tree: TestJson,
+        start_tree: Value,
         cursor: Path,
         node: char,
         class: Class,
-        end_tree: TestJson,
+        end_tree: Value,
     ) {
         run_test_ok(
             start_tree,
@@ -897,61 +899,46 @@ mod tests {
     fn replace_single() {
         // Replace root with one valid char
         test_single_replace_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Null]),
+            json!([true, null]),
             Path::root(),
             'f',
             Class::False,
-            TestJson::False,
+            json!(false),
         );
         // Replace the root with a char this doesn't correspond to a node
         run_test_err(
-            TestJson::False,
+            json!(false),
             Path::root(),
             Action::Replace(Insertable::CountedNode(1, 'm')),
             EditErr::CharNotANode('m'),
         );
         // It doesn't matter how big the branch you're replacing is
         test_single_replace_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            json!([true, false]),
             Path::root(),
             'n',
             Class::Null,
-            TestJson::Null,
+            json!(null),
         );
         // Explicitly replacing just the RHS of fields with one node should just be fine
         test_single_replace_ok(
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::True),
-            ]),
+            json!({"key-1": false, "key-2": true}),
             Path::from_vec(vec![1, 1]),
             'n',
             Class::Null,
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::Null),
-            ]),
+            json!({"key-1": false, "key-2": null}),
         );
         // Replacing the key with a single string is fine (but clears the key's string)
         test_single_replace_ok(
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::True),
-            ]),
+            json!({"key-1": false, "key-2": true}),
             Path::from_vec(vec![1, 0]),
             's',
             Class::Str,
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("".to_string(), TestJson::True),
-            ]),
+            json!({"key-1": false, "": true}),
         );
         // Replacing a key with an invalid node is not OK
         run_test_err(
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::True),
-            ]),
+            json!({"key-1": false, "key-2": true}),
             Path::from_vec(vec![1, 0]),
             Action::Replace(Insertable::CountedNode(1, 'n')),
             EditErr::CannotBeChild {
@@ -968,65 +955,56 @@ mod tests {
     fn replace_nodecounts() {
         // Replace root with too many nodes, of an invalid type
         run_test_err(
-            TestJson::False,
+            json!(false),
             Path::root(),
             Action::Replace(Insertable::CountedNode(3, 'm')),
             EditErr::CharNotANode('m'),
         );
         // Replace root with too many nodes of a valid type
         run_test_err(
-            TestJson::False,
+            json!([{"key": "value"}, true]),
             Path::root(),
             Action::Replace(Insertable::CountedNode(3, 's')),
             EditErr::AddSiblingToRoot,
         );
         // Replace root with no nodes
         run_test_err(
-            TestJson::False,
+            json!([true, false, null]),
             Path::root(),
             Action::Replace(Insertable::CountedNode(0, 's')),
             EditErr::DeletingRoot,
         );
         // Replacing with 0 nodes should be the same as deletion
         run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            json!([true, []]),
             Path::from_vec(vec![1]),
             Action::Replace(Insertable::CountedNode(0, 'n')),
             EditSuccess::Replace(Class::Null),
-            TestJson::Array(vec![TestJson::True]),
+            json!([true]),
             Path::from_vec(vec![0]),
         );
         // Replacing with exactly one valid node
         run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            json!([true, []]),
             Path::from_vec(vec![1]),
             Action::Replace(Insertable::CountedNode(1, 'n')),
             EditSuccess::Replace(Class::Null),
-            TestJson::Array(vec![TestJson::True, TestJson::Null]),
+            json!([true, null]),
             Path::from_vec(vec![1]),
         );
         // Replacing with multiple valid nodes should replace the cursor with several nodes
         // (perhaps not the best action).
         run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            json!([true, []]),
             Path::from_vec(vec![1]),
             Action::Replace(Insertable::CountedNode(4, 'n')),
             EditSuccess::Replace(Class::Null),
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Null,
-                TestJson::Null,
-                TestJson::Null,
-                TestJson::Null,
-            ]),
+            json!([true, null, null, null]),
             Path::from_vec(vec![4]),
         );
         // Replacing a key with too many strings is not OK
         run_test_err(
-            TestJson::Object(vec![
-                ("key-1".to_string(), TestJson::False),
-                ("key-2".to_string(), TestJson::True),
-            ]),
+            json!({"key-1": true, "key-2": false}),
             Path::from_vec(vec![1, 0]),
             Action::Replace(Insertable::CountedNode(3, 'n')),
             EditErr::CannotBeChild {
@@ -1043,54 +1021,27 @@ mod tests {
     fn replace_precount() {
         // `3rt` causes `[<true>, [], "", null]` going to `[true, true, <true>, null]`
         run_test_ok_count(
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Array(vec![]),
-                TestJson::Str("".to_owned()),
-                TestJson::Null,
-            ]),
+            json!([true, [], "", null]),
             Path::from_vec(vec![0]),
             3,
             Action::Replace(Insertable::CountedNode(1, 't')),
             EditSuccess::Replace(Class::True),
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::True,
-                TestJson::True,
-                TestJson::Null,
-            ]),
+            json!([true, true, true, null]),
             Path::from_vec(vec![2]),
         );
         // `2r2t` causes `[<true>, [], "", null]` going to `[true, true, true, <true>, "", null]`
         run_test_ok_count(
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Array(vec![]),
-                TestJson::Str("".to_owned()),
-                TestJson::Null,
-            ]),
+            json!([true, [], "", null]),
             Path::from_vec(vec![0]),
             2,
             Action::Replace(Insertable::CountedNode(2, 't')),
             EditSuccess::Replace(Class::True),
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::True,
-                TestJson::True,
-                TestJson::True,
-                TestJson::Str("".to_owned()),
-                TestJson::Null,
-            ]),
+            json!([true, true, true, true, "", null]),
             Path::from_vec(vec![3]),
         );
         // `2r2t` causes the root to gain siblings, which is not allowed
         run_test_err_count(
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Array(vec![]),
-                TestJson::Str("".to_owned()),
-                TestJson::Null,
-            ]),
+            json!([true, [], "", null]),
             Path::root(),
             2,
             Action::Replace(Insertable::CountedNode(2, 't')),
@@ -1103,7 +1054,7 @@ mod tests {
     #[test]
     fn delete_root_err() {
         run_test_err(
-            TestJson::Array(vec![]),
+            json!([]),
             Path::root(),
             Action::Delete,
             EditErr::DeletingRoot,
@@ -1111,7 +1062,7 @@ mod tests {
 
         // dag level==1
         run_test_err(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::root(),
             Action::Delete,
             EditErr::DeletingRoot,
@@ -1122,35 +1073,35 @@ mod tests {
     fn delete_cursor_move() {
         // If the cursor has later siblings, then deletion won't move the cursor
         run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            json!([true, []]),
             Path::from_vec(vec![0]),
             Action::Delete,
             EditSuccess::Delete {
                 name: "true".to_string(),
             },
-            TestJson::Array(vec![TestJson::Array(vec![])]),
+            json!([[]]),
             Path::from_vec(vec![0]),
         );
         // Cursor should move backwards if we deleted the highest-indexed sibling
         run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            json!([true, []]),
             Path::from_vec(vec![1]),
             Action::Delete,
             EditSuccess::Delete {
                 name: "array".to_string(),
             },
-            TestJson::Array(vec![TestJson::True]),
+            json!([true]),
             Path::from_vec(vec![0]),
         );
         // Cursor should move up a level if we've deleted the last child
         run_test_ok(
-            TestJson::Array(vec![TestJson::True]),
+            json!([true]),
             Path::from_vec(vec![0]),
             Action::Delete,
             EditSuccess::Delete {
                 name: "true".to_string(),
             },
-            TestJson::Array(vec![]),
+            json!([]),
             Path::root(),
         );
     }
@@ -1159,50 +1110,40 @@ mod tests {
     fn delete_counts() {
         // Deleting all of the children in one shot should move the cursor up
         run_test_ok_count(
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            json!([true, []]),
             Path::from_vec(vec![0]),
             2,
             Action::Delete,
             EditSuccess::Delete {
                 name: "true".to_string(),
             },
-            TestJson::Array(vec![]),
+            json!([[]]),
             Path::root(),
         );
         // Test deleting exactly the right number of nodes out of the middle of an array
         run_test_ok_count(
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Null,
-                TestJson::False,
-                TestJson::Array(vec![]),
-            ]),
+            json!([true, null, false, []]),
             Path::from_vec(vec![1]),
             2,
             Action::Delete,
             EditSuccess::Delete {
                 name: "null".to_string(),
             },
-            TestJson::Array(vec![TestJson::True, TestJson::Array(vec![])]),
+            json!([true, []]),
             Path::from_vec(vec![1]),
         );
         // Trying to delete more nodes than there are siblings after the cursor is not an error,
         // but it should not continue deleting backwards (this makes `5x` subtly different from
         // `xxxxx`).
         run_test_ok_count(
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Null,
-                TestJson::False,
-                TestJson::Array(vec![]),
-            ]),
+            json!([true, null, false, []]),
             Path::from_vec(vec![2]),
             4,
             Action::Delete,
             EditSuccess::Delete {
                 name: "false".to_string(),
             },
-            TestJson::Array(vec![TestJson::True, TestJson::Null]),
+            json!([true, null]),
             Path::from_vec(vec![1]),
         );
     }
@@ -1213,21 +1154,21 @@ mod tests {
     fn move_sideways() {
         // move to previous sibling node of root
         run_test_err(
-            TestJson::Array(vec![]),
+            json!([]),
             Path::root(),
             Action::MoveCursor(Direction::Prev),
             EditErr::MoveToSiblingOfRoot,
         );
         // move to next sibling node of root
         run_test_err(
-            TestJson::Array(vec![]),
+            json!([]),
             Path::root(),
             Action::MoveCursor(Direction::Next),
             EditErr::MoveToSiblingOfRoot,
         );
         // move sideways in an array, not reaching the end
         test_movement(
-            TestJson::Array(vec![TestJson::True, TestJson::Null, TestJson::False]),
+            json!([true, null, false]),
             Path::from_vec(vec![0]),
             1,
             Direction::Next,
@@ -1235,7 +1176,7 @@ mod tests {
         );
         // move twice sideways in an array, just reaching the end
         test_movement(
-            TestJson::Array(vec![TestJson::True, TestJson::Null, TestJson::False]),
+            json!([true, null, false]),
             Path::from_vec(vec![0]),
             2,
             Direction::Next,
@@ -1243,7 +1184,7 @@ mod tests {
         );
         // move twice sideways in an array, just overshooting the end
         test_capped_movement(
-            TestJson::Array(vec![TestJson::True, TestJson::Null, TestJson::False]),
+            json!([true, null, false]),
             Path::from_vec(vec![0]),
             5,
             Direction::Next,
@@ -1255,17 +1196,10 @@ mod tests {
     #[test]
     fn move_down() {
         // move to nonexistent child node of root
-        test_capped_movement(
-            TestJson::Array(vec![]),
-            Path::root(),
-            1,
-            Direction::Down,
-            0,
-            Path::root(),
-        );
+        test_capped_movement(json!([]), Path::root(), 1, Direction::Down, 0, Path::root());
         // Move down the tree once
         test_movement(
-            TestJson::Array(vec![TestJson::True, TestJson::Object(vec![])]),
+            json!([true, []]),
             Path::root(),
             1,
             Direction::Down,
@@ -1273,38 +1207,23 @@ mod tests {
         );
         // Move down the tree to a field.  JSON is '{"key": null}'
         test_movement(
-            TestJson::Object(vec![("key".to_owned(), TestJson::Null)]),
+            json!({ "key": null }),
             Path::root(),
             1,
             Direction::Down,
             Path::from_vec(vec![0; 1]),
         );
-        // Move down the tree multiple times.  JSON is '[[{"key": null}, true], true, {}]'
+        // Move down the tree multiple times
         test_movement(
-            TestJson::Array(vec![
-                TestJson::Array(vec![
-                    TestJson::Object(vec![("key".to_owned(), TestJson::Null)]),
-                    TestJson::True,
-                ]),
-                TestJson::True,
-                TestJson::Object(vec![]),
-            ]),
+            json!([[{ "key": null }, true], true, {}]),
             Path::root(),
             4,
             Direction::Down,
             Path::from_vec(vec![0; 4]),
         );
         // Move down the tree multiple times, but not as many times as specified.  JSON is
-        // '[[true, {"key": null}], true, {}]'
         test_capped_movement(
-            TestJson::Array(vec![
-                TestJson::Array(vec![
-                    TestJson::True,
-                    TestJson::Object(vec![("key".to_owned(), TestJson::Null)]),
-                ]),
-                TestJson::True,
-                TestJson::Object(vec![]),
-            ]),
+            json!([[true, { "key": null }], true, {}]),
             Path::root(),
             4,
             Direction::Down,
@@ -1316,17 +1235,10 @@ mod tests {
     #[test]
     fn move_up() {
         // move to parent node of root
-        test_capped_movement(
-            TestJson::Array(vec![]),
-            Path::root(),
-            1,
-            Direction::Up,
-            0,
-            Path::root(),
-        );
+        test_capped_movement(json!([]), Path::root(), 1, Direction::Up, 0, Path::root());
         // move to root from child
         test_movement(
-            TestJson::Array(vec![TestJson::False, TestJson::True]),
+            json!([false, true]),
             Path::from_vec(vec![1]),
             1,
             Direction::Up,
@@ -1334,10 +1246,7 @@ mod tests {
         );
         // move from child not to root
         test_movement(
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Array(vec![TestJson::False, TestJson::Null]),
-            ]),
+            json!([true, [false, null]]),
             Path::from_vec(vec![1, 0]),
             1,
             Direction::Up,
@@ -1345,10 +1254,7 @@ mod tests {
         );
         // move from child to root, multiple times
         test_movement(
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Array(vec![TestJson::False, TestJson::Null]),
-            ]),
+            json!([true, [false, null]]),
             Path::from_vec(vec![1, 0]),
             2,
             Direction::Up,
@@ -1356,10 +1262,7 @@ mod tests {
         );
         // move to root from child, multiple times (but only 2 of 3 moves are actually possible)
         test_capped_movement(
-            TestJson::Array(vec![
-                TestJson::True,
-                TestJson::Array(vec![TestJson::False, TestJson::Null]),
-            ]),
+            json!([true, [false, null]]),
             Path::from_vec(vec![1, 0]),
             3,
             Direction::Up,
@@ -1372,14 +1275,14 @@ mod tests {
 
     #[test]
     fn undo_root() {
-        let start_tree = TestJson::Array(vec![]);
+        let start_tree = json!([]);
         let start_cursor_location = Path::root();
-        let end_tree = TestJson::False;
+        let end_tree = json!(false);
         let end_cursor_location = Path::root();
 
         // Initialise the Dag with the `start_tree`
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree.clone(), &arena);
         let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
 
         // We start with an empty Json array (`[]`), and we replace it with `false`
@@ -1388,7 +1291,7 @@ mod tests {
             dag.replace_cursor(1, Insertable::CountedNode(1, 'f')),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), end_tree, "Not equal in tree.");
         assert_eq!(
             end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
@@ -1400,20 +1303,20 @@ mod tests {
             dag.undo(1),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree.");
         assert_eq!(
             start_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
         );
 
         // Dag level == 1
-        let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
+        let start_tree = json!([null, true, false]);
         let start_cursor_location = Path::root();
         // We move the cursor so we expect the cursor to move but no change to occur to the tree
         let end_cursor_location = Path::from_vec(vec![0]);
 
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree.clone(), &arena);
         let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
@@ -1421,7 +1324,7 @@ mod tests {
             dag.move_cursor(1, Direction::Down),
             "Not equal in action result (move 0)."
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 0).");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree (move 0).");
         assert_eq!(
             end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 0)."
@@ -1433,7 +1336,7 @@ mod tests {
             dag.undo(1),
             "Not equal in action result (move 1)"
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 1).");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree (move 1).");
         assert_eq!(
             end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 1)."
@@ -1442,11 +1345,11 @@ mod tests {
 
     #[test]
     fn redo_root() {
-        let start_tree = TestJson::Array(vec![]);
-        let end_tree = TestJson::Object(vec![]);
+        let start_tree = json!([]);
+        let end_tree = json!({});
 
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree.clone(), &arena);
         let mut dag = Dag::new(&arena, root, Path::root());
 
         assert_eq!(
@@ -1454,7 +1357,7 @@ mod tests {
             dag.replace_cursor(1, Insertable::CountedNode(1, 'o')),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), end_tree, "Not equal in tree.");
         assert_eq!(
             Path::root(),
             dag.current_cursor_path,
@@ -1467,7 +1370,7 @@ mod tests {
             dag.undo(1),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree.");
         assert_eq!(
             Path::root(),
             dag.current_cursor_path,
@@ -1480,7 +1383,7 @@ mod tests {
             dag.redo(1),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), end_tree, "Not equal in tree.");
         assert_eq!(
             Path::root(),
             dag.current_cursor_path,
@@ -1488,13 +1391,13 @@ mod tests {
         );
 
         //Dag level == 1
-        let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
+        let start_tree = json!([null, true, false]);
         let start_cursor_location = Path::root();
         let end_cursor_location = Path::from_vec(vec![0]);
 
         // Initialise a Dag with the cursor at the root
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree.clone(), &arena);
         let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
@@ -1502,7 +1405,7 @@ mod tests {
             dag.move_cursor(1, Direction::Down),
             "Not equal in action result (move 0)."
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 0).");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree (move 0).");
         assert_eq!(
             end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 0)."
@@ -1514,7 +1417,7 @@ mod tests {
             dag.undo(1),
             "Not equal in action result (move 1)."
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 1).");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree (move 1).");
         assert_eq!(
             end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 1). "
@@ -1526,7 +1429,7 @@ mod tests {
             dag.redo(1),
             "Not equal in action result (move 2)."
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree (move 2).");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree (move 2).");
         assert_eq!(
             end_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location (move 2)."
@@ -1536,12 +1439,12 @@ mod tests {
     #[test]
     fn undo_redo() {
         // The original snapshot of the tree
-        let start_tree = TestJson::Array(vec![TestJson::Null, TestJson::True, TestJson::False]);
-        let end_tree = TestJson::False;
+        let start_tree = json!([null, true, false]);
+        let end_tree = json!(false);
 
         // Create and initialise Dag to test
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree.clone(), &arena);
         let mut dag = Dag::new(&arena, root, Path::root());
 
         // Step 1: Replace root with `false`
@@ -1551,7 +1454,7 @@ mod tests {
             dag.replace_cursor(1, Insertable::CountedNode(1, 'f')),
             "Not equal in action result."
         );
-        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), end_tree, "Not equal in tree.");
         assert_eq!(
             Path::root(),
             dag.current_cursor_path,
@@ -1565,7 +1468,7 @@ mod tests {
             dag.undo(1),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree.");
         assert_eq!(
             Path::root(),
             dag.current_cursor_path,
@@ -1579,7 +1482,7 @@ mod tests {
             dag.undo(1),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, dag.root(), "Failed undo modified the tree");
+        assert_eq!(*dag.root(), start_tree, "Failed undo modified the tree");
         assert_eq!(
             Path::root(),
             dag.current_cursor_path,
@@ -1593,7 +1496,7 @@ mod tests {
             dag.redo(1),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), end_tree, "Not equal in tree.");
         assert_eq!(
             Path::root(),
             dag.current_cursor_path,
@@ -1607,7 +1510,7 @@ mod tests {
             dag.redo(1),
             "Not equal in action result"
         );
-        assert_eq!(end_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), end_tree, "Not equal in tree.");
         assert_eq!(
             Path::root(),
             dag.current_cursor_path,
@@ -1617,15 +1520,19 @@ mod tests {
 
     #[test]
     fn multiple_undo_redo() {
-        // Step 0: Set up a Dag which stores the JSON `<[]>`
-        let tree_0 = TestJson::Array(vec![]);
+        // Step 0: Set up a Dag with an empty JSON array
+        let tree_0 = json!([]);
         let arena: Arena<Json> = Arena::new();
-        let mut dag = Dag::new(&arena, tree_0.add_to_arena(&arena), Path::root());
+        let mut dag = Dag::new(
+            &arena,
+            add_value_to_arena(tree_0.clone(), &arena),
+            Path::root(),
+        );
 
         /* Perform some actions on the tree */
 
         // Step 1: Insert two trues, so we end up with `[true, <true>]`
-        let tree_1 = TestJson::Array(vec![TestJson::True; 2]);
+        let tree_1 = json!([true, true]);
         assert_eq!(
             dag.insert_child(1, Insertable::CountedNode(2, 't')),
             Ok(EditSuccess::InsertChild(Class::True))
@@ -1636,16 +1543,13 @@ mod tests {
             Ok(EditSuccess::Move(1, Direction::Prev))
         );
         // Step 2: Replace the cursor with an object: `[<{}>, true]`
-        let tree_2 = TestJson::Array(vec![TestJson::Object(vec![]), TestJson::True]);
+        let tree_2 = json!([{}, true]);
         assert_eq!(
             dag.replace_cursor(1, Insertable::CountedNode(1, 'o')),
             Ok(EditSuccess::Replace(Class::Object))
         );
         // Step 3: Insert null into the object: `[{<"": null>}, true]`
-        let tree_3 = TestJson::Array(vec![
-            TestJson::Object(vec![("".to_owned(), TestJson::Null)]),
-            TestJson::True,
-        ]);
+        let tree_3 = json!([{ "": null }, true]);
         assert_eq!(
             dag.insert_child(1, Insertable::CountedNode(1, 'n')),
             Ok(EditSuccess::InsertChild(Class::Null))
@@ -1660,10 +1564,7 @@ mod tests {
             Ok(EditSuccess::Move(1, Direction::Next))
         );
         // Step 4: Replace the null with false: `[{"": <false>}, true]`
-        let tree_4 = TestJson::Array(vec![
-            TestJson::Object(vec![("".to_owned(), TestJson::False)]),
-            TestJson::True,
-        ]);
+        let tree_4 = json!([{"": false}, true]);
         assert_eq!(
             dag.replace_cursor(1, Insertable::CountedNode(1, 'f')),
             Ok(EditSuccess::Replace(Class::False))
@@ -1673,14 +1574,10 @@ mod tests {
             dag.move_cursor(1, Direction::Up),
             Ok(EditSuccess::Move(1, Direction::Up))
         );
-        // Step 5: Insert a string after the cursor: `[{"": null, <"": "">}, true]`
-        let tree_5 = TestJson::Array(vec![
-            TestJson::Object(vec![
-                ("".to_owned(), TestJson::False),
-                ("".to_owned(), TestJson::Str("".to_owned())),
-            ]),
-            TestJson::True,
-        ]);
+        // Step 5: Insert a string after the cursor: `[{"": false, <"": "">}, true]`.  This can't be
+        // generated by the json! macro (because the two values have the same key), so we use
+        // string comparison instead
+        let tree_5_str = r#"[{"": false, "": ""}, true]"#;
         assert_eq!(
             dag.insert_next_to_cursor(1, Insertable::CountedNode(1, 's'), Side::Next),
             Ok(EditSuccess::InsertNextToCursor {
@@ -1689,31 +1586,31 @@ mod tests {
             })
         );
         // Check that the tree is as we expect
-        assert_eq!(tree_5, dag.root());
+        assert_eq!(dag.root().to_text(&JsonFormat::Compact), tree_5_str);
         // 5 - 3 = 2
         assert_eq!(dag.undo(3), Ok(EditSuccess::Undo));
-        assert_eq!(tree_2, dag.root());
+        assert_eq!(*dag.root(), tree_2);
         // 2 + 2 = 4
         assert_eq!(dag.redo(2), Ok(EditSuccess::Redo));
-        assert_eq!(tree_4, dag.root());
+        assert_eq!(*dag.root(), tree_4);
         // 2 + 5 caps out at 5
         assert_eq!(dag.redo(5), Ok(EditSuccess::Redo));
-        assert_eq!(tree_5, dag.root());
+        assert_eq!(dag.root().to_text(&JsonFormat::Compact), tree_5_str);
         // 5 - 1 = 4
         assert_eq!(dag.undo(1), Ok(EditSuccess::Undo));
-        assert_eq!(tree_4, dag.root());
+        assert_eq!(*dag.root(), tree_4);
         // 4 - 1 = 3
         assert_eq!(dag.undo(1), Ok(EditSuccess::Undo));
-        assert_eq!(tree_3, dag.root());
+        assert_eq!(*dag.root(), tree_3);
         // 3 - 2 = 1
         assert_eq!(dag.undo(2), Ok(EditSuccess::Undo));
-        assert_eq!(tree_1, dag.root());
+        assert_eq!(*dag.root(), tree_1);
         // 1 - 2 caps out at 0
         assert_eq!(dag.undo(2), Ok(EditSuccess::Undo));
-        assert_eq!(tree_0, dag.root());
+        assert_eq!(*dag.root(), tree_0);
         // 0 + 5 = 5
         assert_eq!(dag.redo(5), Ok(EditSuccess::Redo));
-        assert_eq!(tree_5, dag.root());
+        assert_eq!(dag.root().to_text(&JsonFormat::Compact), tree_5_str);
     }
 
     /* INSERT CHILD */
@@ -1721,35 +1618,31 @@ mod tests {
     #[test]
     fn insert_child_single() {
         run_test_ok(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::from_vec(vec![0]),
             Action::InsertChild(Insertable::CountedNode(1, 'f')),
             EditSuccess::InsertChild(Class::False),
-            TestJson::Array(vec![TestJson::Array(vec![TestJson::False]), TestJson::True]),
+            json!([[false], true]),
             Path::from_vec(vec![0, 0]),
         );
 
         run_test_ok(
-            TestJson::Array(vec![]),
+            json!([]),
             Path::root(),
             Action::InsertChild(Insertable::CountedNode(1, 'f')),
             EditSuccess::InsertChild(Class::False),
-            TestJson::Array(vec![TestJson::False]),
+            json!([false]),
             Path::from_vec(vec![0]),
         );
 
         // Dag level == 1
 
         run_test_ok(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::root(),
             Action::InsertChild(Insertable::CountedNode(1, 'n')),
             EditSuccess::InsertChild(Class::Null),
-            TestJson::Array(vec![
-                TestJson::Array(vec![]),
-                TestJson::True,
-                TestJson::Null,
-            ]),
+            json!([[], true, null]),
             Path::from_vec(vec![2]),
         )
     }
@@ -1757,30 +1650,27 @@ mod tests {
     #[test]
     fn insert_child_nodecount() {
         run_test_ok(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::from_vec(vec![0]),
             Action::InsertChild(Insertable::CountedNode(3, 'f')),
             EditSuccess::InsertChild(Class::False),
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::False; 3]),
-                TestJson::True,
-            ]),
+            json!([[false, false, false], true]),
             Path::from_vec(vec![0, 2]),
         );
 
         run_test_ok(
-            TestJson::Array(vec![]),
+            json!([]),
             Path::root(),
             Action::InsertChild(Insertable::CountedNode(2, 'f')),
             EditSuccess::InsertChild(Class::False),
-            TestJson::Array(vec![TestJson::False, TestJson::False]),
+            json!([false, false]),
             Path::from_vec(vec![1]),
         );
 
         // Dag level == 1
 
         run_test_err(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::root(),
             Action::InsertChild(Insertable::CountedNode(0, 'n')),
             EditErr::NoNodesToInsert,
@@ -1790,45 +1680,39 @@ mod tests {
     #[test]
     fn insert_child_precount() {
         run_test_ok_count(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::from_vec(vec![0]),
             3,
             Action::InsertChild(Insertable::CountedNode(1, 'f')),
             EditSuccess::InsertChild(Class::False),
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::False; 3]),
-                TestJson::True,
-            ]),
+            json!([[false, false, false], true]),
             Path::from_vec(vec![0, 2]),
         );
 
         run_test_ok_count(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::from_vec(vec![0]),
             2,
             Action::InsertChild(Insertable::CountedNode(2, 'f')),
             EditSuccess::InsertChild(Class::False),
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::False; 4]),
-                TestJson::True,
-            ]),
+            json!([[false, false, false, false], true]),
             Path::from_vec(vec![0, 3]),
         );
 
         run_test_ok_count(
-            TestJson::Array(vec![]),
+            json!([]),
             Path::root(),
             2,
             Action::InsertChild(Insertable::CountedNode(1, 'f')),
             EditSuccess::InsertChild(Class::False),
-            TestJson::Array(vec![TestJson::False, TestJson::False]),
+            json!([false, false]),
             Path::from_vec(vec![1]),
         );
 
         // Dag level == 1
 
         run_test_err_count(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::root(),
             10,
             Action::InsertChild(Insertable::CountedNode(0, 'n')),
@@ -1840,7 +1724,7 @@ mod tests {
     #[test]
     fn insert_after() {
         run_test_err(
-            TestJson::Array(vec![]),
+            json!([]),
             Path::root(),
             Action::InsertAfter(Insertable::CountedNode(1, 'f')),
             EditErr::AddSiblingToRoot,
@@ -1848,41 +1732,34 @@ mod tests {
 
         // tree level == 1
         run_test_err(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::root(),
             Action::InsertAfter(Insertable::CountedNode(1, 'f')),
             EditErr::AddSiblingToRoot,
         );
 
         run_test_ok(
-            TestJson::Array(vec![TestJson::True, TestJson::True]),
+            json!([true, true]),
             Path::from_vec(vec![1]),
             Action::InsertAfter(Insertable::CountedNode(1, 'f')),
             EditSuccess::InsertNextToCursor {
                 side: Side::Next,
                 class: Class::False,
             },
-            TestJson::Array(vec![TestJson::True, TestJson::True, TestJson::False]),
+            json!([true, true, false]),
             Path::from_vec(vec![2]),
         );
 
         // Dag level == 2
         run_test_ok(
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::Null, TestJson::True]),
-                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-            ]),
+            json!([[null, true], {"value": true}]),
             Path::from_vec(vec![1]),
             Action::InsertAfter(Insertable::CountedNode(1, 'f')),
             EditSuccess::InsertNextToCursor {
                 side: Side::Next,
                 class: Class::False,
             },
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::Null, TestJson::True]),
-                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-                TestJson::False,
-            ]),
+            json!([[null, true], {"value": true}, false]),
             Path::from_vec(vec![2]),
         );
     }
@@ -1890,7 +1767,7 @@ mod tests {
     #[test]
     fn insert_before() {
         run_test_err(
-            TestJson::Array(vec![]),
+            json!([]),
             Path::root(),
             Action::InsertBefore(Insertable::CountedNode(1, 'f')),
             EditErr::AddSiblingToRoot,
@@ -1898,45 +1775,34 @@ mod tests {
 
         // tree level == 1
         run_test_err(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::root(),
             Action::InsertBefore(Insertable::CountedNode(1, 'f')),
             EditErr::AddSiblingToRoot,
         );
 
         run_test_ok(
-            TestJson::Array(vec![TestJson::Array(vec![]), TestJson::True]),
+            json!([[], true]),
             Path::from_vec(vec![0]),
             Action::InsertBefore(Insertable::CountedNode(1, 'f')),
             EditSuccess::InsertNextToCursor {
                 side: Side::Prev,
                 class: Class::False,
             },
-            TestJson::Array(vec![
-                TestJson::False,
-                TestJson::Array(vec![]),
-                TestJson::True,
-            ]),
+            json!([false, [], true]),
             Path::from_vec(vec![0]),
         );
 
         // Dag level == 2
         run_test_ok(
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::Null, TestJson::True]),
-                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-            ]),
+            json!([[null, true], {"value": true}]),
             Path::from_vec(vec![1]),
             Action::InsertBefore(Insertable::CountedNode(1, 'f')),
             EditSuccess::InsertNextToCursor {
                 side: Side::Prev,
                 class: Class::False,
             },
-            TestJson::Array(vec![
-                TestJson::Array(vec![TestJson::Null, TestJson::True]),
-                TestJson::False,
-                TestJson::Object(vec![("value".to_string(), TestJson::True)]),
-            ]),
+            json!([[null, true], false, {"value": true}]),
             Path::from_vec(vec![1]),
         );
     }
@@ -1946,21 +1812,13 @@ mod tests {
     fn level_2_undo() {
         // The original snapshot of the tree
 
-        let start_tree = TestJson::Array(vec![
-            TestJson::Null,
-            TestJson::Object(vec![("key".to_string(), TestJson::True)]),
-            TestJson::False,
-        ]);
+        let start_tree = json!([null, {"key": true}, false]);
 
-        let expected_tree = TestJson::Array(vec![
-            TestJson::Null,
-            TestJson::Object(vec![]),
-            TestJson::False,
-        ]);
+        let expected_tree = json!([null, {}, false]);
 
         // Create and initialise Dag to test
         let arena: Arena<Json> = Arena::new();
-        let root = start_tree.add_to_arena(&arena);
+        let root = add_value_to_arena(start_tree.clone(), &arena);
         let start_cursor_location = Path::from_vec(vec![1, 0]);
         let expected_cursor_location = Path::from_vec(vec![1]);
         let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
@@ -1974,7 +1832,7 @@ mod tests {
             dag.delete_cursor(1),
             "Not equal in action result."
         );
-        assert_eq!(expected_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), expected_tree, "Not equal in tree.");
         assert_eq!(
             expected_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
@@ -1987,7 +1845,7 @@ mod tests {
             dag.undo(1),
             "Not equal in action result"
         );
-        assert_eq!(start_tree, dag.root(), "Not equal in tree.");
+        assert_eq!(*dag.root(), start_tree, "Not equal in tree.");
         assert_eq!(
             start_cursor_location.clone(),
             dag.current_cursor_path,
@@ -2008,7 +1866,7 @@ mod tests {
             // Create and initialise Dag to test (start with Json `[null]` with the cursor selecting
             // the `null`)
             let arena: Arena<Json> = Arena::new();
-            let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+            let root = add_value_to_arena(json!([null]), &arena);
             let mut dag = Dag::new(&arena, root, Path::from_vec(vec![0]));
 
             // Delete the node under the cursor, causing the cursor to move to the root
@@ -2037,7 +1895,7 @@ mod tests {
             // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
             // the `null`)
             let arena: Arena<Json> = Arena::new();
-            let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+            let root = add_value_to_arena(json!([null]), &arena);
             let mut dag = Dag::new(&arena, root, Path::root());
 
             // Inserting an invalid char into the array should error gracefully
@@ -2066,7 +1924,7 @@ mod tests {
             // Create and initialise Dag to test (start with JSON `[null]` with the cursor selecting
             // the `null`)
             let arena: Arena<Json> = Arena::new();
-            let root = TestJson::Array(vec![TestJson::Null]).add_to_arena(&arena);
+            let root = add_value_to_arena(json!([null]), &arena);
             let mut dag = Dag::new(&arena, root, Path::root());
 
             // Inserting an invalid char into the array should error gracefully
@@ -2095,13 +1953,13 @@ mod tests {
         fn i_78_incorrect_field_replace() {
             run_test_ok(
                 // We are selecting the field, not the contained value
-                TestJson::Object(vec![("key".to_owned(), TestJson::True)]),
+                json!({"key": true}),
                 Path::from_vec(vec![0]),
                 Action::Replace(Insertable::CountedNode(1, 'f')),
                 EditSuccess::Replace(Class::False),
                 // We'd **expect** a new field to implicitly be created, but that is not the case.
                 // Instead the resulting JSON will be `{false}`, which is invalid
-                TestJson::Object(vec![("".to_owned(), TestJson::False)]),
+                json!({"": false}),
                 Path::from_vec(vec![0]),
             );
         }
@@ -2110,7 +1968,7 @@ mod tests {
         #[test]
         fn pr_81_undo_add_child_crash() {
             let arena: Arena<Json> = Arena::new();
-            let root = TestJson::Array(vec![TestJson::True]).add_to_arena(&arena);
+            let root = add_value_to_arena(json!([null]), &arena);
             let mut dag = Dag::new(&arena, root, Path::from_vec(vec![0]));
 
             // Replace the root with an array
