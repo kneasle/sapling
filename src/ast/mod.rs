@@ -273,4 +273,7 @@ pub trait Ast<'arena>: std::fmt::Debug + Clone + Eq + Default + std::hash::Hash 
 
     /// Returns whether or not a give index and ['char'] is a valid root
     fn is_valid_root(&self, node_type: Self::Class) -> bool;
+
+    /// The name of this node as should be displayed in the DAG debug graph
+    fn debug_name(&self) -> String;
 }

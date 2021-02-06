@@ -437,6 +437,18 @@ impl<'arena> Ast<'arena> for Json<'arena> {
     fn is_valid_root(&self, _node_type: Class) -> bool {
         true
     }
+
+    fn debug_name(&self) -> String {
+        match self {
+            Self::True => "True".to_owned(),
+            Self::False => "False".to_owned(),
+            Self::Null => "Null".to_owned(),
+            Self::Str(string) => format!("\"{}\"", string),
+            Self::Array(_) => "Array".to_owned(),
+            Self::Field(_) => "Field".to_owned(),
+            Self::Object(_) => "Object".to_owned(),
+        }
+    }
 }
 
 // Allow JSON to be compared to `serde_json::Value`s
