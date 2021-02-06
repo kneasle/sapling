@@ -14,7 +14,10 @@ Most of the ideas for this project come from my friend Shtanton's
 the purpose of Sapling is to use ideas from structured editing to **speed up** moment-to-moment
 code editing, much how editors like Vim and Emacs speed up editing.  Sapling's editing model will
 be largely inspired by [Vim](https://github.com/vim/vim)/[NeoVim](https://github.com/neovim/neovim)
-and [kakoune](https://github.com/mawww/kakoune).
+and [kakoune](https://github.com/mawww/kakoune).  Sapling also aims to be **general purpose** -
+Sapling should be able to edit any language, given that a suitable grammar is provided.
+
+_Contributions of all kinds are very welcome!_
 
 It is worth noting that Sapling is primarily **an experiment** to determine whether or not such an
 editor could work.  Therefore, for the time being, Sapling can be expected to change at any time.
@@ -63,6 +66,8 @@ These goals are roughly in order of importance, with the most important first:
   power users in mind.
 - **Stability**: Sapling should not, under any circumstances, corrupt the user's data or crash.
   Either of these are considered critical bugs and should be reported.
+- **Generality**: Sapling should, in theory, be able to edit any language.  This will likely be done
+  with making the language plug-in-able and probably specified by some kind of grammar.
 - **Familiarity**: Sapling should feel familiar to people who are used to modal editors such as Vim
   and Kakoune.  However, some alterations are required for Sapling to edit ASTs and not just text.
 - **Interactivity**: Sapling should always give the user immediate feedback about their actions.
@@ -82,6 +87,8 @@ These goals are roughly in order of importance, with the most important first:
   parser that is not language specific.  Designed primarily to provide better syntax highlighting
   for [the Atom text editor](https://github.com/atom/atom).
 - _[grasp](http://www.graspjs.com/)_: A regex-like language for searching JavaScript ASTs.
+- _[r/nosyntax](https://reddit.com/r/nosyntax)_: A subreddit for strutured and projectional editors.  They also have
+  [a list](https://www.reddit.com/r/nosyntax/comments/6xv61b/list_of_projects/) of such projects.
 - _[Barista](https://www.researchgate.net/publication/221518157_Barista_An_implementation_framework_for_enabling_new_tools_interaction_techniques_and_views_in_code_editors)_:
   A structured editor that allows the user to fall back on text editing if required, which is
   something I'd like to explore for Sapling.  The source code is
