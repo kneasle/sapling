@@ -25,6 +25,10 @@ pub enum Category {
     Quit,
     /// An [`Action`] that handles reading and writing from disk
     IO,
+    /// An [`Action`] that swith to command mode
+    CommandMode,
+    /// An [`Action`] that swith to normal mode
+    NormalMode,
     /// The keystrokes did not correspond to a well-defined action
     Undefined,
 }
@@ -43,6 +47,8 @@ impl Category {
             Category::Delete => Color::RED,
             Category::Quit => Color::MAGENTA,
             Category::IO => Color::GREEN,
+            Category::CommandMode => Color::LIGHT_MAGENTA,
+            Category::NormalMode => Color::LIGHT_MAGENTA,
             Category::Undefined => Color::LIGHT_RED,
         }
     }

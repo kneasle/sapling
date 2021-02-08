@@ -7,29 +7,12 @@ use std::borrow::Cow;
 
 use tuikit::prelude::Key;
 
-/// The [`State`] that Sapling enters to quit the mainloop and exit
-#[derive(Debug, Copy, Clone)]
-pub struct Quit;
-
-impl<'arena, Node: Ast<'arena>> State<'arena, Node> for Quit {
-    fn transition(
-        self: Box<Self>,
-        _key: Key,
-        _editor: &mut Editor<'arena, Node>,
-    ) -> (Box<dyn State<'arena, Node>>, Option<(String, Category)>) {
-        (self, None)
-    }
-
-    fn is_quit(&self) -> bool {
-        true
-    }
-}
-
 /// A trait which should be implemented for every `State` in Sapling's state machine.
 ///
 /// The current states are:
-/// - [`Quit`]
+/// - `crate::editor::command_mode::Quit`
 /// - [`crate::editor::normal_mode::State`]
+/// - [`crate::editor::command_mode::State`]
 /// - `crate::editor::IntermediateState` (link doesn't work because `IntermediateState` is private)
 pub trait State<'arena, Node: Ast<'arena>>: std::fmt::Debug {
     /// Consume a keystroke, returning the `State` after this transition
@@ -46,8 +29,13 @@ pub trait State<'arena, Node: Ast<'arena>>: std::fmt::Debug {
     }
 
     /// Returns `true` if Sapling should quit.  By default, this returns `false`.  This should
-    /// **only** be `true` for [`Quit`].
+    /// **only** be `true` for `crate::editor::command_mode::Quit`.(link doesn't work because 'Quit' is private)
     fn is_quit(&self) -> bool {
         false
+    }
+
+    /// Returns name of the current mode
+    fn name(&self) -> &'arena str {
+        return "";
     }
 }

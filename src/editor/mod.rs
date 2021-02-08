@@ -1,5 +1,6 @@
 //! The top-level functionality of Sapling
 
+pub mod command_mode;
 pub mod dag;
 pub mod keystroke_log;
 pub mod normal_mode;
@@ -48,6 +49,10 @@ impl<'arena, Node: Ast<'arena>> State<'arena, Node> for IntermediateState {
 
     fn keystroke_buffer(&self) -> Cow<'_, str> {
         panic!("Invalid state should never exist except during state transitions.");
+    }
+
+    fn name(&self) -> &'static str {
+        return "";
     }
 }
 
@@ -210,9 +215,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         /* RENDER BOTTOM BAR */
 
         // Add the `Press 'q' to exit.` message
-        self.term
-            .print(height - 1, 0, "Press 'q' to exit.")
-            .unwrap();
+        self.term.print(height - 1, 0, &self.state.name()).unwrap();
         // Draw the current keystroke buffer
         let keystroke_buffer = self.state.keystroke_buffer();
         self.term

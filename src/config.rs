@@ -1,9 +1,11 @@
 //! Module to hold all user-configurable parameters, until we find a better way to handle
 //! configuration
 
+//use std::array::IntoIter;
+
 use crate::ast::display_token::{syntax_category::*, SyntaxCategory};
 use crate::core::Direction;
-use crate::editor::normal_mode::CmdType;
+use crate::editor::{command_mode, normal_mode}; //::CmdType;
 
 use tuikit::prelude::{Color, Key};
 
@@ -39,38 +41,51 @@ pub fn default_color_scheme() -> ColorScheme {
 
 /* KEY BINDINGS */
 
-/// Mapping of keys to keystrokes.
+/// Mapping of keys to keystrokes in normal mode.
 /// Shortcut definition, also allows us to change the type if needed.
-pub type KeyMap = std::collections::HashMap<Key, CmdType>;
+pub type NormalModeKeyMap = std::collections::HashMap<Key, normal_mode::CmdType>;
 
-/// Generates a 'canonical' [`KeyMap`].  These keybindings will be very similar to those of Vim.
-pub fn default_keymap() -> KeyMap {
+/// Generates a 'canonical' [`NormalModeKeyMap`].  These keybindings will be very similar to those of Vim.
+pub fn normal_mode_default_keymap() -> NormalModeKeyMap {
     hmap::hmap! {
-        Key::Char('q') => CmdType::Quit,
-        Key::Char('w') => CmdType::Write,
-        Key::Char('i') => CmdType::InsertBefore,
-        Key::Char('a') => CmdType::InsertAfter,
-        Key::Char('o') => CmdType::InsertChild,
-        Key::Char('r') => CmdType::Replace,
-        Key::Char('x') => CmdType::Delete,
-        Key::Char('c') => CmdType::MoveCursor(Direction::Down),
-        Key::Char('p') => CmdType::MoveCursor(Direction::Up),
-        Key::Char('h') => CmdType::MoveCursor(Direction::Prev),
-        Key::Char('j') => CmdType::MoveCursor(Direction::Next),
-        Key::Char('k') => CmdType::MoveCursor(Direction::Prev),
-        Key::Char('l') => CmdType::MoveCursor(Direction::Next),
-        Key::Char('u') => CmdType::Undo,
-        Key::Char('R') => CmdType::Redo
+        Key::Char('i') => normal_mode::CmdType::InsertBefore,
+        Key::Char('a') => normal_mode::CmdType::InsertAfter,
+        Key::Char('o') => normal_mode::CmdType::InsertChild,
+        Key::Char('r') => normal_mode::CmdType::Replace,
+        Key::Char('x') => normal_mode::CmdType::Delete,
+        Key::Char('c') => normal_mode::CmdType::MoveCursor(Direction::Down),
+        Key::Char('p') => normal_mode::CmdType::MoveCursor(Direction::Up),
+        Key::Char('h') => normal_mode::CmdType::MoveCursor(Direction::Prev),
+        Key::Char('j') => normal_mode::CmdType::MoveCursor(Direction::Next),
+        Key::Char('k') => normal_mode::CmdType::MoveCursor(Direction::Prev),
+        Key::Char('l') => normal_mode::CmdType::MoveCursor(Direction::Next),
+        Key::Char('u') => normal_mode::CmdType::Undo,
+        Key::Char('R') => normal_mode::CmdType::Redo,
+        Key::Char(':') => normal_mode::CmdType::CommandMode
     }
 }
 
+/// /// Mapping of keys to keystrokes in command mode.
+pub type CommandModeKeyMap = std::collections::HashMap<Key, command_mode::CmdType>;
+
+/// Generates a 'canonical' [`CommandModeKeyMap`].  These keybindings will be very similar to those of Vim.
+pub fn command_mode_default_keymap() -> CommandModeKeyMap {
+    hmap::hmap! {
+        Key::Char('q') => command_mode::CmdType::Quit,
+        Key::Char('w') => command_mode::CmdType::Write,
+        Key::Char('d') => command_mode::CmdType::DotGraph,
+        Key::ESC => command_mode::CmdType::NormalMode
+    }
+}
 /* COMPLETE CONFIG */
 
 /// A struct to hold the entire run-time configuration of Sapling
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// A mapping between [`char`]s and [`CmdType`]s
-    pub keymap: KeyMap,
+    /// A mapping between [`char`]s and [`crate::editor::normal_mode::CmdType`]s in normal mode
+    pub normal_mode_keymap: NormalModeKeyMap,
+    /// A mapping between [`char`]s and [`crate::editor::command_mode::CmdType`]s in command mode
+    pub command_mode_keymap: CommandModeKeyMap,
     /// The current [`ColorScheme`] of Sapling
     pub color_scheme: ColorScheme,
 }
@@ -78,7 +93,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            keymap: default_keymap(),
+            normal_mode_keymap: normal_mode_default_keymap(),
+            command_mode_keymap: command_mode_default_keymap(),
             color_scheme: default_color_scheme(),
         }
     }

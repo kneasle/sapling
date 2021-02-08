@@ -793,7 +793,7 @@ mod tests {
                 Action::InsertBefore(c) => self.insert_next_to_cursor(count, c, Side::Prev),
                 Action::InsertAfter(c) => self.insert_next_to_cursor(count, c, Side::Next),
                 Action::Delete => self.delete_cursor(count),
-                Action::Quit | Action::Write => unreachable!(),
+                Action::CommandMode => unreachable!(),
             }
         }
     }
