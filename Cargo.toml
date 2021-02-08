@@ -10,4 +10,4 @@ typed-arena = "2.0.1"
 hmap = "0.1.0"
 log = "0.4.14"
 pretty_env_logger = "0.4.0"
-serde_json = { version = "1.0.59", features = ["preserve_order"] }
+serde_json = { version = "1.0.62", features = ["preserve_order"] }
