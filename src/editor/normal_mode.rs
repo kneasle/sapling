@@ -1,13 +1,12 @@
 //! The code for 'normal-mode', similar to that of Vim
 
 use super::dag::{Insertable, LogMessage};
-use super::{keystroke_log::Category, state, Editor};
+use super::{command_mode, keystroke_log::Category, state, Editor};
 use crate::ast::Ast;
-use crate::config::KeyMap;
+use crate::config::NormalModeKeyMap;
 use crate::core::{keystrokes_to_string, Direction, Side};
 
 use std::borrow::Cow;
-use std::io::prelude::*;
 use std::iter::Peekable;
 
 use tuikit::prelude::Key;
@@ -16,19 +15,20 @@ use tuikit::prelude::Key;
 /// normal mode.
 #[derive(Debug, Clone)]
 pub struct State {
+    name: &'static str,
     keystroke_buffer: Vec<Key>,
 }
 
 impl Default for State {
     fn default() -> Self {
         State {
+            name: "NORMAL",
             keystroke_buffer: Vec::new(),
         }
     }
 }
 
 impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
-    // TODO: Fix some of the jank of this function
     fn transition(
         mut self: Box<Self>,
         key: Key,
@@ -41,70 +41,49 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
 
         let tree = &mut editor.tree;
 
-        let log_entry = match parse_command(&editor.config.keymap, &self.keystroke_buffer) {
-            // If the command buffer is a valid and complete command, then we execute the resulting
-            // 'action'
-            Ok((count, action)) => {
-                // If the count is 0, then the command does not execute.  So we short-circuit in
-                // this case
-                if count == 0 {
-                    return (self, Some(("no action".to_owned(), Category::Undefined)));
-                }
-                match action {
-                    // If the command was a 'quit', then immediately make a state transition to the
-                    // 'Quitted' state.  It doesn't matter what the count is, because quitting is
-                    // idempotent
-                    Action::Quit => {
-                        return (
-                            Box::new(state::Quit),
-                            Some((action.description(), action.category())),
-                        );
+        let log_entry =
+            match parse_command(&editor.config.normal_mode_keymap, &self.keystroke_buffer) {
+                // If the command buffer is a valid and complete command, then we execute the resulting
+                // 'action'
+                Ok((count, action)) => {
+                    // If the count is 0, then the command does not execute.  So we short-circuit in
+                    // this case
+                    if count == 0 {
+                        return (self, Some(("no action".to_owned(), Category::Undefined)));
                     }
-                    Action::Write => {
-                        if let Some(path) = &editor.file_path {
-                            // If the editor was given a file-path, then write to it
-                            let mut file = std::fs::File::create(path).unwrap();
-                            let mut content = tree.to_text(&editor.format_style);
-                            // Force the file to finish with a newline.  BTW, <str>.chars().last()
-                            // is O(1), regardless of the length of the string.
-                            if content.chars().last() != Some('\n') {
-                                content.push('\n');
-                            }
-                            file.write_all(content.as_bytes()).unwrap();
-                        } else {
-                            // Otherwise, log a warning and do nothing
-                            log::warn!("No file to write to!");
-                        }
-                        // If we haven't returned yet, then clear the buffer
-                        self.keystroke_buffer.clear();
-                        return (self, Some((action.description(), action.category())));
+                    match action {
+                        // Otherwise, we perform the action on the `Dag`.  This returns the
+                        // `EditResult`, which is logged outside the `match`
+                        Action::Undo => tree.undo(count),
+                        Action::Redo => tree.redo(count),
+                        Action::MoveCursor(direction) => tree.move_cursor(count, direction),
+                        Action::Replace(c) => tree.replace_cursor(count, c),
+                        Action::InsertChild(c) => tree.insert_child(count, c),
+                        Action::InsertBefore(c) => tree.insert_next_to_cursor(count, c, Side::Prev),
+                        Action::InsertAfter(c) => tree.insert_next_to_cursor(count, c, Side::Next),
+                        Action::Delete => tree.delete_cursor(count),
+                        Action::CommandMode => {
+                            return (
+                                Box::new(command_mode::State::default()),
+                                Some((action.description(), action.category())),
+                            );
+                        } // TODO fix this
                     }
-                    // Otherwise, we perform the action on the `Dag`.  This returns the
-                    // `EditResult`, which is logged outside the `match`
-                    Action::Undo => tree.undo(count),
-                    Action::Redo => tree.redo(count),
-                    Action::MoveCursor(direction) => tree.move_cursor(count, direction),
-                    Action::Replace(c) => tree.replace_cursor(count, c),
-                    Action::InsertChild(c) => tree.insert_child(count, c),
-                    Action::InsertBefore(c) => tree.insert_next_to_cursor(count, c, Side::Prev),
-                    Action::InsertAfter(c) => tree.insert_next_to_cursor(count, c, Side::Next),
-                    Action::Delete => tree.delete_cursor(count),
+                    .log_message();
+                    (action.description(), action.category())
                 }
-                .log_message();
-                (action.description(), action.category())
-            }
-            // If the command is incomplete, we early return without clearing the buffer or logging
-            // any messages
-            Err(ParseErr::Incomplete) => return (self, None),
-            // If the command is invalid, we report the invalid command as a log message
-            Err(ParseErr::Invalid) => (
-                format!(
-                    "Undefined command '{}'",
-                    keystrokes_to_string(&self.keystroke_buffer)
+                // If the command is incomplete, we early return without clearing the buffer or logging
+                // any messages
+                Err(ParseErr::Incomplete) => return (self, None),
+                // If the command is invalid, we report the invalid command as a log message
+                Err(ParseErr::Invalid) => (
+                    format!(
+                        "Undefined command '{}'",
+                        keystrokes_to_string(&self.keystroke_buffer)
+                    ),
+                    Category::Undefined,
                 ),
-                Category::Undefined,
-            ),
-        };
+            };
 
         // If we haven't returned yet, then clear the buffer
         self.keystroke_buffer.clear();
@@ -114,16 +93,16 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
     fn keystroke_buffer(&self) -> Cow<'_, str> {
         Cow::from(keystrokes_to_string(&self.keystroke_buffer))
     }
+
+    fn name(&self) -> &'static str {
+        return self.name;
+    }
 }
 
 /// The possible keystroke typed by user without any parameters.  Each `KeyStroke` can be mapped to
 /// an individual [`char`].
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum CmdType {
-    /// Quit Sapling
-    Quit,
-    /// Write current buffer to disk
-    Write,
     /// Replace the selected node, expects an argument
     Replace,
     /// Insert a new node as the last child of the cursor, expects an argument
@@ -141,14 +120,14 @@ pub enum CmdType {
     Undo,
     /// Redo a change
     Redo,
+    /// Command mode
+    CommandMode,
 }
 
 impl CmdType {
     /// Returns a lower-case summary string of the given keystroke
     pub fn summary_string(&self) -> &'static str {
         match self {
-            CmdType::Quit => "quit",
-            CmdType::Write => "write",
             CmdType::Replace => "replace",
             CmdType::InsertChild => "insert child",
             CmdType::InsertBefore => "insert before",
@@ -160,6 +139,7 @@ impl CmdType {
             CmdType::MoveCursor(Direction::Next) => "move to next sibling",
             CmdType::Undo => "undo",
             CmdType::Redo => "redo",
+            CmdType::CommandMode => "switch to command mode",
         }
     }
 }
@@ -183,10 +163,8 @@ pub enum Action {
     Undo,
     /// Redo a change
     Redo,
-    /// Quit Sapling
-    Quit,
-    /// Write current buffer to disk
-    Write,
+    /// Switch the command mode
+    CommandMode,
 }
 
 impl Action {
@@ -205,8 +183,7 @@ impl Action {
             Action::MoveCursor(Direction::Next) => "move to next sibling".to_string(),
             Action::Undo => "undo a change".to_string(),
             Action::Redo => "redo a change".to_string(),
-            Action::Quit => "quit Sapling".to_string(),
-            Action::Write => "write to disk".to_string(),
+            Action::CommandMode => "switch to command mode".to_string(),
         }
     }
 
@@ -220,8 +197,7 @@ impl Action {
             Action::Delete => Category::Delete,
             Action::MoveCursor(_) => Category::Move,
             Action::Undo | Action::Redo => Category::History,
-            Action::Quit => Category::Quit,
-            Action::Write => Category::IO,
+            Action::CommandMode => Category::CommandMode,
         }
     }
 }
@@ -238,14 +214,7 @@ enum ParseErr {
 /// Attempt to parse an entire command.  This is the entry point to the parsing code.  This parser
 /// is a recursive descent parser, where there is a separate function for each syntactic element
 /// ([`parse_insertable`], [`parse_count`], etc.).
-///
-/// Note that this parser will return as soon as a valid command is reached.  Therefore,
-/// `"q489flshb"` will be treated like `"q"`, and will return [`Action::Quit`] even though
-/// `"q489flshb"` is not technically valid.  However, the command buffer is parsed every time the
-/// user types a keystroke character, so the user would not be able to input `"q489flshb"` in one
-/// go because doing so would require them to first input every possible prefix of `"q489flshb"`,
-/// including `"q"`.
-fn parse_command(keymap: &KeyMap, keys: &[Key]) -> ParseResult<(usize, Action)> {
+fn parse_command(keymap: &NormalModeKeyMap, keys: &[Key]) -> ParseResult<(usize, Action)> {
     // Generate an iterator of keystrokes, which are treated similar to tokens by the parser.
     let mut key_iter = keys.iter().copied().peekable();
 
@@ -266,9 +235,7 @@ fn parse_command(keymap: &KeyMap, keys: &[Key]) -> ParseResult<(usize, Action)> 
             CmdType::MoveCursor(direction) => Action::MoveCursor(*direction),
             CmdType::Undo => Action::Undo,
             CmdType::Redo => Action::Redo,
-            // "q" quits Sapling
-            CmdType::Quit => Action::Quit,
-            CmdType::Write => Action::Write,
+            CmdType::CommandMode => Action::CommandMode,
         },
     ))
 }
@@ -325,7 +292,7 @@ fn parse_count(keystroke_char_iter: &mut Peekable<impl Iterator<Item = Key>>) ->
 #[cfg(test)]
 mod tests {
     use super::{parse_command, Action, Insertable, ParseErr};
-    use crate::config::default_keymap;
+    use crate::config::normal_mode_default_keymap;
     use crate::core::Direction;
     use tuikit::prelude::Key;
 
@@ -335,7 +302,7 @@ mod tests {
 
     #[test]
     fn parse_single_cmd_valid() {
-        let keymap = default_keymap();
+        let keymap = normal_mode_default_keymap();
         for (keystrokes, expected_effect) in &[
             ("x", Action::Delete),
             ("h", Action::MoveCursor(Direction::Prev)),
@@ -356,7 +323,6 @@ mod tests {
                 "a15x",
                 Action::InsertAfter(Insertable::CountedNode(15, 'x')),
             ),
-            ("q", Action::Quit),
         ] {
             assert_eq!(
                 parse_command(&keymap, &to_char_keys(keystrokes)),
@@ -367,7 +333,7 @@ mod tests {
 
     #[test]
     fn parse_counted_command() {
-        let keymap = default_keymap();
+        let keymap = normal_mode_default_keymap();
         for (keystrokes, exp_count, exp_action) in &[
             ("1x", 1, Action::Delete),
             ("0ra", 0, Action::Replace(Insertable::CountedNode(1, 'a'))),
@@ -386,7 +352,7 @@ mod tests {
 
     #[test]
     fn parse_keystroke_invalid() {
-        let keymap = default_keymap();
+        let keymap = normal_mode_default_keymap();
         for keystroke in &["d", "Pxx", "Qsx", "t", "Y", "X", "\""] {
             println!("Testing {}", keystroke);
             assert_eq!(
@@ -398,7 +364,7 @@ mod tests {
 
     #[test]
     fn parse_keystroke_incomplete() {
-        let keymap = default_keymap();
+        let keymap = normal_mode_default_keymap();
         for keystroke in &[
             "", "r", "o", "a", "i", "o3", "i34", "3", "1o", "0o3", "41523",
         ] {
