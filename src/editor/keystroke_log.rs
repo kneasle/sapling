@@ -3,7 +3,7 @@
 
 use crate::core::keystrokes_to_string;
 
-#[allow(unused_imports)] // used solely for doc-comments
+#[allow(unused_imports)] // Only used by doc-comments, which rustc can't see
 use super::normal_mode::Action;
 
 use tuikit::prelude::*;
