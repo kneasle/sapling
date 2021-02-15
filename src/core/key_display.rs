@@ -40,3 +40,11 @@ impl KeyDisplay for Key {
         }
     }
 }
+
+/// converts a `Key`s keystroke_buffer into a `String`
+pub fn keystrokes_to_string(keystroke_buffer: &[Key]) -> String {
+    keystroke_buffer
+        .iter()
+        .map(|x| x.compact_string())
+        .collect()
+}
