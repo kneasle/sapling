@@ -5,7 +5,7 @@ authors = ["Ben White-Horne <kneasle@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-tuikit = "0.4.3"
+tuikit = "0.4.5"
 typed-arena = "2.0.1"
 hmap = "0.1.0"
 log = "0.4.14"
