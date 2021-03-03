@@ -215,6 +215,7 @@ pub struct Dag<'arena, Node: Ast<'arena>> {
     /// be in `0..root_history.len()`.
     history_index: usize,
     current_cursor_path: Path,
+    cursor_location_history: HashMap<usize, usize>,
 }
 
 impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
@@ -229,6 +230,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             )],
             history_index: 0,
             current_cursor_path: cursor_path,
+            cursor_location_history: HashMap::new(),
         }
     }
 
@@ -262,8 +264,16 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             Direction::Down => {
                 let mut successful_distance = 0usize;
                 while !current_cursor.children().is_empty() && successful_distance < distance {
-                    self.current_cursor_path.push(0);
-                    current_cursor = current_cursor.children()[0];
+                    // use current_cursor's memory address as key in hashmap,
+                    // look up the previous cursor location in hashmap
+                    // if key is not in hashmap, return None, and use 0 as index
+                    let current_node_id = current_cursor as *const Node as usize;
+                    let index = *self
+                        .cursor_location_history
+                        .get(&current_node_id)
+                        .unwrap_or(&0);
+                    self.current_cursor_path.push(index);
+                    current_cursor = current_cursor.children()[index];
                     successful_distance += 1;
                 }
                 successful_distance
@@ -271,7 +281,12 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             Direction::Up => {
                 let mut successful_distance = 0usize;
                 while !self.current_cursor_path.is_root() && successful_distance < distance {
-                    self.current_cursor_path.pop();
+                    let (_, parent) = self.cursor_and_parent();
+                    // this block of code will run when the current cursor is not on root, so unwrap is ok
+                    let parent_node_id = parent.unwrap() as *const Node as usize;
+                    // insert or update the parent_node_id and current_cursor_index in hashmap
+                    self.cursor_location_history
+                        .insert(parent_node_id, self.current_cursor_path.pop().unwrap());
                     successful_distance += 1;
                 }
                 successful_distance
@@ -1908,6 +1923,42 @@ mod tests {
             dag.current_cursor_path,
             "Not equal in cursor location."
         );
+    }
+
+    #[test]
+    // This is the test case for issue 88
+    fn move_cursor_to_previous_child() {
+        let start_tree = json!([null, {"key": true}, false]);
+
+        // Create and initialise Dag to test
+        let arena: Arena<Json> = Arena::new();
+        let root = add_value_to_arena(start_tree.clone(), &arena);
+
+        // Create and initialise Dag to test
+        let start_cursor_location = Path::from_vec(vec![]);
+        let expected_cursor_location_1 = Path::from_vec(vec![0]);
+        let expected_cursor_location_2 = Path::from_vec(vec![1]);
+        let expected_cursor_location_3 = Path::from_vec(vec![]);
+        let expected_cursor_location_4 = Path::from_vec(vec![1]);
+        let expected_cursor_location_5 = Path::from_vec(vec![1, 0]);
+
+        let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
+
+        let ok_1 = dag.move_cursor(1, Direction::Down);
+        assert_eq!(dag.current_cursor_path, expected_cursor_location_1);
+        assert_eq!(ok_1, Ok(EditSuccess::Move(1, Direction::Down)));
+        let ok_2 = dag.move_cursor(1, Direction::Next);
+        assert_eq!(dag.current_cursor_path, expected_cursor_location_2);
+        assert_eq!(ok_2, Ok(EditSuccess::Move(1, Direction::Next)));
+        let ok_3 = dag.move_cursor(1, Direction::Up);
+        assert_eq!(dag.current_cursor_path, expected_cursor_location_3);
+        assert_eq!(ok_3, Ok(EditSuccess::Move(1, Direction::Up)));
+        let ok_4 = dag.move_cursor(1, Direction::Down);
+        assert_eq!(dag.current_cursor_path, expected_cursor_location_4);
+        assert_eq!(ok_4, Ok(EditSuccess::Move(1, Direction::Down)));
+        let ok_5 = dag.move_cursor(1, Direction::Down);
+        assert_eq!(dag.current_cursor_path, expected_cursor_location_5);
+        assert_eq!(ok_5, Ok(EditSuccess::Move(1, Direction::Down)));
     }
 
     /// Regression tests for previous bugs
