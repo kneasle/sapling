@@ -28,9 +28,9 @@ use serde_json::Value;
 /// [`Editor::run`].
 fn main() {
     // Initialise the logging and startup
-    pretty_env_logger::formatted_builder()
-        .filter_level(log::LevelFilter::Debug)
-        .init();
+    // pretty_env_logger::formatted_builder()
+    //     .filter_level(log::LevelFilter::Debug)
+    //     .init();
     log::info!("Starting up...");
 
     // Read a file name as the CLI argument

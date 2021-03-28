@@ -5,7 +5,8 @@ use crate::ast::display_token::{syntax_category::*, SyntaxCategory};
 use crate::core::Direction;
 use crate::editor::normal_mode::CmdType;
 
-use tuikit::prelude::{Color, Key};
+use crossterm::event::{KeyCode, KeyEvent};
+use tui::style::Color;
 
 /* DEBUG FLAGS */
 
@@ -23,17 +24,17 @@ pub type ColorScheme = std::collections::HashMap<SyntaxCategory, Color>;
 /// Return the default [`ColorScheme`] of Sapling
 pub fn default_color_scheme() -> ColorScheme {
     hmap::hmap! {
-        DEFAULT => Color::WHITE,
-        CONST => Color::RED,
-        LITERAL => Color::YELLOW,
-        COMMENT => Color::GREEN,
-        IDENT => Color::CYAN,
-        KEYWORD => Color::BLUE,
-        PRE_PROC => Color::MAGENTA,
-        TYPE => Color::LIGHT_YELLOW,
-        SPECIAL => Color::LIGHT_GREEN,
-        UNDERLINED => Color::LIGHT_RED,
-        ERROR => Color::LIGHT_RED
+        DEFAULT => Color::White,
+        CONST => Color::Red,
+        LITERAL => Color::Yellow,
+        COMMENT => Color::Green,
+        IDENT => Color::Cyan,
+        KEYWORD => Color::Black,
+        PRE_PROC => Color::Magenta,
+        TYPE => Color::LightYellow,
+        SPECIAL => Color::LightGreen,
+        UNDERLINED => Color::LightRed,
+        ERROR => Color::LightRed
     }
 }
 
@@ -41,26 +42,26 @@ pub fn default_color_scheme() -> ColorScheme {
 
 /// Mapping of keys to keystrokes.
 /// Shortcut definition, also allows us to change the type if needed.
-pub type KeyMap = std::collections::HashMap<Key, CmdType>;
+pub type KeyMap = std::collections::HashMap<KeyCode, CmdType>;
 
 /// Generates a 'canonical' [`KeyMap`].  These keybindings will be very similar to those of Vim.
 pub fn default_keymap() -> KeyMap {
     hmap::hmap! {
-        Key::Char('q') => CmdType::Quit,
-        Key::Char('w') => CmdType::Write,
-        Key::Char('i') => CmdType::InsertBefore,
-        Key::Char('a') => CmdType::InsertAfter,
-        Key::Char('o') => CmdType::InsertChild,
-        Key::Char('r') => CmdType::Replace,
-        Key::Char('x') => CmdType::Delete,
-        Key::Char('c') => CmdType::MoveCursor(Direction::Down),
-        Key::Char('p') => CmdType::MoveCursor(Direction::Up),
-        Key::Char('h') => CmdType::MoveCursor(Direction::Prev),
-        Key::Char('j') => CmdType::MoveCursor(Direction::Next),
-        Key::Char('k') => CmdType::MoveCursor(Direction::Prev),
-        Key::Char('l') => CmdType::MoveCursor(Direction::Next),
-        Key::Char('u') => CmdType::Undo,
-        Key::Char('R') => CmdType::Redo
+        KeyCode::Char('q') => CmdType::Quit,
+        KeyCode::Char('w') => CmdType::Write,
+        KeyCode::Char('i') => CmdType::InsertBefore,
+        KeyCode::Char('a') => CmdType::InsertAfter,
+        KeyCode::Char('o') => CmdType::InsertChild,
+        KeyCode::Char('r') => CmdType::Replace,
+        KeyCode::Char('x') => CmdType::Delete,
+        KeyCode::Char('c') => CmdType::MoveCursor(Direction::Down),
+        KeyCode::Char('p') => CmdType::MoveCursor(Direction::Up),
+        KeyCode::Char('h') => CmdType::MoveCursor(Direction::Prev),
+        KeyCode::Char('j') => CmdType::MoveCursor(Direction::Next),
+        KeyCode::Char('k') => CmdType::MoveCursor(Direction::Prev),
+        KeyCode::Char('l') => CmdType::MoveCursor(Direction::Next),
+        KeyCode::Char('u') => CmdType::Undo,
+        KeyCode::Char('R') => CmdType::Redo
     }
 }
 

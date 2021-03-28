@@ -16,10 +16,25 @@ use state::State;
 
 use std::borrow::{Borrow, Cow};
 use std::collections::{hash_map::DefaultHasher, HashSet};
+use std::convert::TryInto;
 use std::hash::Hasher;
+use std::io;
 use std::path::PathBuf;
 
-use tuikit::prelude::*;
+use crossterm::{
+    event::{Event, KeyEvent},
+    terminal,
+};
+use tui::backend::CrosstermBackend;
+use tui::{
+    buffer::Buffer,
+    layout::Rect,
+    style::{Color, Style},
+    text::Span,
+    widgets,
+};
+
+pub(crate) type Terminal = tui::Terminal<CrosstermBackend<io::Stdout>>;
 
 /// The [`State`] that Sapling is in during a transition function.  This has to exist, but
 /// none of the methods should ever be called, since doing so would require the transition function
@@ -33,7 +48,7 @@ struct IntermediateState;
 impl<'arena, Node: Ast<'arena>> State<'arena, Node> for IntermediateState {
     fn transition(
         self: Box<Self>,
-        _key: Key,
+        _key: KeyEvent,
         _tree: &mut Editor<'arena, Node>,
     ) -> (
         Box<dyn State<'arena, Node>>,
@@ -58,7 +73,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     /// The style that the tree is being printed to the screen
     format_style: Node::FormatStyle,
     /// The `tuikit` terminal that the `Editor` is rendering to
-    term: Term,
+    term: Option<Terminal>,
     /// The current state-machine [`State`] that Sapling is in
     state: Box<dyn State<'arena, Node>>,
     /// The current user configuration
@@ -67,87 +82,59 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     keystroke_log: KeyStrokeLog,
     file_path: Option<PathBuf>,
 }
+use tui::widgets::Widget;
+impl<'arena, Node: Ast<'arena> + 'arena> Widget for &'_ Editor<'arena, Node> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        tui::widgets::Clear.render(area, buf);
 
-impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
-    /// Create a new [`Editor`] with a given tree
-    pub fn new(
-        tree: &'arena mut Dag<'arena, Node>,
-        format_style: Node::FormatStyle,
-        config: Config,
-        file_path: Option<PathBuf>,
-    ) -> Editor<'arena, Node> {
-        let term = Term::new().unwrap();
-        Editor {
-            tree,
-            term,
-            format_style,
-            state: Box::new(normal_mode::State::default()),
-            config,
-            keystroke_log: KeyStrokeLog::new(10),
-            file_path,
-        }
-    }
+        // Render status bar
+        let keystroke_buffer = self.state.keystroke_buffer();
+        let buf_width: u16 = Span::raw(&*keystroke_buffer)
+            .width()
+            .try_into()
+            .expect("reasonable keystroke buffer");
+        buf.set_string(
+            area.right() - buf_width - 5,
+            area.bottom() - 1,
+            &keystroke_buffer,
+            Style::default(),
+        );
+        let (x, _) = buf.set_stringn(
+            area.left(),
+            area.bottom() - 1,
+            "Press 'q' to exit",
+            usize::MAX,
+            Style::default(),
+        );
 
-    /// Render the tree to the screen
-    fn render_tree(&self, row: usize, col: usize) {
         let cols = [
-            Color::MAGENTA,
-            Color::RED,
-            Color::YELLOW,
-            Color::GREEN,
-            Color::CYAN,
-            Color::BLUE,
-            Color::WHITE,
-            Color::LIGHT_RED,
-            Color::LIGHT_BLUE,
-            Color::LIGHT_CYAN,
-            Color::LIGHT_GREEN,
-            Color::LIGHT_YELLOW,
-            Color::LIGHT_MAGENTA,
-            Color::LIGHT_WHITE,
+            Color::Magenta,
+            Color::Red,
+            Color::Yellow,
+            Color::Gray,
+            Color::Cyan,
+            Color::Blue,
+            Color::White,
+            Color::LightRed,
+            Color::LightBlue,
+            Color::LightCyan,
+            Color::LightGreen,
+            Color::LightYellow,
+            Color::LightMagenta,
         ];
 
+        /* RENDER MAIN TEXT VIEW */
         // Mutable variables to track where the terminal cursor should go
-        let mut row = row;
-        let mut col = col;
+        let mut row = area.top();
+        let mut col = area.left();
         let mut indentation_amount = 0;
 
         let mut unknown_categories: HashSet<SyntaxCategory> = HashSet::with_capacity(0);
 
-        /// A cheeky macro to print a string to the terminal
-        macro_rules! term_print {
-            ($string: expr) => {{
-                let string = $string;
-                // Print the string
-                self.term.print(row, col, string).unwrap();
-                // Move the cursor to the end of the string
-                let size = Size::from(string);
-                if size.lines() == 0 {
-                    col += size.last_line_length();
-                } else {
-                    row += size.lines();
-                    col = size.last_line_length();
-                }
-            }};
-            ($string: expr, $attr: expr) => {{
-                let string = $string;
-                // Print the string
-                self.term.print_with_attr(row, col, string, $attr).unwrap();
-                // Move the cursor to the end of the string
-                let size = Size::from(string);
-                if size.lines() == 0 {
-                    col += size.last_line_length();
-                } else {
-                    row += size.lines();
-                    col = size.last_line_length();
-                }
-            }};
-        }
-
         for (node, tok) in self.tree.root().display_tokens(&self.format_style) {
             match tok {
                 DisplayToken::Text(s, category) => {
-                    let col = if DEBUG_HIGHLIGHTING {
+                    let color = if DEBUG_HIGHLIGHTING {
                         // Hash the ref to decide on the colour
                         let mut hasher = DefaultHasher::new();
                         node.hash(&mut hasher);
@@ -156,20 +143,31 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                     } else {
                         *self.config.color_scheme.get(category).unwrap_or_else(|| {
                             unknown_categories.insert(category);
-                            &Color::LIGHT_MAGENTA
+                            &Color::LightMagenta
                         })
                     };
                     // Generate the display attributes depending on if the node is selected
-                    let attr = if std::ptr::eq(node, self.tree.cursor()) {
-                        Attr::default().fg(Color::BLACK).bg(col)
+                    let style = if std::ptr::eq(node, self.tree.cursor()) {
+                        Style::default().fg(Color::Black).bg(color)
                     } else {
-                        Attr::default().fg(col)
+                        Style::default().fg(color)
                     };
-                    // Print the token
-                    term_print!(s.borrow(), attr);
+                    let mut lines = s.lines();
+                    col = buf
+                        .set_stringn(
+                            col,
+                            row,
+                            lines.next().unwrap(),
+                            (area.right() - col).into(),
+                            style,
+                        )
+                        .0;
+                    for line in lines {
+                        todo!("implement multiline tokens");
+                    }
                 }
                 DisplayToken::Whitespace(n) => {
-                    col += n;
+                    col += n as u16;
                 }
                 DisplayToken::Newline => {
                     row += 1;
@@ -188,50 +186,53 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         for c in unknown_categories {
             log::error!("Unknown highlight category '{}'", c);
         }
+
+        self.keystroke_log.render(
+            Rect::new(area.x + area.width / 2, area.y, area.width / 2, area.height),
+            buf,
+        );
+    }
+}
+
+impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
+    /// Create a new [`Editor`] with a given tree
+    pub fn new(
+        tree: &'arena mut Dag<'arena, Node>,
+        format_style: Node::FormatStyle,
+        config: Config,
+        file_path: Option<PathBuf>,
+    ) -> Editor<'arena, Node> {
+        let mut term = io::stdout();
+        crossterm::execute!(term, terminal::EnterAlternateScreen).unwrap();
+        terminal::enable_raw_mode().unwrap();
+        Editor {
+            tree,
+            term: Some(Terminal::new(CrosstermBackend::new(term)).unwrap()),
+            format_style,
+            state: Box::new(normal_mode::State::default()),
+            config,
+            keystroke_log: KeyStrokeLog::new(10),
+            file_path,
+        }
     }
 
     /* ===== MAIN FUNCTIONS ===== */
 
     /// Update the terminal UI display
-    fn update_display(&self) {
-        // Put the terminal size into some convenient variables
-        let (width, height) = self.term.term_size().unwrap();
-        // Clear the terminal
-        self.term.clear().unwrap();
-
-        /* RENDER MAIN TEXT VIEW */
-
-        self.render_tree(0, 0);
-
-        /* RENDER LOG SECTION */
-
-        self.keystroke_log.render(&self.term, 0, width / 2);
-
-        /* RENDER BOTTOM BAR */
-
-        // Add the `Press 'q' to exit.` message
-        self.term
-            .print(height - 1, 0, "Press 'q' to exit.")
-            .unwrap();
-        // Draw the current keystroke buffer
-        let keystroke_buffer = self.state.keystroke_buffer();
-        self.term
-            .print(
-                height - 1,
-                width - 5 - keystroke_buffer.chars().count(),
-                keystroke_buffer.borrow(),
-            )
-            .unwrap();
-
-        /* UPDATE THE TERMINAL SCREEN */
-
-        self.term.present().unwrap();
+    fn update_display(&mut self) {
+        let mut term = self.term.take().unwrap();
+        term.draw(|f| {
+            f.render_widget(&*self, f.size());
+        })
+        .unwrap();
+        self.term = Some(term);
     }
 
     fn mainloop(&mut self) {
         log::trace!("Starting mainloop");
+        self.update_display();
         // Sit in the infinte mainloop
-        while let Ok(event) = self.term.poll_event() {
+        while let Ok(event) = crossterm::event::read() {
             /* RESPOND TO THE USER'S INPUT */
             if let Event::Key(key) = event {
                 // Consume the key and use it to move through the state machine.  Here, we use
@@ -259,15 +260,22 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                     self.keystroke_log.log_entry(description, category);
                 }
             }
-
             // If we have reached `state::Quit` then we should exit the main loop
             if self.state.is_quit() {
                 break;
             }
 
             // Make sure that the logger isn't taller than the screen
-            self.keystroke_log
-                .set_max_entries(self.term.term_size().unwrap().1.min(10));
+            self.keystroke_log.set_max_entries(
+                self.term
+                    .as_mut()
+                    .unwrap()
+                    .size()
+                    .unwrap()
+                    .height
+                    .min(10)
+                    .into(),
+            );
             // Update the screen after every input (if this becomes a bottleneck then we can
             // optimise the number of calls to `update_display` but for now it's not worth the
             // added complexity)
@@ -282,7 +290,13 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         // Show the cursor before closing so that the cursor isn't permanently disabled
         // (see issue `lotabout/tuikit#28`: https://github.com/lotabout/tuikit/issues/28)
         log::trace!("Making the cursor reappear.");
-        self.term.show_cursor(true).unwrap();
-        self.term.present().unwrap();
+        self.term.as_mut().unwrap().show_cursor().unwrap();
+        crossterm::execute!(
+            self.term.as_mut().unwrap().backend_mut(),
+            terminal::LeaveAlternateScreen
+        )
+        .unwrap();
+        self.term.as_mut().unwrap().flush().unwrap();
+        terminal::disable_raw_mode().unwrap();
     }
 }

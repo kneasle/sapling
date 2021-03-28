@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use tuikit::prelude::Key;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// An extension trait to add a convenient way to display keystrokes
 pub trait KeyDisplay {
@@ -10,39 +10,47 @@ pub trait KeyDisplay {
     fn compact_string(self) -> Cow<'static, str>;
 }
 
-impl KeyDisplay for Key {
+impl KeyDisplay for KeyEvent {
     fn compact_string(self) -> Cow<'static, str> {
-        match self {
-            Key::Char(c) => Cow::from(String::from(c)),
-            Key::Ctrl(c) => Cow::from(format!("^{}", c)),
+        if self.modifiers.contains(KeyModifiers::CONTROL) {
+            if let KeyCode::Char(c) = self.code {
+                return Cow::from(format!("^{}", c));
+            }
+        }
+        if self.modifiers.is_empty() {
+            match self.code {
+                KeyCode::Char(c) => Cow::from(String::from(c)),
 
-            Key::Up => Cow::from("<Up>"),
-            Key::Down => Cow::from("<Down>"),
-            Key::Left => Cow::from("<Left>"),
-            Key::Right => Cow::from("<Right>"),
+                KeyCode::Up => Cow::from("<Up>"),
+                KeyCode::Down => Cow::from("<Down>"),
+                KeyCode::Left => Cow::from("<Left>"),
+                KeyCode::Right => Cow::from("<Right>"),
 
-            Key::F(num) => Cow::from(format!("<F{}>", num)),
-            Key::ESC => Cow::from("<Esc>"),
+                KeyCode::F(num) => Cow::from(format!("<F{}>", num)),
+                KeyCode::Esc => Cow::from("<Esc>"),
 
-            Key::Backspace => Cow::from("<BS>"),
-            Key::Delete => Cow::from("<Del>"),
+                KeyCode::Backspace => Cow::from("<BS>"),
+                KeyCode::Delete => Cow::from("<Del>"),
 
-            Key::Tab => Cow::from("<Tab>"),
-            Key::Enter => Cow::from("<CR>"),
+                KeyCode::Tab => Cow::from("<Tab>"),
+                KeyCode::Enter => Cow::from("<CR>"),
 
-            Key::Insert => Cow::from("<Insert>"),
-            Key::Home => Cow::from("<Home>"),
-            Key::End => Cow::from("<End>"),
-            Key::PageUp => Cow::from("<PageUp>"),
-            Key::PageDown => Cow::from("<PageDown>"),
+                KeyCode::Insert => Cow::from("<Insert>"),
+                KeyCode::Home => Cow::from("<Home>"),
+                KeyCode::End => Cow::from("<End>"),
+                KeyCode::PageUp => Cow::from("<PageUp>"),
+                KeyCode::PageDown => Cow::from("<PageDown>"),
 
-            _ => Cow::from(format!("{:?}", self)),
+                _ => Cow::from(format!("{:?}", self)),
+            }
+        } else {
+            Cow::from(format!("{:?}", self))
         }
     }
 }
 
 /// converts a `Key`s keystroke_buffer into a `String`
-pub fn keystrokes_to_string(keystroke_buffer: &[Key]) -> String {
+pub fn keystrokes_to_string(keystroke_buffer: &[KeyEvent]) -> String {
     keystroke_buffer
         .iter()
         .map(|x| x.compact_string())

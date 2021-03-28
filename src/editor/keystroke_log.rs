@@ -2,11 +2,18 @@
 //! the viewers of my streams feedback for what I'm typing.
 
 use crate::core::keystrokes_to_string;
+use crate::editor::Terminal;
 
 #[allow(unused_imports)] // Only used by doc-comments, which rustc can't see
 use super::normal_mode::Action;
 
-use tuikit::prelude::*;
+use crossterm::event::KeyEvent;
+use tui::{
+    backend::CrosstermBackend,
+    buffer::Buffer,
+    layout::Rect,
+    style::{Color, Style},
+};
 
 /// A category grouping similar actions
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -36,14 +43,14 @@ pub enum Category {
 impl Category {
     fn term_color(self) -> Color {
         match self {
-            Category::Move => Color::LIGHT_BLUE,
-            Category::History => Color::LIGHT_YELLOW,
-            Category::Insert => Color::LIGHT_GREEN,
-            Category::Replace => Color::CYAN,
-            Category::Delete => Color::RED,
-            Category::Quit => Color::MAGENTA,
-            Category::IO => Color::GREEN,
-            Category::Undefined => Color::LIGHT_RED,
+            Category::Move => Color::LightBlue,
+            Category::History => Color::LightYellow,
+            Category::Insert => Color::LightGreen,
+            Category::Replace => Color::Cyan,
+            Category::Delete => Color::Red,
+            Category::Quit => Color::Magenta,
+            Category::IO => Color::Green,
+            Category::Undefined => Color::LightRed,
         }
     }
 }
@@ -52,7 +59,7 @@ impl Category {
 /// accumulation of many identical keystrokes that are executed consecutively.
 struct Entry {
     count: usize,
-    keystrokes: Vec<Key>,
+    keystrokes: Vec<KeyEvent>,
     description: String,
     color: Color,
 }
@@ -71,9 +78,67 @@ pub struct KeyStrokeLog {
     /// The maximum number of entries that should be displayed at once
     max_entries: usize,
     /// The keystrokes that will be included in the next log entry
-    unlogged_keystrokes: Vec<Key>,
+    unlogged_keystrokes: Vec<KeyEvent>,
 }
-
+impl tui::widgets::Widget for &'_ KeyStrokeLog {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        // Calculate how wide the numbers column should be, enforcing that it is at least two
+        // chars wide.
+        let count_col_width = self
+            .keystrokes
+            .iter()
+            .map(|e| match e.count {
+                1 => 0,
+                c => format!("{}x", c).len(),
+            })
+            .max()
+            .unwrap_or(0)
+            .max(2) as u16;
+        // Calculate the width of the keystroke column, and make sure that it is at least two
+        // chars wide.
+        let cmd_col_width = self
+            .keystrokes
+            .iter()
+            .map(|e| e.keystroke_string().len())
+            .max()
+            .unwrap_or(0)
+            .max(2) as u16;
+        // Render the keystrokes
+        for (i, e) in self.keystrokes.iter().enumerate() {
+            let i = i as u16;
+            // Print the count if greater than 1
+            if e.count > 1 {
+                buf.set_string(
+                    area.left(),
+                    area.top() + i,
+                    &format!("{}x", e.count),
+                    Style::default(),
+                );
+            }
+            // Print the keystrokes in one column
+            buf.set_string(
+                area.left() + count_col_width + 1,
+                area.top() + i,
+                &e.keystroke_string(),
+                Style::default().fg(Color::White),
+            );
+            // Print a `=>`
+            buf.set_string(
+                area.left() + count_col_width + 1 + cmd_col_width + 1,
+                area.top() + i,
+                "=>",
+                Style::default(),
+            );
+            // Print the meanings in another column
+            buf.set_string(
+                area.left() + count_col_width + 1 + cmd_col_width + 4,
+                area.top() + i,
+                &e.description,
+                Style::default().fg(e.color),
+            );
+        }
+    }
+}
 impl KeyStrokeLog {
     /// Create a new (empty) keystroke log
     pub fn new(max_entries: usize) -> KeyStrokeLog {
@@ -90,57 +155,6 @@ impl KeyStrokeLog {
         self.enforce_entry_limit();
     }
 
-    /// Draw a log of recent keystrokes to a given terminal at a given location
-    pub fn render(&self, term: &Term, row: usize, col: usize) {
-        // Calculate how wide the numbers column should be, enforcing that it is at least two
-        // chars wide.
-        let count_col_width = self
-            .keystrokes
-            .iter()
-            .map(|e| match e.count {
-                1 => 0,
-                c => format!("{}x", c).len(),
-            })
-            .max()
-            .unwrap_or(0)
-            .max(2);
-        // Calculate the width of the keystroke column, and make sure that it is at least two
-        // chars wide.
-        let cmd_col_width = self
-            .keystrokes
-            .iter()
-            .map(|e| e.keystroke_string().len())
-            .max()
-            .unwrap_or(0)
-            .max(2);
-        // Render the keystrokes
-        for (i, e) in self.keystrokes.iter().enumerate() {
-            // Print the count if greater than 1
-            if e.count > 1 {
-                term.print(row + i, col, &format!("{}x", e.count)).unwrap();
-            }
-            // Print the keystrokes in one column
-            term.print_with_attr(
-                row + i,
-                col + count_col_width + 1,
-                &e.keystroke_string(),
-                Attr::default().fg(Color::WHITE),
-            )
-            .unwrap();
-            // Print a `=>`
-            term.print(row + i, col + count_col_width + 1 + cmd_col_width + 1, "=>")
-                .unwrap();
-            // Print the meanings in another column
-            term.print_with_attr(
-                row + i,
-                col + count_col_width + 1 + cmd_col_width + 4,
-                &e.description,
-                Attr::default().fg(e.color),
-            )
-            .unwrap();
-        }
-    }
-
     /// Repeatedly remove keystrokes until the entry limit is satisfied
     fn enforce_entry_limit(&mut self) {
         while self.keystrokes.len() > self.max_entries {
@@ -148,12 +162,12 @@ impl KeyStrokeLog {
         }
     }
 
-    /// Log a new [`Key`] that should be added to the next log entry.
-    pub fn push_key(&mut self, key: Key) {
+    /// Log a new [`KeyEvent`] that should be added to the next log entry.
+    pub fn push_key(&mut self, key: KeyEvent) {
         self.unlogged_keystrokes.push(key);
     }
 
-    /// Creates a new entry in the log, which occured as a result of the [`Key`]s already
+    /// Creates a new entry in the log, which occured as a result of the [`KeyEvent`]s already
     /// [`push_key`](Self::push_key)ed.
     pub fn log_entry(&mut self, description: String, category: Category) {
         // If the keystroke is identical to the last log entry, incrememnt that counter by one
