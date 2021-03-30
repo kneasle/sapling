@@ -4,22 +4,30 @@ pub mod dag;
 pub mod keystroke_log;
 pub mod normal_mode;
 pub mod state;
+mod widgets;
 
-use crate::ast::display_token::{DisplayToken, SyntaxCategory};
 use crate::ast::Ast;
 use crate::config::{Config, DEBUG_HIGHLIGHTING};
-use crate::core::Size;
 
 use dag::Dag;
 use keystroke_log::KeyStrokeLog;
 use state::State;
 
-use std::borrow::{Borrow, Cow};
-use std::collections::{hash_map::DefaultHasher, HashSet};
-use std::hash::Hasher;
+use std::borrow::Cow;
+use std::io;
 use std::path::PathBuf;
 
-use tuikit::prelude::*;
+use crossterm::{
+    cursor,
+    event::{Event, KeyEvent},
+    terminal,
+};
+use tui::{
+    backend::CrosstermBackend,
+    layout::{Constraint, Direction, Layout},
+};
+
+pub(crate) type Terminal = tui::Terminal<CrosstermBackend<io::Stdout>>;
 
 /// The [`State`] that Sapling is in during a transition function.  This has to exist, but
 /// none of the methods should ever be called, since doing so would require the transition function
@@ -33,7 +41,7 @@ struct IntermediateState;
 impl<'arena, Node: Ast<'arena>> State<'arena, Node> for IntermediateState {
     fn transition(
         self: Box<Self>,
-        _key: Key,
+        _key: KeyEvent,
         _tree: &mut Editor<'arena, Node>,
     ) -> (
         Box<dyn State<'arena, Node>>,
@@ -58,7 +66,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     /// The style that the tree is being printed to the screen
     format_style: Node::FormatStyle,
     /// The `tuikit` terminal that the `Editor` is rendering to
-    term: Term,
+    term: Terminal,
     /// The current state-machine [`State`] that Sapling is in
     state: Box<dyn State<'arena, Node>>,
     /// The current user configuration
@@ -66,6 +74,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     /// A list of the keystrokes that have been executed, along with a summary of what they mean
     keystroke_log: KeyStrokeLog,
     file_path: Option<PathBuf>,
+    log: tui_logger::TuiWidgetState,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
@@ -76,7 +85,9 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         config: Config,
         file_path: Option<PathBuf>,
     ) -> Editor<'arena, Node> {
-        let term = Term::new().unwrap();
+        let mut term = Terminal::new(CrosstermBackend::new(io::stdout())).unwrap();
+        crossterm::execute!(term.backend_mut(), terminal::EnterAlternateScreen).unwrap();
+        terminal::enable_raw_mode().unwrap();
         Editor {
             tree,
             term,
@@ -85,153 +96,65 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             config,
             keystroke_log: KeyStrokeLog::new(10),
             file_path,
-        }
-    }
-
-    /// Render the tree to the screen
-    fn render_tree(&self, row: usize, col: usize) {
-        let cols = [
-            Color::MAGENTA,
-            Color::RED,
-            Color::YELLOW,
-            Color::GREEN,
-            Color::CYAN,
-            Color::BLUE,
-            Color::WHITE,
-            Color::LIGHT_RED,
-            Color::LIGHT_BLUE,
-            Color::LIGHT_CYAN,
-            Color::LIGHT_GREEN,
-            Color::LIGHT_YELLOW,
-            Color::LIGHT_MAGENTA,
-            Color::LIGHT_WHITE,
-        ];
-
-        // Mutable variables to track where the terminal cursor should go
-        let mut row = row;
-        let mut col = col;
-        let mut indentation_amount = 0;
-
-        let mut unknown_categories: HashSet<SyntaxCategory> = HashSet::with_capacity(0);
-
-        /// A cheeky macro to print a string to the terminal
-        macro_rules! term_print {
-            ($string: expr) => {{
-                let string = $string;
-                // Print the string
-                self.term.print(row, col, string).unwrap();
-                // Move the cursor to the end of the string
-                let size = Size::from(string);
-                if size.lines() == 0 {
-                    col += size.last_line_length();
-                } else {
-                    row += size.lines();
-                    col = size.last_line_length();
-                }
-            }};
-            ($string: expr, $attr: expr) => {{
-                let string = $string;
-                // Print the string
-                self.term.print_with_attr(row, col, string, $attr).unwrap();
-                // Move the cursor to the end of the string
-                let size = Size::from(string);
-                if size.lines() == 0 {
-                    col += size.last_line_length();
-                } else {
-                    row += size.lines();
-                    col = size.last_line_length();
-                }
-            }};
-        }
-
-        for (node, tok) in self.tree.root().display_tokens(&self.format_style) {
-            match tok {
-                DisplayToken::Text(s, category) => {
-                    let col = if DEBUG_HIGHLIGHTING {
-                        // Hash the ref to decide on the colour
-                        let mut hasher = DefaultHasher::new();
-                        node.hash(&mut hasher);
-                        let hash = hasher.finish();
-                        cols[hash as usize % cols.len()]
-                    } else {
-                        *self.config.color_scheme.get(category).unwrap_or_else(|| {
-                            unknown_categories.insert(category);
-                            &Color::LIGHT_MAGENTA
-                        })
-                    };
-                    // Generate the display attributes depending on if the node is selected
-                    let attr = if std::ptr::eq(node, self.tree.cursor()) {
-                        Attr::default().fg(Color::BLACK).bg(col)
-                    } else {
-                        Attr::default().fg(col)
-                    };
-                    // Print the token
-                    term_print!(s.borrow(), attr);
-                }
-                DisplayToken::Whitespace(n) => {
-                    col += n;
-                }
-                DisplayToken::Newline => {
-                    row += 1;
-                    col = indentation_amount;
-                }
-                DisplayToken::Indent => {
-                    indentation_amount += 4;
-                }
-                DisplayToken::Dedent => {
-                    indentation_amount -= 4;
-                }
-            }
-        }
-
-        // Print warning messages for unknown syntax categories
-        for c in unknown_categories {
-            log::error!("Unknown highlight category '{}'", c);
+            log: tui_logger::TuiWidgetState::default(),
         }
     }
 
     /* ===== MAIN FUNCTIONS ===== */
 
     /// Update the terminal UI display
-    fn update_display(&self) {
-        // Put the terminal size into some convenient variables
-        let (width, height) = self.term.term_size().unwrap();
-        // Clear the terminal
-        self.term.clear().unwrap();
+    fn update_display(&mut self) {
+        let Self {
+            term,
+            state,
+            tree,
+            keystroke_log,
+            config,
+            format_style,
+            log,
+            ..
+        } = self;
+        term.draw(|f| {
+            let area = f.size();
+            let rows = Layout::default()
+                .constraints(vec![Constraint::Min(0), Constraint::Length(1)])
+                .split(area);
+            let cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints(vec![Constraint::Min(40), Constraint::Percentage(30)])
+                .split(rows[0]);
+            let details = Layout::default()
+                .constraints(vec![Constraint::Percentage(60), Constraint::Min(5)])
+                .split(cols[1]);
 
-        /* RENDER MAIN TEXT VIEW */
-
-        self.render_tree(0, 0);
-
-        /* RENDER LOG SECTION */
-
-        self.keystroke_log.render(&self.term, 0, width / 2);
-
-        /* RENDER BOTTOM BAR */
-
-        // Add the `Press 'q' to exit.` message
-        self.term
-            .print(height - 1, 0, "Press 'q' to exit.")
-            .unwrap();
-        // Draw the current keystroke buffer
-        let keystroke_buffer = self.state.keystroke_buffer();
-        self.term
-            .print(
-                height - 1,
-                width - 5 - keystroke_buffer.chars().count(),
-                keystroke_buffer.borrow(),
-            )
-            .unwrap();
-
-        /* UPDATE THE TERMINAL SCREEN */
-
-        self.term.present().unwrap();
+            f.render_widget(tui::widgets::Clear, area);
+            f.render_widget(
+                widgets::StatusBar {
+                    keystroke_buffer: &state.keystroke_buffer(),
+                },
+                rows[1],
+            );
+            f.render_widget(
+                widgets::TextView {
+                    tree: &*tree,
+                    color_scheme: &config.color_scheme,
+                    format_style: &*format_style,
+                },
+                cols[0],
+            );
+            f.render_widget(&*keystroke_log, details[0]);
+            let mut logger = tui_logger::TuiLoggerWidget::default();
+            logger.state(&*log);
+            f.render_widget(logger, details[1]);
+        })
+        .unwrap();
     }
 
     fn mainloop(&mut self) {
         log::trace!("Starting mainloop");
+        self.update_display();
         // Sit in the infinte mainloop
-        while let Ok(event) = self.term.poll_event() {
+        while let Ok(event) = crossterm::event::read() {
             /* RESPOND TO THE USER'S INPUT */
             if let Event::Key(key) = event {
                 // Consume the key and use it to move through the state machine.  Here, we use
@@ -259,7 +182,6 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                     self.keystroke_log.log_entry(description, category);
                 }
             }
-
             // If we have reached `state::Quit` then we should exit the main loop
             if self.state.is_quit() {
                 break;
@@ -267,7 +189,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
 
             // Make sure that the logger isn't taller than the screen
             self.keystroke_log
-                .set_max_entries(self.term.term_size().unwrap().1.min(10));
+                .set_max_entries(self.term.size().unwrap().height.into());
             // Update the screen after every input (if this becomes a bottleneck then we can
             // optimise the number of calls to `update_display` but for now it's not worth the
             // added complexity)
@@ -282,7 +204,12 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
         // Show the cursor before closing so that the cursor isn't permanently disabled
         // (see issue `lotabout/tuikit#28`: https://github.com/lotabout/tuikit/issues/28)
         log::trace!("Making the cursor reappear.");
-        self.term.show_cursor(true).unwrap();
-        self.term.present().unwrap();
+        crossterm::execute!(
+            self.term.backend_mut(),
+            terminal::LeaveAlternateScreen,
+            cursor::Show
+        )
+        .unwrap();
+        terminal::disable_raw_mode().unwrap();
     }
 }

@@ -10,13 +10,13 @@ use std::borrow::Cow;
 use std::io::prelude::*;
 use std::iter::Peekable;
 
-use tuikit::prelude::Key;
+use crossterm::event::{KeyCode, KeyEvent};
 
 /// The struct covering all the [`State`](state::State)s which correspond to Sapling being in
 /// normal mode.
 #[derive(Debug, Clone)]
 pub struct State {
-    keystroke_buffer: Vec<Key>,
+    keystroke_buffer: Vec<KeyEvent>,
 }
 
 impl Default for State {
@@ -31,7 +31,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
     // TODO: Fix some of the jank of this function
     fn transition(
         mut self: Box<Self>,
-        key: Key,
+        key: KeyEvent,
         editor: &mut Editor<'arena, Node>,
     ) -> (
         Box<dyn state::State<'arena, Node>>,
@@ -245,9 +245,9 @@ enum ParseErr {
 /// user types a keystroke character, so the user would not be able to input `"q489flshb"` in one
 /// go because doing so would require them to first input every possible prefix of `"q489flshb"`,
 /// including `"q"`.
-fn parse_command(keymap: &KeyMap, keys: &[Key]) -> ParseResult<(usize, Action)> {
+fn parse_command(keymap: &KeyMap, keys: &[KeyEvent]) -> ParseResult<(usize, Action)> {
     // Generate an iterator of keystrokes, which are treated similar to tokens by the parser.
-    let mut key_iter = keys.iter().copied().peekable();
+    let mut key_iter = keys.iter().map(|ev| ev.code).peekable();
 
     // Parse a count off the front of the command
     let count = parse_count(&mut key_iter);
@@ -273,12 +273,12 @@ fn parse_command(keymap: &KeyMap, keys: &[Key]) -> ParseResult<(usize, Action)> 
     ))
 }
 
-/// Attempt to parse a sequence of [`Key`]strokes into an [`Insertable`].
+/// Attempt to parse a sequence of [`KeyCode`]strokes into an [`Insertable`].
 ///
 /// Currently an [`Insertable`] only has one form ([`Insertable::CountedNode`]), and so this is a
 /// simple matter of attempting to parse a count and then taking one char of the keystroke.
 fn parse_insertable(
-    keystroke_char_iter: &mut Peekable<impl Iterator<Item = Key>>,
+    keystroke_char_iter: &mut Peekable<impl Iterator<Item = KeyCode>>,
 ) -> ParseResult<Insertable> {
     // Parse a count before reading the char
     let count = parse_count(keystroke_char_iter);
@@ -286,31 +286,31 @@ fn parse_insertable(
     let key = keystroke_char_iter.next().ok_or(ParseErr::Incomplete)?;
     // If the next keystroke is a `char`, then return it with success otherwise the command is
     // invalid
-    if let Key::Char(c) = key {
+    if let KeyCode::Char(c) = key {
         Ok(Insertable::CountedNode(count, c))
     } else {
         Err(ParseErr::Invalid)
     }
 }
 
-/// Parse a 'count' off the front of an sequence of [`Key`]strokes.  This cannot fail, because if
-/// the first [`Key`] is not a numeral, this returns `1`.
-fn parse_count(keystroke_char_iter: &mut Peekable<impl Iterator<Item = Key>>) -> usize {
+/// Parse a 'count' off the front of an sequence of [`KeyCode`]strokes.  This cannot fail, because if
+/// the first [`KeyCode`] is not a numeral, this returns `1`.
+fn parse_count(keystroke_char_iter: &mut Peekable<impl Iterator<Item = KeyCode>>) -> usize {
     // accumulated_count tracks the number that is represented by the keystrokes already consumed
     // or None if no numbers have been consumed
     let mut accumulated_count: Option<usize> = None;
     loop {
         let new_digit = match keystroke_char_iter.peek() {
-            Some(Key::Char('0')) => 0,
-            Some(Key::Char('1')) => 1,
-            Some(Key::Char('2')) => 2,
-            Some(Key::Char('3')) => 3,
-            Some(Key::Char('4')) => 4,
-            Some(Key::Char('5')) => 5,
-            Some(Key::Char('6')) => 6,
-            Some(Key::Char('7')) => 7,
-            Some(Key::Char('8')) => 8,
-            Some(Key::Char('9')) => 9,
+            Some(KeyCode::Char('0')) => 0,
+            Some(KeyCode::Char('1')) => 1,
+            Some(KeyCode::Char('2')) => 2,
+            Some(KeyCode::Char('3')) => 3,
+            Some(KeyCode::Char('4')) => 4,
+            Some(KeyCode::Char('5')) => 5,
+            Some(KeyCode::Char('6')) => 6,
+            Some(KeyCode::Char('7')) => 7,
+            Some(KeyCode::Char('8')) => 8,
+            Some(KeyCode::Char('9')) => 9,
             _ => break,
         };
         // Pop the digit.  We use lookahead so that we leave the future keystrokes untouched for
@@ -327,10 +327,16 @@ mod tests {
     use super::{parse_command, Action, Insertable, ParseErr};
     use crate::config::default_keymap;
     use crate::core::Direction;
-    use tuikit::prelude::Key;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-    fn to_char_keys(string: &str) -> Vec<Key> {
-        string.chars().map(|c| Key::Char(c)).collect::<Vec<_>>()
+    fn to_char_keys(string: &str) -> Vec<KeyEvent> {
+        string
+            .chars()
+            .map(|c| KeyEvent {
+                code: KeyCode::Char(c),
+                modifiers: KeyModifiers::empty(),
+            })
+            .collect::<Vec<_>>()
     }
 
     #[test]

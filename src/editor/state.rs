@@ -5,7 +5,7 @@ use crate::ast::Ast;
 
 use std::borrow::Cow;
 
-use tuikit::prelude::Key;
+use crossterm::event::KeyEvent;
 
 /// The [`State`] that Sapling enters to quit the mainloop and exit
 #[derive(Debug, Copy, Clone)]
@@ -14,7 +14,7 @@ pub struct Quit;
 impl<'arena, Node: Ast<'arena>> State<'arena, Node> for Quit {
     fn transition(
         self: Box<Self>,
-        _key: Key,
+        _key: KeyEvent,
         _editor: &mut Editor<'arena, Node>,
     ) -> (Box<dyn State<'arena, Node>>, Option<(String, Category)>) {
         (self, None)
@@ -35,7 +35,7 @@ pub trait State<'arena, Node: Ast<'arena>>: std::fmt::Debug {
     /// Consume a keystroke, returning the `State` after this transition
     fn transition(
         self: Box<Self>,
-        key: Key,
+        key: KeyEvent,
         editor: &mut Editor<'arena, Node>,
     ) -> (Box<dyn State<'arena, Node>>, Option<(String, Category)>);
 

@@ -108,11 +108,6 @@ git clone https://github.com/kneasle/sapling.git
 cargo run 2> log
 ```
 
-Note that Sapling will not compile for Windows.  Windows support is absolutely intended, but Sapling
-currently uses [tuikit](https://github.com/lotabout/tuikit) as a terminal abstraction, which does
-not yet have Windows support.  PRs to Sapling or `tuikit` to add support for Windows would be very
-much appreciated.
-
 ### Current Keybindings
 
 #### Misc
