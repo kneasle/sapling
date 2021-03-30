@@ -108,6 +108,10 @@ git clone https://github.com/kneasle/sapling.git
 cargo run 2> log
 ```
 
+### Demo
+
+![Demo GIF](https://user-images.githubusercontent.com/60934058/112751246-d8e23f00-8fc4-11eb-9a15-8a3ef32d54a4.gif)
+
 ### Current Keybindings
 
 #### Misc
