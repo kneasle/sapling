@@ -7,7 +7,12 @@ use crate::core::keystrokes_to_string;
 use super::normal_mode::Action;
 
 use crossterm::event::KeyEvent;
-use tui::{buffer::Buffer, layout::{Constraint, Rect}, style::{Color, Style}, widgets::{Cell, Row, Table, Widget}};
+use tui::{
+    buffer::Buffer,
+    layout::{Constraint, Rect},
+    style::{Color, Style},
+    widgets::{Cell, Row, Table, Widget},
+};
 
 /// A category grouping similar actions
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -74,6 +79,7 @@ pub struct KeyStrokeLog {
     /// The keystrokes that will be included in the next log entry
     unlogged_keystrokes: Vec<KeyEvent>,
 }
+
 impl Widget for &'_ KeyStrokeLog {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let rows_displayed = self
@@ -102,6 +108,7 @@ impl Widget for &'_ KeyStrokeLog {
         .render(area, buf);
     }
 }
+
 impl KeyStrokeLog {
     /// Create a new (empty) keystroke log
     pub fn new(max_entries: usize) -> KeyStrokeLog {

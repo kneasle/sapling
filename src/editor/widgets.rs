@@ -1,10 +1,18 @@
-use crate::ast::{Ast, display_token::{DisplayToken, SyntaxCategory}};
 use super::DEBUG_HIGHLIGHTING;
+use crate::ast::{
+    display_token::{DisplayToken, SyntaxCategory},
+    Ast,
+};
 
-use std::hash::Hasher;
 use std::collections::{hash_map::DefaultHasher, HashSet};
+use std::hash::Hasher;
 
-use tui::{buffer::Buffer, layout::{Alignment, Rect}, style::{Color, Style}, widgets::{Paragraph, Widget}};
+use tui::{
+    buffer::Buffer,
+    layout::{Alignment, Rect},
+    style::{Color, Style},
+    widgets::{Paragraph, Widget},
+};
 
 pub struct StatusBar<'a> {
     pub keystroke_buffer: &'a str,
@@ -20,7 +28,7 @@ impl Widget for StatusBar<'_> {
 
 pub struct TextView<'a, 'arena, Node: Ast<'arena>> {
     pub tree: &'a super::Dag<'arena, Node>,
-    pub color_scheme: &'a super::config::ColorScheme,
+    pub color_scheme: &'a crate::config::ColorScheme,
     pub format_style: &'a Node::FormatStyle,
 }
 impl<'arena, Node: Ast<'arena>> Widget for TextView<'_, 'arena, Node> {

@@ -8,9 +8,6 @@ mod widgets;
 
 use crate::ast::Ast;
 use crate::config::{Config, DEBUG_HIGHLIGHTING};
-use crate::{
-    config,
-};
 
 use dag::Dag;
 use keystroke_log::KeyStrokeLog;
@@ -77,6 +74,7 @@ pub struct Editor<'arena, Node: Ast<'arena>> {
     /// A list of the keystrokes that have been executed, along with a summary of what they mean
     keystroke_log: KeyStrokeLog,
     file_path: Option<PathBuf>,
+    log: tui_logger::TuiWidgetState,
 }
 
 impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
@@ -98,6 +96,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             config,
             keystroke_log: KeyStrokeLog::new(10),
             file_path,
+            log: tui_logger::TuiWidgetState::default(),
         }
     }
 
@@ -112,6 +111,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             keystroke_log,
             config,
             format_style,
+            log,
             ..
         } = self;
         term.draw(|f| {
@@ -123,6 +123,9 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 .direction(Direction::Horizontal)
                 .constraints(vec![Constraint::Min(40), Constraint::Percentage(30)])
                 .split(rows[0]);
+            let details = Layout::default()
+                .constraints(vec![Constraint::Percentage(60), Constraint::Min(5)])
+                .split(cols[1]);
 
             f.render_widget(tui::widgets::Clear, area);
             f.render_widget(
@@ -139,7 +142,10 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
                 },
                 cols[0],
             );
-            f.render_widget(&*keystroke_log, cols[1]);
+            f.render_widget(&*keystroke_log, details[0]);
+            let mut logger = tui_logger::TuiLoggerWidget::default();
+            logger.state(&*log);
+            f.render_widget(logger, details[1]);
         })
         .unwrap();
     }
@@ -182,13 +188,8 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             }
 
             // Make sure that the logger isn't taller than the screen
-            self.keystroke_log.set_max_entries(
-                self.term
-                    .size()
-                    .unwrap()
-                    .height
-                    .into(),
-            );
+            self.keystroke_log
+                .set_max_entries(self.term.size().unwrap().height.into());
             // Update the screen after every input (if this becomes a bottleneck then we can
             // optimise the number of calls to `update_display` but for now it's not worth the
             // added complexity)
