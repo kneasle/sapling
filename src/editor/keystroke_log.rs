@@ -2,18 +2,12 @@
 //! the viewers of my streams feedback for what I'm typing.
 
 use crate::core::keystrokes_to_string;
-use crate::editor::Terminal;
 
 #[allow(unused_imports)] // Only used by doc-comments, which rustc can't see
 use super::normal_mode::Action;
 
 use crossterm::event::KeyEvent;
-use tui::{
-    backend::CrosstermBackend,
-    buffer::Buffer,
-    layout::Rect,
-    style::{Color, Style},
-};
+use tui::{buffer::Buffer, layout::{Constraint, Rect}, style::{Color, Style}, widgets::{Cell, Row, Table, Widget}};
 
 /// A category grouping similar actions
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -80,63 +74,32 @@ pub struct KeyStrokeLog {
     /// The keystrokes that will be included in the next log entry
     unlogged_keystrokes: Vec<KeyEvent>,
 }
-impl tui::widgets::Widget for &'_ KeyStrokeLog {
+impl Widget for &'_ KeyStrokeLog {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        // Calculate how wide the numbers column should be, enforcing that it is at least two
-        // chars wide.
-        let count_col_width = self
+        let rows_displayed = self
             .keystrokes
-            .iter()
-            .map(|e| match e.count {
-                1 => 0,
-                c => format!("{}x", c).len(),
-            })
-            .max()
-            .unwrap_or(0)
-            .max(2) as u16;
-        // Calculate the width of the keystroke column, and make sure that it is at least two
-        // chars wide.
-        let cmd_col_width = self
-            .keystrokes
-            .iter()
-            .map(|e| e.keystroke_string().len())
-            .max()
-            .unwrap_or(0)
-            .max(2) as u16;
-        // Render the keystrokes
-        for (i, e) in self.keystrokes.iter().enumerate() {
-            let i = i as u16;
-            // Print the count if greater than 1
-            if e.count > 1 {
-                buf.set_string(
-                    area.left(),
-                    area.top() + i,
-                    &format!("{}x", e.count),
-                    Style::default(),
-                );
-            }
-            // Print the keystrokes in one column
-            buf.set_string(
-                area.left() + count_col_width + 1,
-                area.top() + i,
-                &e.keystroke_string(),
-                Style::default().fg(Color::White),
-            );
-            // Print a `=>`
-            buf.set_string(
-                area.left() + count_col_width + 1 + cmd_col_width + 1,
-                area.top() + i,
-                "=>",
-                Style::default(),
-            );
-            // Print the meanings in another column
-            buf.set_string(
-                area.left() + count_col_width + 1 + cmd_col_width + 4,
-                area.top() + i,
-                &e.description,
-                Style::default().fg(e.color),
-            );
-        }
+            .len()
+            .checked_sub(area.height as usize)
+            .unwrap_or(0);
+        Table::new(self.keystrokes[rows_displayed..].iter().map(|entry| {
+            Row::new(vec![
+                if entry.count > 1 {
+                    format!("{}x", entry.count).into()
+                } else {
+                    Cell::default()
+                },
+                Cell::from(entry.keystroke_string()).style(Style::default().fg(Color::White)),
+                "=>".into(),
+                Cell::from(&*entry.description).style(Style::default().fg(entry.color)),
+            ])
+        }))
+        .widths(&[
+            Constraint::Min(2),
+            Constraint::Min(2),
+            Constraint::Length(2),
+            Constraint::Min(0),
+        ])
+        .render(area, buf);
     }
 }
 impl KeyStrokeLog {

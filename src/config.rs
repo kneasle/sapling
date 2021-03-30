@@ -5,7 +5,7 @@ use crate::ast::display_token::{syntax_category::*, SyntaxCategory};
 use crate::core::Direction;
 use crate::editor::normal_mode::CmdType;
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyCode;
 use tui::style::Color;
 
 /* DEBUG FLAGS */
