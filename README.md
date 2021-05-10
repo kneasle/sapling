@@ -1,12 +1,16 @@
-# Sapling
+<img src="https://raw.githubusercontent.com/kneasle/sapling/master/resources/sapling.gif" alt="Sapling Logo" align="right" />
 
-![Sapling logo](https://raw.githubusercontent.com/kneasle/sapling/master/resources/sapling.gif)
+# Sapling
 
 A highly experimental code editor where you edit code, not text.
 
-_Cheeky plug_: I will be streaming some of the development of Sapling over on
-[my YouTube channel](https://www.youtube.com/channel/UCKl0T4IDZC3vUz152hDAzGw) on 2pm EST on
-Saturdays.  Smash the subscribe button to not miss upcoming streams!
+_I (@kneasle) don't currently have time to work on Sapling (I have exams coming up
+and other projects are requiring my time).  This doesn't mean the project is dead or that I've
+forgotten about it - I still think it's cool and the community support has been crazy.  I'm also
+not currently streaming development, but all vods are still on
+[my YouTube channel](https://www.youtube.com/channel/UCKl0T4IDZC3vUz152hDAzGw) for anyone
+interested.  There's also a discord server for discussions about Sapling and structured editing in
+general ([invite link](https://discord.gg/Amv3Tsb4fV)). OK enough from me, onto the real README!_
 
 Most of the ideas for this project come from my friend Shtanton's
 [blog post](http://shtanton.com/ex.html).  The concept of directly editing syntax trees is called
