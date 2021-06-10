@@ -776,7 +776,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                 format!("node{} [label={:?}]\n", name, node.debug_name()),
             );
 
-            if node.children().len() > 0 {
+            if !node.children().is_empty() {
                 for &child in node.children() {
                     add_to_graph(child, digraph_edges, hmap_nodes);
                 }
@@ -792,7 +792,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                         digraph_edges.push_str(&format!("node{}", child_name));
                     }
                 }
-                digraph_edges.push_str("\n");
+                digraph_edges.push('\n');
             }
         }
 
@@ -807,7 +807,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
         for value in hmap_nodes.values() {
             dot_buffer.push_str(&value);
         }
-        dot_buffer.push_str("\n");
+        dot_buffer.push('\n');
 
         dot_buffer.push_str(&digraph_edges);
         dot_buffer.push_str(&digraph_tail);

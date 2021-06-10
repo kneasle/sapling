@@ -32,7 +32,7 @@ fn main() {
     log::info!("Starting up...");
 
     // Read a file name as the CLI argument
-    let (file_path, initial_json) = if let Some(first_arg) = std::env::args().skip(1).next() {
+    let (file_path, initial_json) = if let Some(first_arg) = std::env::args().nth(1) {
         let path = PathBuf::from(first_arg);
         let file = match std::fs::File::open(&path) {
             Ok(x) => x,

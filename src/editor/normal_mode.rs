@@ -67,7 +67,7 @@ impl<'arena, Node: Ast<'arena>> state::State<'arena, Node> for State {
                             let mut content = tree.to_text(&editor.format_style);
                             // Force the file to finish with a newline.  BTW, <str>.chars().last()
                             // is O(1), regardless of the length of the string.
-                            if content.chars().last() != Some('\n') {
+                            if !content.ends_with('\n') {
                                 content.push('\n');
                             }
                             file.write_all(content.as_bytes()).unwrap();
