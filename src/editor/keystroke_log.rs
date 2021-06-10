@@ -82,11 +82,7 @@ pub struct KeyStrokeLog {
 
 impl Widget for &'_ KeyStrokeLog {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let rows_displayed = self
-            .keystrokes
-            .len()
-            .checked_sub(area.height as usize)
-            .unwrap_or(0);
+        let rows_displayed = self.keystrokes.len().saturating_sub(area.height as usize);
         Table::new(self.keystrokes[rows_displayed..].iter().map(|entry| {
             Row::new(vec![
                 if entry.count > 1 {
