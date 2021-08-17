@@ -166,7 +166,7 @@ mod tests {
             let mut total_size_add_assign = Size::ZERO;
             let mut full_string = String::new();
             for s in *strings {
-                total_size_add = total_size_add + Size::from(*s);
+                total_size_add += Size::from(*s);
                 total_size_add_assign += Size::from(*s);
                 full_string.push_str(s);
             }

@@ -304,8 +304,8 @@ impl<'arena> Ast<'arena> for Json<'arena> {
     fn children<'s>(&'s self) -> &'s [&'arena Json<'arena>] {
         match self {
             Json::True | Json::False | Json::Null | Json::Str(_) => &[],
-            Json::Array(children) => &children,
-            Json::Object(fields) => &fields,
+            Json::Array(children) => children,
+            Json::Object(fields) => fields,
             Json::Field(key_value) => &key_value[..],
         }
     }

@@ -366,7 +366,7 @@ mod tests {
         ] {
             assert_eq!(
                 parse_command(&keymap, &to_char_keys(keystrokes)),
-                Ok((1, expected_effect.clone()))
+                Ok((1, *expected_effect))
             );
         }
     }
@@ -385,7 +385,7 @@ mod tests {
         ] {
             assert_eq!(
                 parse_command(&keymap, &to_char_keys(keystrokes)),
-                Ok((*exp_count, exp_action.clone()))
+                Ok((*exp_count, *exp_action))
             );
         }
     }
