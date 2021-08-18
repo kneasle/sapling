@@ -103,7 +103,7 @@ impl Path {
     where
         Node: Ast<'arena>,
     {
-        NodeIter::new(root, &self)
+        NodeIter::new(root, self)
     }
 }
 

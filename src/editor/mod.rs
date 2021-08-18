@@ -136,7 +136,7 @@ impl<'arena, Node: Ast<'arena> + 'arena> Editor<'arena, Node> {
             );
             f.render_widget(
                 widgets::TextView {
-                    tree: &*tree,
+                    tree: *tree,
                     color_scheme: &config.color_scheme,
                     format_style: &*format_style,
                 },

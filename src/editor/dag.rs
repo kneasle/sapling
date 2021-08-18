@@ -535,7 +535,7 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
                                 } else {
                                     cloned_parent.insert_child(
                                         new_node,
-                                        &this.arena,
+                                        this.arena,
                                         insert_index,
                                     )?;
                                 }
@@ -805,12 +805,12 @@ impl<'arena, Node: Ast<'arena>> Dag<'arena, Node> {
             add_to_graph(snapshot.root, &mut digraph_edges, &mut hmap_nodes);
         }
         for value in hmap_nodes.values() {
-            dot_buffer.push_str(&value);
+            dot_buffer.push_str(value);
         }
         dot_buffer.push('\n');
 
         dot_buffer.push_str(&digraph_edges);
-        dot_buffer.push_str(&digraph_tail);
+        dot_buffer.push_str(digraph_tail);
 
         dot_buffer
     }
@@ -926,7 +926,7 @@ mod tests {
     ) {
         let arena: Arena<Json> = Arena::new();
         let root = add_value_to_arena(start_tree.clone(), &arena);
-        let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
+        let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         assert_eq!(
             Ok(EditSuccess::Move(actual_distance, direction)),
@@ -1959,8 +1959,7 @@ mod tests {
         );
         assert_eq!(*dag.root(), start_tree, "Not equal in tree.");
         assert_eq!(
-            start_cursor_location.clone(),
-            dag.current_cursor_path,
+            start_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
         );
     }
@@ -1972,7 +1971,7 @@ mod tests {
 
         // Create and initialise Dag to test
         let arena: Arena<Json> = Arena::new();
-        let root = add_value_to_arena(start_tree.clone(), &arena);
+        let root = add_value_to_arena(start_tree, &arena);
 
         // Create and initialise Dag to test
         let start_cursor_location = Path::from_vec(vec![]);
@@ -1982,7 +1981,7 @@ mod tests {
         let expected_cursor_location_4 = Path::from_vec(vec![1]);
         let expected_cursor_location_5 = Path::from_vec(vec![1, 0]);
 
-        let mut dag = Dag::new(&arena, root, start_cursor_location.clone());
+        let mut dag = Dag::new(&arena, root, start_cursor_location);
 
         let ok_1 = dag.move_cursor(1, Direction::Down);
         assert_eq!(dag.current_cursor_path, expected_cursor_location_1);
