@@ -1959,8 +1959,7 @@ mod tests {
         );
         assert_eq!(*dag.root(), start_tree, "Not equal in tree.");
         assert_eq!(
-            start_cursor_location,
-            dag.current_cursor_path,
+            start_cursor_location, dag.current_cursor_path,
             "Not equal in cursor location."
         );
     }
