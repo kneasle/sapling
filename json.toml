@@ -1,0 +1,52 @@
+root = "value"
+whitespace = " \t\r\n"
+
+# Root JSON type
+[types.value]
+children = ["true", "false", "null", "array", "object", "string"]
+
+[types]
+true = { key = "t", pattern = ["true"] }
+false = { key = "f", pattern = ["false"] }
+null = { key = "n", pattern = ["null"] }
+
+[types.array]
+keys = ["a", "[", "]"]
+pattern = ["[", { seq = [{ type = "value" }], delimiter = "," }, "]"] # [ $( <value> ),* ]
+
+[types.object]
+keys = ["o", "{", "}"]
+pattern = ["{", { seq = [{ type = "field" }], delimiter = "," }, "}"] # { $( <field> ),* }
+
+[types.field]
+pattern = [{ type = "string" }, ":", { type = "value" }] # <string>: <value>
+
+[types.number]
+key = "n"
+stringy = true # Sapling currently doesn't understand that numbers have special meaning
+validity_regex = '''
+    -?                      # negation (optional)
+    (?: 0 | (?:[1-9]\d*) )  # integer  (single `0`, or >=1 digits which doesn't start with 0)
+    (?: \. \d+ )            # fraction (optional; `.` followed by >=1 digits)
+    (?: [Ee] [-+]? \d+ )    # exponent (optional; `E` or `e`, then possibly `-` or `+`, then >=1 digits)
+    '''
+default = "0"
+# no escaping required
+
+[types.string]
+keys = ["s", '"']
+stringy = true
+# Strings start and end with a double quote
+delim_start = '"'
+delim_end = '"'
+## validity_regex = ".*" # by default
+default = ""
+escape_rules.'\"' = '"'
+escape_rules.'\\' = '\'
+escape_rules.'\/' = '/'
+escape_rules.'\b' = "\b" # `\b` -> `<backspace>`
+escape_rules.'\f' = "\f" # `\f` -> `<form feed>`
+escape_rules.'\r' = "\r" # `\r` -> `<carriage return>`
+escape_rules.'\n' = "\n" # `\n` -> `<line feed>`
+escape_rules.'\t' = "\t" # `\t` -> `<tab>`
+unicode_escape_prefix = '\u' # `\uWXYZ` -> `<unicode codepoint 0xWXYZ>`

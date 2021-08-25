@@ -1,0 +1,2 @@
+[workspace]
+members = ["sapling", "tui", "grammar"]
