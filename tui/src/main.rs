@@ -1,5 +1,5 @@
-use sapling_grammar::Grammar;
+use sapling::Lang;
 
 fn main() {
-    let _ = dbg!(Grammar::load_toml_file("json.toml"));
+    let _ = dbg!(Lang::load_toml_file("json.toml"));
 }

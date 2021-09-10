@@ -71,11 +71,16 @@ fn convert_type(
             delim_start,
             delim_end,
             default_content,
-            validity_regex,
+            mut validity_regex,
             escape_rules,
             unicode_escape_prefix,
         } => {
             assert!(stringy); // stringy should always be set to `true`
+
+            // Add `^` and `$` to either end of the regex, to force the regex engine to match the
+            // entire node contents
+            validity_regex.insert(0, '^');
+            validity_regex.push('$');
             let validity_regex =
                 Regex::new(&validity_regex).map_err(|inner| ConvertError::Regex {
                     type_name: name.to_owned(),

@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-bimap = "0.6"
-regex = "1.5"
-hmap = "0.1"
+sapling_grammar.path = "../grammar"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5"

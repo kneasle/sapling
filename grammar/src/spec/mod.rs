@@ -14,17 +14,37 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
+use crate::Grammar;
+
+use self::convert::ConvertResult;
+
 type TypeName = String;
 type TokenValue = String;
 type Pattern = Vec<PatternElement>;
 
+/// A simplified version of [`Grammar`] which can be [`Deserialize`]d from any JSON-like data
+/// structure (usually TOML).  In fact, it can **only** be generated through [`serde`], and the
+/// only exported method is [`to_grammar`](SpecGrammar::to_grammar), which checks the source data
+/// and returns a [`Grammar`] specifying the same language as the source `SpecGrammar`.
+///
+/// This type is implemented very declaratively, with minimal use of [`serde`] features.  To this
+/// end, it is designed to be consulted as a reference specification for the TOML files consumed by
+/// Sapling.  However, the exact implementation is considered implementation details to the rest of
+/// the code, and can easily be changed and iterated on.
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct SpecGrammar {
+pub struct SpecGrammar {
     #[serde(rename = "root")]
     root_type: TypeName,
     #[serde(rename = "whitespace")]
     whitespace_chars: String,
     types: HashMap<TypeName, Type>,
+}
+
+impl SpecGrammar {
+    #[inline]
+    pub fn to_grammar(self) -> ConvertResult<Grammar> {
+        convert::convert(self)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

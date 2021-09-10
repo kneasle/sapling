@@ -1,12 +1,6 @@
-use std::{
-    fmt::{Display, Formatter},
-    rc::Rc,
-};
+use std::{fmt, rc::Rc};
 
-use crate::grammar::{
-    self,
-    compiled::{Grammar, StringyType, Token, Type},
-};
+use sapling_grammar::{Grammar, TokenId, TypeId};
 
 /// A syntax tree which fully stores the state of a text buffer (including formatting)
 #[derive(Debug, Clone)]
@@ -29,7 +23,7 @@ pub enum Node {
 /// An syntax tree node which contains a sequence of tokens and sub-nodes
 #[derive(Debug, Clone)]
 pub struct TreeNode {
-    type_: Rc<Type>,
+    type_: TypeId,
     contents: Vec<Elem>,
 }
 
@@ -38,7 +32,7 @@ pub struct TreeNode {
 /// for e.g. identifiers or string/numeric literals.
 #[derive(Debug, Clone)]
 pub struct StringyNode {
-    type_: Rc<StringyType>,
+    type_: TypeId,
     /// The un-escaped contents of this node
     internal_str: String,
     /// The escaped contents of this node which should be added to the file
@@ -48,74 +42,45 @@ pub struct StringyNode {
 #[derive(Debug, Clone)]
 pub enum Elem {
     /// The token and any whitespace which directly follows it
-    Token {
-        token: Rc<Token>,
-        whitespace: String,
-    },
+    Token { token: TokenId, whitespace: String },
     /// This element contains a [`Node`] which stores a sub-tree.  This can be replaced with any
     /// [`Node`] who's [`Type`] is a descendent of `type_bound`.
-    Node {
-        type_bound: Rc<Type>,
-        node: Rc<Node>,
-    },
+    Node { type_bound: TypeId, node: Rc<Node> },
 }
 
 ///////////////////////
 // STRING CONVERSION //
 ///////////////////////
 
-impl Display for Tree {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}", self.leading_whitespace, self.root)
+impl Tree {
+    pub fn write_text(&self, w: &mut impl fmt::Write, grammar: &Grammar) -> fmt::Result {
+        w.write_str(&self.leading_whitespace)?;
+        self.root.write_text(w, grammar)
     }
 }
 
-impl Display for Node {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl Node {
+    pub fn write_text(&self, w: &mut impl fmt::Write, grammar: &Grammar) -> fmt::Result {
         match self {
             Node::Tree(TreeNode { contents, .. }) => {
                 for elem in contents {
-                    write!(f, "{}", elem)?;
+                    elem.write_text(w, grammar)?;
                 }
+                Ok(())
             }
-            Node::Stringy(StringyNode { display_str, .. }) => write!(f, "{}", display_str)?,
+            Node::Stringy(StringyNode { display_str, .. }) => w.write_str(display_str),
         }
-        Ok(())
     }
 }
 
-impl Display for Elem {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl Elem {
+    pub fn write_text(&self, w: &mut impl fmt::Write, grammar: &Grammar) -> fmt::Result {
         match self {
-            Elem::Token { token, whitespace } => write!(f, "{}{}", token, whitespace),
-            Elem::Node { node, .. } => write!(f, "{}", node),
+            Elem::Token { token, whitespace } => {
+                w.write_str(grammar.token_text(*token))?;
+                w.write_str(whitespace)
+            }
+            Elem::Node { node, .. } => node.write_text(w, grammar),
         }
     }
-}
-
-/////////////
-// EXAMPLE //
-/////////////
-
-pub fn example() -> (Rc<Grammar>, Tree) {
-    let json_grammar: Grammar = grammar::spec::expr().compile();
-    let json_grammar = Rc::new(json_grammar);
-
-    /*
-    let root = Node::Tree(TreeNode {
-        type_: json_grammar.get_type("value"),
-        contents: vec![
-            Elem::Token {
-                token: json_grammar.get_token("["),
-                whitespace: String::new(),
-            },
-            Elem::Token {
-                token: json_grammar.get_token("]"),
-                whitespace: String::new(),
-            },
-        ],
-    });
-    */
-
-    todo!()
 }

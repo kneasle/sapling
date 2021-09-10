@@ -1,2 +1,4 @@
 pub mod ast;
-pub mod grammar;
+mod lang;
+
+pub use lang::Lang;

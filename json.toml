@@ -1,27 +1,33 @@
+[lang]
+name = "JSON"
+
+
+[grammar]
 root = "value"
 whitespace = " \t\r\n"
 
-# Root JSON type
-[types.value]
-children = ["true", "false", "null", "array", "object", "string"]
+[grammar.types]
 
-[types]
+# Root JSON type
+value.children = ["true", "false", "null", "array", "object", "string"]
+
+# Keyword types
 true = { key = "t", pattern = ["true"] }
 false = { key = "f", pattern = ["false"] }
 null = { key = "n", pattern = ["null"] }
 
-[types.array]
-keys = ["a", "[", "]"]
-pattern = ["[", { seq = [{ type = "value" }], delimiter = "," }, "]"] # [ $( <value> ),* ]
+# 'Container' types
+array.keys = ["a", "[", "]"]
+array.pattern = ["[", { seq = [{ type = "value" }], delimiter = "," }, "]"] # [ $( <value> ),* ]
 
-[types.object]
-keys = ["o", "{", "}"]
-pattern = ["{", { seq = [{ type = "field" }], delimiter = "," }, "}"] # { $( <field> ),* }
+object.keys = ["o", "{", "}"]
+object.pattern = ["{", { seq = [{ type = "field" }], delimiter = "," }, "}"] # { $( <field> ),* }
 
-[types.field]
-pattern = [{ type = "string" }, ":", { type = "value" }] # <string>: <value>
+field.pattern = [{ type = "string" }, ":", { type = "value" }] # <string>: <value>
 
-[types.number]
+# Stringy types
+
+[grammar.types.number]
 key = "n"
 stringy = true # Sapling currently doesn't understand that numbers have special meaning
 validity_regex = '''
@@ -33,7 +39,7 @@ validity_regex = '''
 default = "0"
 # no escaping required
 
-[types.string]
+[grammar.types.string]
 keys = ["s", '"']
 stringy = true
 # Strings start and end with a double quote

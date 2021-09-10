@@ -1,8 +1,8 @@
-use std::{collections::HashMap, path::Path};
+use std::collections::HashMap;
 
 mod spec;
 
-pub use spec::convert::ConvertError;
+pub use spec::{convert::ConvertError, SpecGrammar};
 
 use index_vec::IndexVec;
 use regex::Regex;
@@ -17,14 +17,8 @@ pub struct Grammar {
 }
 
 impl Grammar {
-    pub fn load_toml_file(path: impl AsRef<Path>) -> Result<Self, LoadError> {
-        let contents = std::fs::read_to_string(path).map_err(LoadError::Io)?;
-        Self::from_toml(&contents)
-    }
-
-    pub fn from_toml(s: &str) -> Result<Self, LoadError> {
-        let spec: spec::SpecGrammar = toml::from_str(s).map_err(LoadError::Parse)?;
-        spec::convert::convert(spec).map_err(LoadError::Convert)
+    pub fn token_text(&self, id: TokenId) -> &str {
+        &self.tokens[id].text
     }
 }
 
@@ -38,11 +32,11 @@ pub struct Type {
     /// example, 'node class' types like expressions (which can never be instantiated directly) or
     /// JSON fields (which are only created implicitly to contain other nodes).
     keys: Vec<String>,
-    inner: InnerType,
+    inner: TypeInner,
 }
 
 #[derive(Debug, Clone)]
-pub enum InnerType {
+pub enum TypeInner {
     Pattern {
         /// A set of types to which this type can be implicitly converted.
         child_types: Vec<TypeId>,
@@ -133,10 +127,3 @@ impl Token {
 // TODO: Tag these indices with which `Grammar` created them
 index_vec::define_index_type! { pub struct TypeId = usize; }
 index_vec::define_index_type! { pub struct TokenId = usize; }
-
-#[derive(Debug)]
-pub enum LoadError {
-    Io(std::io::Error),
-    Parse(toml::de::Error),
-    Convert(ConvertError), // TODO: Fill this
-}
