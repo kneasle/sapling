@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Formatter},
+};
 
 use index_vec::IndexVec;
 use regex::Regex;
@@ -120,7 +123,7 @@ pub enum PatternElement {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Token {
     text: String,
     // TODO: Syntax highlighting groups
@@ -129,6 +132,12 @@ pub struct Token {
 impl Token {
     pub fn new(text: String) -> Self {
         Self { text }
+    }
+}
+
+impl Debug for Token {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Token({})", self.text)
     }
 }
 

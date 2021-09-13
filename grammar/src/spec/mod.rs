@@ -19,7 +19,7 @@ use crate::Grammar;
 use self::convert::ConvertResult;
 
 type TypeName = String;
-type TokenValue = String;
+type TokenText = String;
 type Pattern = Vec<PatternElement>;
 
 /// A simplified version of [`Grammar`] which can be [`Deserialize`]d from any JSON-like data
@@ -42,7 +42,7 @@ pub struct SpecGrammar {
 
 impl SpecGrammar {
     #[inline]
-    pub fn to_grammar(self) -> ConvertResult<Grammar> {
+    pub fn into_grammar(self) -> ConvertResult<Grammar> {
         convert::convert(self)
     }
 }
@@ -97,7 +97,7 @@ pub(crate) enum Type {
 #[serde(deny_unknown_fields, untagged)]
 pub(crate) enum PatternElement {
     /// A single, unchanging piece of non-whitespace text
-    Token(TokenValue),
+    Token(TokenText),
     /// A position where a sub-node will be placed
     Type {
         #[serde(rename = "type")]
@@ -116,7 +116,7 @@ pub(crate) enum PatternElement {
     Seq {
         #[serde(rename = "seq")]
         pattern: Pattern,
-        delimiter: TokenValue,
+        delimiter: TokenText,
     },
 }
 

@@ -1,14 +1,18 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
-use sapling_grammar::{ConvertError, Grammar, SpecGrammar};
+use sapling_grammar::{ConvertError, Grammar, Parser, SpecGrammar};
 use serde::Deserialize;
 
 /// The data required for Sapling to parse and edit a programming language.
 #[derive(Debug, Clone)]
 pub struct Lang {
     header: Header,
-    grammar: Grammar,
-    parser: (),
+    // This is stored in an `Arc` it is jointly owned by the `Parser`
+    grammar: Arc<Grammar>,
+    parser: Parser,
 }
 
 impl Lang {
@@ -21,11 +25,15 @@ impl Lang {
 
     pub fn from_toml(s: &str) -> Result<Self, LoadError> {
         let lang_file: LangFile = toml::from_str(s).map_err(LoadError::Parse)?;
-        let grammar = lang_file.grammar.to_grammar().map_err(LoadError::Convert)?;
+        let grammar = lang_file
+            .grammar
+            .into_grammar()
+            .map_err(LoadError::Convert)?;
+        let grammar = Arc::new(grammar);
         Ok(Self {
             header: lang_file.header,
+            parser: Parser::new(grammar.clone()),
             grammar,
-            parser: (),
         })
     }
 }

@@ -32,7 +32,7 @@ pub(crate) fn convert(grammar: SpecGrammar) -> ConvertResult<Grammar> {
         type_map.get_root(&root_type)?,
         whitespace_chars.chars().collect(),
         types,
-        token_map.to_vec(),
+        token_map.into_vec(),
     ))
 }
 
@@ -170,9 +170,9 @@ mod utils {
             let inner_map = names
                 .into_iter()
                 .map(|name| {
-                    let v = (name.to_owned(), next_id);
+                    let id = next_id;
                     next_id += 1;
-                    v
+                    (name, id)
                 })
                 .collect::<HashMap<_, _>>();
             Self { inner: inner_map }
@@ -222,7 +222,7 @@ mod utils {
 
         /// Yields an [`IndexVec`] which corresponds to the inverse of this [`TokenMap`] (i.e. maps
         /// [`TokenId`]s back to [`Token`]s).
-        pub(super) fn to_vec(self) -> IndexVec<TokenId, Token> {
+        pub(super) fn into_vec(self) -> IndexVec<TokenId, Token> {
             self.tokens
         }
     }
