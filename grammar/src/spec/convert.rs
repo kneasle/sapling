@@ -14,7 +14,7 @@ use self::utils::{TokenMap, TypeMap};
 pub(crate) fn convert(grammar: SpecGrammar) -> ConvertResult<Grammar> {
     let SpecGrammar {
         root_type,
-        whitespace_chars,
+        whitespace,
         types,
     } = grammar;
 
@@ -30,10 +30,24 @@ pub(crate) fn convert(grammar: SpecGrammar) -> ConvertResult<Grammar> {
 
     Ok(Grammar::new(
         type_map.get_root(&root_type)?,
-        whitespace_chars.chars().collect(),
+        convert_whitespace(whitespace),
         types,
         token_map.into_vec(),
     ))
+}
+
+/// The possibly ways that conversion from [`SpecGrammar`] to [`Grammar`] could fail.
+#[derive(Debug)]
+pub enum ConvertError {
+    Regex {
+        type_name: String,
+        inner: regex::Error,
+    },
+    UnknownChildType {
+        name: String,
+        parent_name: String,
+    },
+    UnknownRootType(String),
 }
 
 fn convert_type(
@@ -135,18 +149,10 @@ fn compile_pattern_element(
     })
 }
 
-/// The possibly ways that conversion from [`SpecGrammar`] to [`Grammar`] could fail.
-#[derive(Debug)]
-pub enum ConvertError {
-    Regex {
-        type_name: String,
-        inner: regex::Error,
-    },
-    UnknownChildType {
-        name: String,
-        parent_name: String,
-    },
-    UnknownRootType(String),
+fn convert_whitespace(whitespace: super::Whitespace) -> full::Whitespace {
+    match whitespace {
+        super::Whitespace::Chars(string) => full::Whitespace::from_chars(string.chars().collect()),
+    }
 }
 
 mod utils {

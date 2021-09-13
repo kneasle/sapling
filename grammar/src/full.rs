@@ -3,14 +3,14 @@ use std::{
     fmt::{Debug, Formatter},
 };
 
-use index_vec::IndexVec;
+use index_vec::{IndexSlice, IndexVec};
 use regex::Regex;
 
 /// A complete specification for how to parse files of any particular language.
 #[derive(Debug, Clone)]
 pub struct Grammar {
     root_type: TypeId,
-    whitespace_chars: Vec<char>,
+    whitespace: Whitespace,
     types: IndexVec<TypeId, Type>,
     tokens: IndexVec<TokenId, Token>,
 }
@@ -18,16 +18,28 @@ pub struct Grammar {
 impl Grammar {
     pub fn new(
         root_type: TypeId,
-        whitespace_chars: Vec<char>,
+        whitespace: Whitespace,
         types: IndexVec<TypeId, Type>,
         tokens: IndexVec<TokenId, Token>,
     ) -> Self {
         Self {
             root_type,
-            whitespace_chars,
+            whitespace,
             types,
             tokens,
         }
+    }
+
+    /////////////
+    // GETTERS //
+    /////////////
+
+    pub fn whitespace(&self) -> &Whitespace {
+        &self.whitespace
+    }
+
+    pub fn tokens(&self) -> &IndexSlice<TokenId, [Token]> {
+        &self.tokens
     }
 
     pub fn token_text(&self, id: TokenId) -> &str {
@@ -133,11 +145,33 @@ impl Token {
     pub fn new(text: String) -> Self {
         Self { text }
     }
+
+    #[inline]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
 }
 
 impl Debug for Token {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "Token({})", self.text)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Whitespace {
+    /// Which [`char`]s are considered 'whitespace'
+    chars: Vec<char>,
+}
+
+impl Whitespace {
+    pub(crate) fn from_chars(chars: Vec<char>) -> Self {
+        Self { chars }
+    }
+
+    /// Returns `true` if `c` should be considered whitespace
+    pub fn is(&self, c: char) -> bool {
+        self.chars.contains(&c)
     }
 }
 

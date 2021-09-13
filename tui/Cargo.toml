@@ -5,3 +5,4 @@ edition = "2018"
 
 [dependencies]
 sapling.path = "../sapling"
+sapling_grammar.path = "../grammar"

@@ -3,7 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use sapling_grammar::{ConvertError, Grammar, Parser, SpecGrammar};
+use sapling_grammar::{tokenizer::TokenIter, ConvertError, Grammar, Parser, SpecGrammar};
 use serde::Deserialize;
 
 /// The data required for Sapling to parse and edit a programming language.
@@ -35,6 +35,14 @@ impl Lang {
             parser: Parser::new(grammar.clone()),
             grammar,
         })
+    }
+
+    pub fn grammar(&self) -> &Grammar {
+        &self.grammar
+    }
+
+    pub fn tokenize<'s, 't>(&'t self, s: &'s str) -> (&'s str, TokenIter<'s, 't>) {
+        self.parser.tokenizer.tokenize(s)
     }
 }
 

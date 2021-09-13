@@ -35,8 +35,7 @@ type Pattern = Vec<PatternElement>;
 pub struct SpecGrammar {
     #[serde(rename = "root")]
     root_type: TypeName,
-    #[serde(rename = "whitespace")]
-    whitespace_chars: String,
+    whitespace: Whitespace,
     types: HashMap<TypeName, Type>,
 }
 
@@ -118,6 +117,12 @@ pub(crate) enum PatternElement {
         pattern: Pattern,
         delimiter: TokenText,
     },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields, untagged)]
+pub enum Whitespace {
+    Chars(String),
 }
 
 /// A regex which matches every possible string
