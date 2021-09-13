@@ -35,7 +35,7 @@ impl Tokenizer {
     /// Returns a [`TokenIter`] which will yield the tokens contained in a given [`str`]ing.  Since
     /// whitespace is always 'owned' by the token which precedes it, the leading whitespace can't
     /// be owned by a token and is returned separately.
-    pub fn tokenize<'s, 't>(&'t self, string: &'s str) -> (&'s str, TokenIter<'s, 't>) {
+    pub fn token_iter<'s, 't>(&'t self, string: &'s str) -> (&'s str, TokenIter<'s, 't>) {
         let mut iter = StrIter::new(string);
         // Consume the leading whitespace before creating `self`
         let whitespace = self.grammar.whitespace();

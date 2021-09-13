@@ -42,6 +42,10 @@ impl Grammar {
         &self.tokens
     }
 
+    pub fn num_tokens(&self) -> usize {
+        self.tokens.len()
+    }
+
     pub fn token_text(&self, id: TokenId) -> &str {
         &self.tokens[id].text
     }
@@ -172,6 +176,10 @@ impl Whitespace {
     /// Returns `true` if `c` should be considered whitespace
     pub fn is(&self, c: char) -> bool {
         self.chars.contains(&c)
+    }
+
+    pub fn all_chars(&self) -> Vec<char> {
+        self.chars.clone()
     }
 }
 

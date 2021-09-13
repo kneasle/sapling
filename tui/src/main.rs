@@ -2,8 +2,9 @@ use sapling::Lang;
 
 fn main() {
     let json_lang = Lang::load_toml_file("json.toml").unwrap();
+
     let (leading_whitespace, token_iter) =
-        json_lang.tokenize("  ]][true, true,,, [false]{: null}}\n");
+        json_lang.token_iter("  ]][true, true,,, [false]{: null}}\n");
     let tokens: Vec<_> = token_iter
         .map(|tok_result| {
             tok_result

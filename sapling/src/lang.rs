@@ -41,8 +41,8 @@ impl Lang {
         &self.grammar
     }
 
-    pub fn tokenize<'s, 't>(&'t self, s: &'s str) -> (&'s str, TokenIter<'s, 't>) {
-        self.parser.tokenizer.tokenize(s)
+    pub fn token_iter<'s, 't>(&'t self, s: &'s str) -> (&'s str, TokenIter<'s, 't>) {
+        self.parser.tokenizer.token_iter(s)
     }
 }
 

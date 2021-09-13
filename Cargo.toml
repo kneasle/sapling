@@ -1,2 +1,3 @@
 [workspace]
-members = ["sapling", "tui", "grammar"]
+members = ["sapling", "tui", "grammar", "fuzz"]
+default-members = ["tui"]
