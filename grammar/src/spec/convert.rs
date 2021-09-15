@@ -2,7 +2,7 @@ use index_vec::IndexVec;
 use regex::Regex;
 
 use super::SpecGrammar;
-use crate::{full, Grammar, TypeId};
+use crate::{grammar, Grammar, TypeId};
 
 pub type ConvertResult<T> = Result<T, ConvertError>;
 
@@ -23,7 +23,7 @@ pub(crate) fn convert(grammar: SpecGrammar) -> ConvertResult<Grammar> {
     // Before generating types, assign all names to type IDs (because types may refer to child
     // types which appear after themselves in the HashMap iterator).
     let type_map = TypeMap::new(types.keys().cloned());
-    let types: IndexVec<TypeId, full::Type> = types
+    let types: IndexVec<TypeId, grammar::Type> = types
         .into_iter()
         .map(|(name, t)| convert_type(t, name, &mut token_map, &type_map))
         .collect::<Result<_, _>>()?;
@@ -55,7 +55,7 @@ fn convert_type(
     name: String,
     token_map: &mut TokenMap,
     type_map: &TypeMap,
-) -> ConvertResult<full::Type> {
+) -> ConvertResult<grammar::Type> {
     let (key, mut keys, inner) = match t {
         super::Type::Pattern {
             key,
@@ -68,7 +68,7 @@ fn convert_type(
                 .iter()
                 .map(|child_name| type_map.get(child_name, &name))
                 .collect::<Result<_, _>>()?;
-            let inner = full::TypeInner::Pattern {
+            let inner = grammar::TypeInner::Pattern {
                 child_types: child_type_ids,
                 pattern: match pattern {
                     Some(p) => Some(compile_pattern(p, &name, token_map, type_map)?),
@@ -82,8 +82,10 @@ fn convert_type(
             key,
             keys,
             stringy,
+
             delim_start,
             delim_end,
+
             default_content,
             mut validity_regex,
             escape_rules,
@@ -109,14 +111,14 @@ fn convert_type(
                 unicode_escape_prefix,
                 // deescape_rules: (),
             };
-            (key, keys, full::TypeInner::Stringy(inner))
+            (key, keys, grammar::TypeInner::Stringy(inner))
         }
     };
 
     // Flatten they `key` and `keys` values into one list
     keys.extend(key);
     // Construct type and return
-    Ok(full::Type { name, keys, inner })
+    Ok(grammar::Type { name, keys, inner })
 }
 
 fn compile_pattern(
@@ -124,7 +126,7 @@ fn compile_pattern(
     parent_type_name: &str,
     token_map: &mut TokenMap,
     type_map: &TypeMap,
-) -> ConvertResult<full::Pattern> {
+) -> ConvertResult<grammar::Pattern> {
     elems
         .into_iter()
         .map(|e| compile_pattern_element(e, parent_type_name, token_map, type_map))
@@ -136,9 +138,9 @@ fn compile_pattern_element(
     parent_type_name: &str,
     token_map: &mut TokenMap,
     type_map: &TypeMap,
-) -> ConvertResult<full::PatternElement> {
+) -> ConvertResult<grammar::PatternElement> {
     use super::PatternElement::*;
-    use full::PatternElement as PE;
+    use grammar::PatternElement as PE;
     Ok(match elem {
         Token(name) => PE::Token(token_map.get_id(name)),
         Seq { pattern, delimiter } => PE::Seq {
@@ -149,9 +151,11 @@ fn compile_pattern_element(
     })
 }
 
-fn convert_whitespace(whitespace: super::Whitespace) -> full::Whitespace {
+fn convert_whitespace(whitespace: super::Whitespace) -> grammar::Whitespace {
     match whitespace {
-        super::Whitespace::Chars(string) => full::Whitespace::from_chars(string.chars().collect()),
+        super::Whitespace::Chars(string) => {
+            grammar::Whitespace::from_chars(string.chars().collect())
+        }
     }
 }
 

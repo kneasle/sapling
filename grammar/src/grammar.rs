@@ -5,13 +5,14 @@ use std::{
 
 use index_vec::{IndexSlice, IndexVec};
 use regex::Regex;
+use serde::Deserialize;
 
 /// A complete specification for how to parse files of any particular language.
 #[derive(Debug, Clone)]
 pub struct Grammar {
     root_type: TypeId,
     whitespace: Whitespace,
-    types: IndexVec<TypeId, Type>,
+    pub(crate) types: IndexVec<TypeId, Type>,
     tokens: IndexVec<TokenId, Token>,
 }
 
@@ -49,6 +50,10 @@ impl Grammar {
     pub fn token_text(&self, id: TokenId) -> &str {
         &self.tokens[id].text
     }
+
+    pub fn type_name(&self, id: TypeId) -> &str {
+        &self.types[id].name
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -58,7 +63,7 @@ pub struct Type {
     pub(crate) name: String,
     /// The different sequences of keystrokes which refer to this `Type`.
     ///
-    /// This can be empty, in which case this `Type` can never be created explicitly; take, for
+    /// This can be empty, in which case this `Type` can never be created explicitly: take, for
     /// example, 'node class' types like expressions (which can never be instantiated directly) or
     /// JSON fields (which are only created implicitly to contain other nodes).
     pub(crate) keys: Vec<String>,
@@ -81,6 +86,9 @@ pub enum TypeInner {
     Stringy(Stringy),
 }
 
+/// A [`Type`] where the contents of each node is an arbitrary string (which can be edited
+/// separately).  This is used for nodes like identifiers or any type of literal (strings, numbers,
+/// etc.).
 #[derive(Debug, Clone)]
 pub struct Stringy {
     // TODO: make fields less public
@@ -91,23 +99,44 @@ pub struct Stringy {
 
     /// A [`Regex`] which all node **contents** must match.  This always starts and ends with `^`
     /// and `$` to force the engine to match the whole string.
-    pub(crate) validity_regex: Regex,
+    pub(crate) regex: Option<Regexes>,
     /// Default **contents** of new nodes.  This must match `validity_regex`.
     pub(crate) default_content: String,
 
-    /// Maps **content** substrings to **escaped** substrings.  TODO: Replace this with a
-    /// pre-compiled match regex
-    pub(crate) escape_rules: HashMap<String, String>,
-    /// Maps **escaped** substrings to **content** substrings.  TODO: Replace this with a
-    /// pre-compiled match regex
-    // TODO: deescape_rules: HashMap<String, String>,
-    /// The prefix prepended to 4-character hex unicode escape sequences.  For example, in JSON
-    /// this is `\u`.  Empty signifies that unicode escaping is not possible.
-    pub(crate) unicode_escape_prefix: String,
-    // TODO: Allow encoding of invalid escaped strings - e.g. in JSON a `\` must be succeeded by
-    // one of `\/bfntru"`
-    //
-    // TODO: Specify syntax highlighting groups
+    pub(crate) escape_rules: Option<EscapeRules>,
+    // TODO: Specify syntax highlighting group
+}
+
+/// The [`Regex`]es required to specify the valid strings of a [`Stringy`] node
+#[derive(Debug, Clone)]
+pub struct Regexes {
+    pub(crate) anchored_start: Regex,
+    pub(crate) anchored_both: Regex,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EscapeRules {
+    /// A non-empty string that all escape sequences must start with.  For example, in JSON strings
+    /// this is `\`
+    pub(crate) start_sequence: String,
+    /// Maps escape sequences (to go after `start_sequence`) to the de-escaped [`String`].  For
+    /// example, for JSON strings this is:
+    /// ```text
+    /// `\` -> '\\' (i.e. `\\` de-escapes to `\`)
+    /// `"` -> '"'  (i.e. `\"` de-escapes to `"`)
+    /// `/` -> '/'
+    /// `n` -> '\n'
+    /// `t` -> '\t'
+    /// `b` -> '\u{8}'
+    /// `f` -> '\u{c}'
+    /// `r` -> '\r'
+    /// ```
+    pub(crate) rules: HashMap<String, String>,
+    /// The prefix which takes 4 hex symbols and de-escapes them to that unicode code-point.  For
+    /// example, in JSON strings this is `u` (i.e. `\uABCD` would turn into the unicode code point
+    /// `0xABCD`).
+    pub(crate) unicode_hex_4: Option<String>,
 }
 
 //////////////
