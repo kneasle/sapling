@@ -1,9 +1,6 @@
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::path::{Path, PathBuf};
 
-use sapling_grammar::{tokenizer::TokenIter, ConvertError, Grammar, Parser, SpecGrammar};
+use sapling_grammar::{tokenizer::Tokenizer, ConvertError, Grammar, SpecGrammar};
 use serde::Deserialize;
 
 /// The data required for Sapling to parse and edit a programming language.
@@ -11,8 +8,7 @@ use serde::Deserialize;
 pub struct Lang {
     header: Header,
     // This is stored in an `Arc` it is jointly owned by the `Parser`
-    grammar: Arc<Grammar>,
-    parser: Parser,
+    grammar: Grammar,
 }
 
 impl Lang {
@@ -29,10 +25,8 @@ impl Lang {
             .grammar
             .into_grammar()
             .map_err(LoadError::Convert)?;
-        let grammar = Arc::new(grammar);
         Ok(Self {
             header: lang_file.header,
-            parser: Parser::new(grammar.clone()),
             grammar,
         })
     }
@@ -41,8 +35,8 @@ impl Lang {
         &self.grammar
     }
 
-    pub fn token_iter<'s, 't>(&'t self, s: &'s str) -> (&'s str, TokenIter<'s, 't>) {
-        self.parser.tokenizer.token_iter(s)
+    pub fn tokenize<'s, 't>(&'t self, s: &'s str) -> (&'s str, Tokenizer<'s, 't>) {
+        Tokenizer::new(self.grammar(), s)
     }
 }
 

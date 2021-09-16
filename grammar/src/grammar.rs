@@ -4,6 +4,7 @@ use std::{
 };
 
 use index_vec::{IndexSlice, IndexVec};
+use itertools::Itertools;
 use regex::Regex;
 use serde::Deserialize;
 
@@ -14,6 +15,12 @@ pub struct Grammar {
     whitespace: Whitespace,
     pub(crate) types: IndexVec<TypeId, Type>,
     tokens: IndexVec<TokenId, Token>,
+    // Look-up tables for the parser
+    /// Mapping from token texts to IDs, stored **in decreasing order** of the text length.  This
+    /// makes sure that the tokenizer always consumes the largest possible token (e.g. `"&&"`
+    /// should be tokenized into just `&&`, rather than two `&`s).
+    // TODO: Combine this with `tokens`?
+    static_tokens_decreasing: Vec<(String, TokenId)>,
 }
 
 impl Grammar {
@@ -23,11 +30,19 @@ impl Grammar {
         types: IndexVec<TypeId, Type>,
         tokens: IndexVec<TokenId, Token>,
     ) -> Self {
+        // Sort static tokens by decreasing order of length
+        let mut static_tokens_decreasing = tokens
+            .iter_enumerated()
+            .map(|(id, token)| (token.text().to_owned(), id))
+            .collect_vec();
+        static_tokens_decreasing.sort_by_key(|(name, _id)| std::cmp::Reverse(name.len()));
+
         Self {
             root_type,
             whitespace,
             types,
             tokens,
+            static_tokens_decreasing,
         }
     }
 
@@ -53,6 +68,11 @@ impl Grammar {
 
     pub fn type_name(&self, id: TypeId) -> &str {
         &self.types[id].name
+    }
+
+    /// Returns the static tokens in `self`, in decreasing order of length
+    pub fn static_tokens_decreasing(&self) -> &[(String, TokenId)] {
+        self.static_tokens_decreasing.as_slice()
     }
 }
 

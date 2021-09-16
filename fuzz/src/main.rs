@@ -62,7 +62,7 @@ pub fn fuzz_tokenizer(lang: Lang, average_length_tokens: usize, iteration_limit:
 
             // Tokenise the string.  Also time the speed of the tokenizer
             let start = Instant::now();
-            let (tokenized_leading_ws, token_iter) = lang.token_iter(&unparsed_string);
+            let (tokenized_leading_ws, token_iter) = lang.tokenize(&unparsed_string);
             let tokenize_result = token_iter.collect::<Result<Vec<_>, _>>();
             let is_passed = tokenize_result.map_or(false, |tokens| {
                 leading_ws == tokenized_leading_ws && tokens == expected_tokens
