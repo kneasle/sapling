@@ -14,7 +14,7 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::Grammar;
+use crate::{grammar, Grammar};
 
 use self::convert::ConvertResult;
 
@@ -76,19 +76,14 @@ pub(crate) enum Type {
         /// Default node **contents** (i.e. unescaped string).  This must match `validity_regex`.
         #[serde(default = "String::new", rename = "default")]
         default_content: String,
-        /// A regex against which all **content** strings will be matched.  This implicitly has `^`
-        /// and `$` appended to the start and end (respectively).
-        #[serde(default = "regex_any")]
-        validity_regex: String,
-        /// Maps **escaped** strings to **content** strings (since characters can often be escaped
-        /// in multiple different ways - take the newline character escaping to either `\n` or
-        /// `\u000A`).  This could be better named `deescape_rules`.
-        #[serde(default = "HashMap::new")]
-        escape_rules: HashMap<String, String>,
-        /// The prefix prepended to 4-character hex unicode escape sequences.  For example, in JSON
-        /// this is `\u`.  Empty signifies that unicode escaping is not possible.
-        #[serde(default = "String::new")]
-        unicode_escape_prefix: String,
+        /// A regex against which all **content** strings will be matched.  This is always inside a
+        /// `(?x: <validity_regex> )` group, so whitespace and comments (`#` to the `\n`) are
+        /// ignored.  Additionally, Sapling will add the necessary `^` and `$` tokens, so these are
+        /// also not needed.
+        validity_regex: Option<String>,
+
+        #[serde(rename = "escape")]
+        escape_rules: Option<grammar::EscapeRules>,
     },
 }
 
@@ -123,9 +118,4 @@ pub(crate) enum PatternElement {
 #[serde(deny_unknown_fields, untagged)]
 pub enum Whitespace {
     Chars(String),
-}
-
-/// A regex which matches every possible string
-fn regex_any() -> String {
-    ".*".to_owned()
 }

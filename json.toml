@@ -32,9 +32,9 @@ key = "n"
 stringy = true # Sapling currently doesn't understand that numbers have special meaning
 validity_regex = '''
     -?                      # negation (optional)
-    (?: 0 | (?:[1-9]\d*) )  # integer  (single `0`, or >=1 digits which doesn't start with 0)
-    (?: \. \d+ )            # fraction (optional; `.` followed by >=1 digits)
-    (?: [Ee] [-+]? \d+ )    # exponent (optional; `E` or `e`, then possibly `-` or `+`, then >=1 digits)
+    (?: 0 | [1-9]\d* )      # integer  (single `0`, or >=1 digits which doesn't start with 0)
+    (?: \. \d+ )?           # fraction (optional; `.` followed by >=1 digits)
+    (?: [Ee] [-+]? \d+ )?   # exponent (optional; `E` or `e`, then possibly `-` or `+`, then >=1 digits)
     '''
 default = "0"
 # no escaping required
@@ -45,14 +45,10 @@ stringy = true
 # Strings start and end with a double quote
 delim_start = '"'
 delim_end = '"'
-## validity_regex = ".*" # by default
+
 default = ""
-escape_rules.'\"' = '"'
-escape_rules.'\\' = '\'
-escape_rules.'\/' = '/'
-escape_rules.'\b' = "\b" # `\b` -> `<backspace>`
-escape_rules.'\f' = "\f" # `\f` -> `<form feed>`
-escape_rules.'\r' = "\r" # `\r` -> `<carriage return>`
-escape_rules.'\n' = "\n" # `\n` -> `<line feed>`
-escape_rules.'\t' = "\t" # `\t` -> `<tab>`
-unicode_escape_prefix = '\u' # `\uWXYZ` -> `<unicode codepoint 0xWXYZ>`
+
+escape.start_sequence = '\'
+# `\b` is backspace, `\f` is form feed
+escape.rules = { '"'='"', '\'='\', '/'='/', 'b'="\b", 'f'="\f", 'r'="\r", 'n'="\n", 't'="\t" }
+escape.unicode_hex_4 = 'u' # `\uWXYZ` -> `<unicode codepoint 0xWXYZ>`

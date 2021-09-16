@@ -8,11 +8,11 @@ use number_prefix::NumberPrefix;
 use rand::{prelude::SliceRandom, Rng};
 use rand_distr::{Distribution, Geometric};
 use sapling::Lang;
-use sapling_grammar::TokenId;
+use sapling_grammar::{tokenizer::ParsedToken, TokenId};
 
 fn main() {
     let lang = Lang::load_toml_file("json.toml").unwrap();
-    // Average length should be around 10k tokens, no iteration limit
+    // Average length should be around 10k tokens, and run 10k iterations
     fuzz_tokenizer(lang, 10_000, Some(10_000));
 }
 
@@ -46,21 +46,28 @@ pub fn fuzz_tokenizer(lang: Lang, average_length_tokens: usize, iteration_limit:
             let stream_length = rng.sample(stream_len_distr);
             let expected_tokens = (0..stream_length)
                 .map(|_| {
-                    let token = TokenId::new(rng.gen_range(0..num_unique_tokens));
+                    // For now, only generate static tokens
+                    let tok_id = TokenId::new(rng.gen_range(0..num_unique_tokens));
                     let ws = sample_ws(&ws_samples, &mut rng);
-                    (token, ws)
+                    (ParsedToken::Static(tok_id), ws)
                 })
                 .collect_vec();
 
             // 'Unparse' the token stream into a string
             unparsed_string.clear();
             unparsed_string.push_str(leading_ws);
-            for (token_id, ws) in &expected_tokens {
-                unparsed_string.push_str(lang.grammar().token_text(*token_id));
+            for (token, ws) in &expected_tokens {
+                match token {
+                    ParsedToken::Static(tok_id) => {
+                        unparsed_string.push_str(lang.grammar().token_text(*tok_id))
+                    }
+                    ParsedToken::Stringy(_type_id, _contents) => todo!(),
+                }
                 unparsed_string.push_str(ws);
             }
 
-            // Tokenise the string.  Also time the speed of the tokenizer
+            // Tokenise the string.  Also time the tokenization to measure the throughput of the
+            // tokenizer
             let start = Instant::now();
             let (tokenized_leading_ws, token_iter) = lang.tokenize(&unparsed_string);
             let tokenize_result = token_iter.collect::<Result<Vec<_>, _>>();

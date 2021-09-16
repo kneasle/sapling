@@ -36,11 +36,12 @@ pub(crate) fn convert(grammar: SpecGrammar) -> ConvertResult<Grammar> {
     ))
 }
 
-/// The possibly ways that conversion from [`SpecGrammar`] to [`Grammar`] could fail.
+/// The possibly ways that parsing a [`Grammar`] can fail.
 #[derive(Debug)]
 pub enum ConvertError {
     Regex {
         type_name: String,
+        regex: String,
         inner: regex::Error,
     },
     UnknownChildType {
@@ -87,29 +88,46 @@ fn convert_type(
             delim_end,
 
             default_content,
-            mut validity_regex,
+            validity_regex,
+
             escape_rules,
-            unicode_escape_prefix,
         } => {
             assert!(stringy); // stringy should always be set to `true`
 
-            // Add `^` and `$` to either end of the regex, to force the regex engine to match the
-            // entire node contents
-            validity_regex.insert(0, '^');
-            validity_regex.push('$');
-            let validity_regex =
-                Regex::new(&validity_regex).map_err(|inner| ConvertError::Regex {
-                    type_name: name.to_owned(),
-                    inner,
-                })?;
-            let inner = full::Stringy {
+            let validity_regex = validity_regex
+                // Compile two copies of the regex
+                .map(|regex_str| {
+                    // Generate anchored regex strings.
+                    let str_anchor_start = format!("^(?x: {} )", regex_str);
+                    let str_anchor_both = format!("^(?x: {} )$", regex_str);
+
+                    // Compile regexes
+                    let anchored_start =
+                        Regex::new(&str_anchor_start).map_err(|inner| ConvertError::Regex {
+                            type_name: name.to_owned(),
+                            regex: str_anchor_start,
+                            inner,
+                        })?;
+                    let anchored_both =
+                        Regex::new(&str_anchor_both).map_err(|inner| ConvertError::Regex {
+                            type_name: name.to_owned(),
+                            regex: str_anchor_both,
+                            inner,
+                        })?;
+
+                    Ok(grammar::Regexes {
+                        anchored_start,
+                        anchored_both,
+                    })
+                })
+                // Convert the `Option<Result<R, E>>` into a `Result<Option<R>, E>`
+                .transpose()?;
+            let inner = grammar::Stringy {
                 delim_start,
                 delim_end,
-                validity_regex,
+                regex: validity_regex,
                 default_content,
                 escape_rules,
-                unicode_escape_prefix,
-                // deescape_rules: (),
             };
             (key, keys, grammar::TypeInner::Stringy(inner))
         }
