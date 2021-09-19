@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{Debug, Formatter},
 };
 
@@ -13,7 +13,7 @@ use serde::Deserialize;
 pub struct Grammar {
     root_type: TypeId,
     whitespace: Whitespace,
-    pub(crate) types: IndexVec<TypeId, Type>,
+    pub(crate) types: TypeVec<Type>,
     tokens: IndexVec<TokenId, Token>,
     // Look-up tables for the parser
     /// Mapping from token texts to IDs, stored **in decreasing order** of the text length.  This
@@ -27,7 +27,7 @@ impl Grammar {
     pub fn new(
         root_type: TypeId,
         whitespace: Whitespace,
-        types: IndexVec<TypeId, Type>,
+        types: TypeVec<Type>,
         tokens: IndexVec<TokenId, Token>,
     ) -> Self {
         // Sort static tokens by decreasing order of length
@@ -93,8 +93,10 @@ pub struct Type {
 #[derive(Debug, Clone)]
 pub enum TypeInner {
     Pattern {
-        /// A set of types to which this type can be implicitly converted.
-        child_types: Vec<TypeId>,
+        /// The complete set of types to which this type can be implicitly converted, **including**
+        /// itself.  Note that [`Stringy`] types can't have descendant types.
+        descendants: HashSet<TypeId>,
+        /// The pattern describing which token sequences are valid instances of this [`Type`].
         pattern: Option<Pattern>,
     },
     /// A node which store a string value, editable by the user.  These nodes always correspond to
@@ -239,3 +241,5 @@ impl Whitespace {
 // TODO: Tag these indices with which `Grammar` created them
 index_vec::define_index_type! { pub struct TypeId = usize; }
 index_vec::define_index_type! { pub struct TokenId = usize; }
+
+pub type TypeVec<T> = IndexVec<TypeId, T>;
