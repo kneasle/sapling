@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use sapling_grammar::{tokenizer::Tokenizer, ConvertError, Grammar, SpecGrammar};
+use sapling_grammar::{parser, tokenizer::Tokenizer, ConvertError, Grammar, SpecGrammar, TypeId};
 use serde::Deserialize;
+
+use crate::ast::Tree;
 
 /// The data required for Sapling to parse and edit a programming language.
 #[derive(Debug, Clone)]
@@ -37,6 +39,19 @@ impl Lang {
 
     pub fn tokenize<'s, 't>(&'t self, s: &'s str) -> (&'s str, Tokenizer<'s, 't>) {
         Tokenizer::new(self.grammar(), s)
+    }
+
+    pub fn parse(&self, type_id: TypeId, s: &str) -> Result<Tree, parser::Error> {
+        self.grammar
+            .parse(type_id, s)
+            .map(|(leading_ws, root)| Tree {
+                leading_ws: leading_ws.to_owned(),
+                root,
+            })
+    }
+
+    pub fn parse_root(&self, s: &str) -> Result<Tree, parser::Error> {
+        self.parse(self.grammar.root_type(), s)
     }
 }
 

@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::{Debug, Formatter},
 };
 
@@ -8,6 +8,8 @@ use itertools::Itertools;
 use regex::Regex;
 use serde::Deserialize;
 
+use crate::parser::{self, Ast};
+
 /// A complete specification for how to parse files of any particular language.
 #[derive(Debug, Clone)]
 pub struct Grammar {
@@ -15,7 +17,8 @@ pub struct Grammar {
     whitespace: Whitespace,
     pub(crate) types: TypeVec<Type>,
     tokens: IndexVec<TokenId, Token>,
-    // Look-up tables for the parser
+
+    /* LOOK-UP TABLES FOR THE TOKENIZER/PARSER */
     /// Mapping from token texts to IDs, stored **in decreasing order** of the text length.  This
     /// makes sure that the tokenizer always consumes the largest possible token (e.g. `"&&"`
     /// should be tokenized into just `&&`, rather than two `&`s).
@@ -46,13 +49,39 @@ impl Grammar {
         }
     }
 
-    /////////////
-    // GETTERS //
-    /////////////
-
-    pub fn whitespace(&self) -> &Whitespace {
-        &self.whitespace
+    /// Construct a concrete AST representing a [`str`]ing of the root type according to this [`Grammar`].
+    pub fn parse_root<'s, N: Ast>(&self, s: &'s str) -> Result<(&'s str, N), parser::Error> {
+        parser::parse(self, self.root_type, s)
     }
+
+    /// Construct a concrete AST representing a [`str`]ing according to this [`Grammar`].
+    pub fn parse<'s, N: Ast>(
+        &self,
+        type_id: TypeId,
+        s: &'s str,
+    ) -> Result<(&'s str, N), parser::Error> {
+        parser::parse(self, type_id, s)
+    }
+
+    ///////////
+    // TYPES //
+    ///////////
+
+    pub fn root_type(&self) -> TypeId {
+        self.root_type
+    }
+
+    pub fn get_type(&self, id: TypeId) -> &Type {
+        &self.types[id]
+    }
+
+    pub fn type_name(&self, id: TypeId) -> &str {
+        &self.types[id].name
+    }
+
+    ////////////
+    // TOKENS //
+    ////////////
 
     pub fn tokens(&self) -> &IndexSlice<TokenId, [Token]> {
         &self.tokens
@@ -66,8 +95,8 @@ impl Grammar {
         &self.tokens[id].text
     }
 
-    pub fn type_name(&self, id: TypeId) -> &str {
-        &self.types[id].name
+    pub fn whitespace(&self) -> &Whitespace {
+        &self.whitespace
     }
 
     /// Returns the static tokens in `self`, in decreasing order of length
@@ -87,18 +116,19 @@ pub struct Type {
     /// example, 'node class' types like expressions (which can never be instantiated directly) or
     /// JSON fields (which are only created implicitly to contain other nodes).
     pub(crate) keys: Vec<String>,
+    /// The complete set of types to which this type can be implicitly converted in order of
+    /// parsing precedence, **including**
+    /// itself.  For [`Stringy`] types, this will only contain `self`.
+    pub(crate) descendants: Vec<TypeId>,
     pub(crate) inner: TypeInner,
 }
 
 #[derive(Debug, Clone)]
 pub enum TypeInner {
-    Pattern {
-        /// The complete set of types to which this type can be implicitly converted, **including**
-        /// itself.  Note that [`Stringy`] types can't have descendant types.
-        descendants: HashSet<TypeId>,
-        /// The pattern describing which token sequences are valid instances of this [`Type`].
-        pattern: Option<Pattern>,
-    },
+    /// A [`Type`] which can't be instantiated, but can contain child nodes
+    Container,
+    /// The pattern describing which token sequences are valid instances of this [`Type`].
+    Pattern(Pattern),
     /// A node which store a string value, editable by the user.  These nodes always correspond to
     /// precisely one token.
     ///

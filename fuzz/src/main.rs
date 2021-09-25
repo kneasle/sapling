@@ -61,7 +61,7 @@ pub fn fuzz_tokenizer(lang: Lang, average_length_tokens: usize, iteration_limit:
                     ParsedToken::Static(tok_id) => {
                         unparsed_string.push_str(lang.grammar().token_text(*tok_id))
                     }
-                    ParsedToken::Stringy(_type_id, _contents) => todo!(),
+                    ParsedToken::Stringy(_type_id, _contents, _ws) => todo!(),
                 }
                 unparsed_string.push_str(ws);
             }

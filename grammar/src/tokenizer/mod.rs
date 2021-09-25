@@ -20,6 +20,7 @@ pub struct Tokenizer<'s, 'g> {
 impl<'s, 'g> Tokenizer<'s, 'g> {
     /// Creates a new [`TokenIter`] which tokenizes a given [`str`]ing slice according to a
     /// [`Grammar`].
+    // TODO: Make this pub(crate)?
     pub fn new(grammar: &'g Grammar, string: &'s str) -> (&'s str, Self) {
         let mut iter = StrIter::new(string);
         // Consume the leading whitespace before creating `self`
@@ -30,7 +31,7 @@ impl<'s, 'g> Tokenizer<'s, 'g> {
             .iter_enumerated()
             .filter_map(|(id, ty)| match &ty.inner {
                 TypeInner::Stringy(s) => Some((id, s)),
-                TypeInner::Pattern { .. } => None,
+                _ => None,
             })
             .collect_vec();
 
@@ -45,9 +46,9 @@ impl<'s, 'g> Tokenizer<'s, 'g> {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum ParsedToken {
+pub enum ParsedToken<'s> {
     Static(TokenId),
-    Stringy(TypeId, String),
+    Stringy(TypeId, String, &'s str),
 }
 
 #[derive(Debug, Clone)]
@@ -87,7 +88,7 @@ pub enum BadUnicodeEscapeError {
 ////////////////////////////
 
 impl<'s, 't> Iterator for Tokenizer<'s, 't> {
-    type Item = Result<(ParsedToken, &'s str), Error>;
+    type Item = Result<(ParsedToken<'s>, &'s str), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // A `TokenIter` always starts having just finished consuming whitespace so, if the string
@@ -107,10 +108,12 @@ impl<'s, 't> Iterator for Tokenizer<'s, 't> {
             // `usize`s) - it could be `Copy`, but copy semantics would be dangerous.
             let mut iter = self.iter.clone();
             let token = match eat_stringy(&mut iter, stringy_type, id) {
-                Ok(Some(contents)) => ParsedToken::Stringy(id, contents), // The token was matched
-                Ok(None) => continue,                                     // The token doesn't match
+                Ok(Some((contents, display_str))) => {
+                    ParsedToken::Stringy(id, contents, display_str)
+                } // The token was matched
+                Ok(None) => continue, // The token doesn't match
                 Err(e) => return Some(Err(e)), // The token started matching, but caused the whole
-                                               // tokenization pass to abort
+                                       // tokenization pass to abort
             };
 
             // `longest_token_match` if this is the new longest match
@@ -170,11 +173,11 @@ fn consume_whitespace<'s>(iter: &mut StrIter<'s>, whitespace: &Whitespace) -> &'
 
 /// Eat as much of the [`StrIter`] as possible whilst still generating a valid
 /// [`ParsedToken::Stringy`].
-fn eat_stringy(
-    iter: &mut StrIter<'_>,
+fn eat_stringy<'s>(
+    iter: &mut StrIter<'s>,
     stringy: &Stringy,
     type_id: TypeId,
-) -> Result<Option<String>, Error> {
+) -> Result<Option<(String, &'s str)>, Error> {
     let start_idx = iter.consumed_length();
     match (
         stringy.delim_start.as_str(),
@@ -193,7 +196,9 @@ fn eat_stringy(
                     // The regex matched, so there must be a token at this location
                     assert_eq!(r#match.start(), 0);
                     iter.eat_len(r#match.end()).unwrap();
-                    Ok(r#match.as_str().to_owned())
+                    let match_str = r#match.as_str();
+                    Ok((match_str.to_owned(), match_str)) // No delimiters or escaping, so
+                                                          // display_str and contents are the same
                 })
                 .transpose()
         }
@@ -202,10 +207,6 @@ fn eat_stringy(
         // Cases with start/end delimiters and escape rules can be handled with a DFA-style state
         // machine.  This case will handle string literals.
         (delim_start, delim_end, None, Some(esc_rules)) => {
-            if delim_end.chars().count() != 1 {
-                // To do this properly, we should probably use the Regex library
-                todo!();
-            }
             let end_char = delim_end.chars().exactly_one().unwrap_or_else(|_| {
                 todo!("We should do some regex magic for end delims with len > 1")
             });
@@ -227,7 +228,9 @@ fn eat_stringy(
                 // Check if we've finished matching the token.  The range will be inferred from
                 // how much has been consumed by `iter`
                 if ch == end_char {
-                    return Ok(Some(contents));
+                    let end_idx = iter.consumed_length();
+                    let display_str = &iter.source_str()[start_idx..end_idx];
+                    return Ok(Some((contents, display_str)));
                 }
                 // Check if we have an escape string
                 if ch == esc_start_char {
@@ -271,13 +274,17 @@ fn eat_stringy(
         // handle that I've implemented it anyway
         (delim_start, delim_end, None, None) => {
             if !iter.eat(delim_start) {
-                return Ok(None); // If the first delimiter isn't matched, try other tokens
+                return Ok(None);
             }
             // Search for the end delimiter in the string.  If it isn't found, then return an error
             match iter.str_remaining().find(delim_end) {
                 Some(idx) => {
                     iter.eat_len(idx + delim_end.len()).unwrap(); // Consume this token
-                    Ok(Some(iter.str_remaining()[..idx].to_owned())) // Return its contents
+                    let contents = iter.str_remaining()[..idx].to_owned();
+
+                    let end_idx = iter.consumed_length();
+                    let display_str = &iter.source_str()[start_idx..end_idx];
+                    Ok(Some((contents, display_str)))
                 }
                 None => Err(Error::UnfinishedStringy { start_idx, type_id }),
             }

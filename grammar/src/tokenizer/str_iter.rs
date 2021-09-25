@@ -93,6 +93,11 @@ impl<'s> StrIter<'s> {
         self.str_remaining().is_empty()
     }
 
+    /// The full string slice being tokenized
+    pub fn source_str(&self) -> &'s str {
+        self.source_str
+    }
+
     /// The string slice yet to be consumed
     pub fn str_remaining(&self) -> &'s str {
         self.char_iter.as_str()

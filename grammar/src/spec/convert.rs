@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use index_vec::IndexSlice;
 use itertools::Itertools;
@@ -91,7 +91,7 @@ fn convert_types(
 fn convert_type(
     t: super::Type,
     name: String,
-    descendants: HashSet<TypeId>,
+    descendants: Vec<TypeId>,
     token_map: &mut TokenMap,
     type_map: &TypeMap,
 ) -> ConvertResult<grammar::Type> {
@@ -102,12 +102,11 @@ fn convert_type(
             children: _, // Already been used to compute descendants
             pattern,
         } => {
-            let inner = grammar::TypeInner::Pattern {
-                descendants,
-                pattern: match pattern {
-                    Some(p) => Some(compile_pattern(p, &name, token_map, type_map)?),
-                    None => None,
-                },
+            let inner = match pattern {
+                Some(p) => {
+                    grammar::TypeInner::Pattern(compile_pattern(p, &name, token_map, type_map)?)
+                }
+                None => grammar::TypeInner::Container,
             };
             (key, keys, inner)
         }
@@ -169,7 +168,12 @@ fn convert_type(
     // Flatten they `key` and `keys` values into one list
     keys.extend(key);
     // Construct type and return
-    Ok(grammar::Type { name, keys, inner })
+    Ok(grammar::Type {
+        name,
+        keys,
+        descendants,
+        inner,
+    })
 }
 
 //////////////////////
@@ -181,7 +185,7 @@ fn convert_type(
 fn compute_type_descendants(
     types: &IndexSlice<TypeId, [(super::TypeName, super::Type)]>,
     type_map: &TypeMap,
-) -> ConvertResult<TypeVec<HashSet<TypeId>>> {
+) -> ConvertResult<TypeVec<Vec<TypeId>>> {
     // For each TypeId, determine the `TypeId`s of its children
     let child_type_ids: TypeVec<Vec<TypeId>> = types
         .iter()
@@ -204,10 +208,10 @@ fn compute_type_descendants(
             let mut type_stack = Vec::<TypeId>::new(); // This will store which types are being
                                                        // expanded further up the call stack, used
                                                        // for detecting cycles
-            let mut descendants = HashSet::<TypeId>::new();
+            let mut descendants = Vec::<TypeId>::new();
             enumerate_type_descendants(
                 id,
-                &types,
+                types,
                 &child_type_ids,
                 &mut type_stack,
                 &mut descendants,
@@ -226,7 +230,7 @@ fn enumerate_type_descendants(
     types: &IndexSlice<TypeId, [(super::TypeName, super::Type)]>,
     child_type_ids: &IndexSlice<TypeId, [Vec<TypeId>]>,
     type_stack: &mut Vec<TypeId>,
-    out: &mut HashSet<TypeId>,
+    out: &mut Vec<TypeId>,
 ) -> ConvertResult<()> {
     // Check for cycles
     if let Some(idx) = type_stack.iter().position(|&i| i == id) {
@@ -238,8 +242,10 @@ fn enumerate_type_descendants(
             .collect_vec();
         return Err(ConvertError::TypeCycle(cycle));
     }
-    // Mark this type as a descendant
-    out.insert(id);
+    // Mark this type as a descendant (if it hasn't been listed already)
+    if !out.contains(&id) {
+        out.push(id);
+    }
     // Recurse over this type's children
     type_stack.push(id);
     for &child_id in &child_type_ids[id] {

@@ -9,7 +9,7 @@ whitespace = " \t\r\n"
 [grammar.types]
 
 # Root JSON type
-value.children = ["true", "false", "null", "array", "object", "string"]
+value.children = ["true", "false", "null", "array", "object", "number", "string"]
 
 # Keyword types
 true = { key = "t", pattern = ["true"] }
