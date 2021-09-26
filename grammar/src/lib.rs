@@ -20,6 +20,7 @@
 //! optimised parser is unlikely to be a major bottleneck of Sapling, so it's worth doing some
 //! profiling before committing large amounts of time into optimising the parsing engine.
 
+pub mod char_set;
 mod grammar;
 pub mod parser;
 mod spec; // AST-like specification of the TOML format consumed by Sapling

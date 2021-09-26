@@ -8,7 +8,10 @@ use itertools::Itertools;
 use regex::Regex;
 use serde::Deserialize;
 
-use crate::parser::{self, Ast};
+use crate::{
+    char_set::{self, CharSet},
+    parser::{self, Ast},
+};
 
 /// A complete specification for how to parse files of any particular language.
 #[derive(Debug, Clone)]
@@ -246,21 +249,21 @@ impl Debug for Token {
 #[derive(Debug, Clone)]
 pub struct Whitespace {
     /// Which [`char`]s are considered 'whitespace'
-    chars: Vec<char>,
+    chars: CharSet,
 }
 
 impl Whitespace {
-    pub(crate) fn from_chars(chars: Vec<char>) -> Self {
+    pub(crate) fn from_chars(chars: CharSet) -> Self {
         Self { chars }
     }
 
     /// Returns `true` if `c` should be considered whitespace
     pub fn is(&self, c: char) -> bool {
-        self.chars.contains(&c)
+        self.chars.contains(c)
     }
 
-    pub fn all_chars(&self) -> Vec<char> {
-        self.chars.clone()
+    pub fn sampler(&self) -> char_set::Sampler {
+        self.chars.sampler()
     }
 }
 
