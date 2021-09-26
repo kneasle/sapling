@@ -9,7 +9,6 @@ use crate::ast::Tree;
 #[derive(Debug, Clone)]
 pub struct Lang {
     header: Header,
-    // This is stored in an `Arc` it is jointly owned by the `Parser`
     grammar: Grammar,
 }
 
