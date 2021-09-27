@@ -3,7 +3,7 @@ use std::{fmt, rc::Rc};
 use sapling_grammar::{parser, Grammar, TokenId, TypeId};
 
 /// A syntax tree which fully stores the state of a text buffer (including formatting)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tree {
     /// The whitespace which appears before the first token in a file.  All tokens own the
     /// whitespace which comes directly after them, but there is no token to own the start of the
@@ -11,34 +11,40 @@ pub struct Tree {
     /// token to one end of the file to prevent this).
     pub(crate) leading_ws: String,
     /// The root node of the tree
-    pub(crate) root: Node,
+    pub(crate) root: Rc<Node>,
 }
 
-#[derive(Debug, Clone)]
+impl Tree {
+    pub fn new(leading_ws: String, root: Rc<Node>) -> Self {
+        Self { leading_ws, root }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Node {
     Tree(TreeNode),
-    Stringy(StringyNode, String),
+    Stringy { inner: StringyNode, ws: String },
 }
 
 impl parser::Ast for Node {
     type Builder = NodeBuilder;
 
     fn new_stringy(type_id: TypeId, contents: String, display_str: String, ws: &str) -> Self {
-        Node::Stringy(
-            StringyNode {
+        Node::Stringy {
+            inner: StringyNode {
                 type_: type_id,
                 contents,
                 display_str,
             },
-            ws.to_owned(),
-        )
+            ws: ws.to_owned(),
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct NodeBuilder {
     type_id: TypeId,
-    pattern: Vec<Elem>,
+    pattern: Pattern,
 }
 
 impl parser::Builder for NodeBuilder {
@@ -57,7 +63,7 @@ impl parser::Builder for NodeBuilder {
 
     fn add_token(&mut self, token: TokenId, ws: &str) {
         self.pattern.push(Elem::Token {
-            token,
+            token_id: token,
             ws: ws.to_owned(),
         });
     }
@@ -81,17 +87,25 @@ impl parser::Builder for NodeBuilder {
 }
 
 /// An syntax tree node which contains a sequence of tokens and sub-nodes
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeNode {
     type_id: TypeId,
-    pattern: Vec<Elem>,
+    pattern: Pattern,
 }
 
-#[derive(Debug, Clone)]
+impl TreeNode {
+    pub fn new(type_id: TypeId, pattern: Pattern) -> Self {
+        Self { type_id, pattern }
+    }
+}
+
+pub type Pattern = Vec<Elem>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Elem {
     /// The token and any whitespace which directly follows it
     Token {
-        token: TokenId,
+        token_id: TokenId,
         ws: String,
     },
     /// This element contains a [`Node`] which stores a sub-tree.  This can be replaced with any
@@ -108,13 +122,23 @@ pub enum Elem {
 /// An syntax tree node representing a 'stringy' node.  This node cannot contain sub-nodes, but
 /// instead contains an arbitrary string value that can be edited by the user.  This is very useful
 /// for e.g. identifiers or string/numeric literals.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StringyNode {
     type_: TypeId,
     /// The un-escaped contents of this node
     contents: String,
     /// The escaped contents of this node which should be added to the file
     display_str: String,
+}
+
+impl StringyNode {
+    pub fn new(type_: TypeId, contents: String, display_str: String) -> Self {
+        Self {
+            type_,
+            contents,
+            display_str,
+        }
+    }
 }
 
 ///////////////////////
@@ -124,11 +148,11 @@ pub struct StringyNode {
 impl Tree {
     pub fn to_text(&self, grammar: &Grammar) -> Result<String, fmt::Error> {
         let mut s = String::new();
-        self.write_text(&mut s, grammar)?;
+        self.write_text(grammar, &mut s)?;
         Ok(s)
     }
 
-    pub fn write_text(&self, w: &mut impl fmt::Write, grammar: &Grammar) -> fmt::Result {
+    pub fn write_text(&self, grammar: &Grammar, w: &mut impl fmt::Write) -> fmt::Result {
         w.write_str(&self.leading_ws)?;
         self.root.write_text(w, grammar)
     }
@@ -145,7 +169,10 @@ impl Node {
                 }
                 Ok(())
             }
-            Node::Stringy(StringyNode { display_str, .. }, ws) => {
+            Node::Stringy {
+                inner: StringyNode { display_str, .. },
+                ws,
+            } => {
                 w.write_str(display_str)?;
                 w.write_str(ws)
             }
@@ -156,7 +183,10 @@ impl Node {
 impl Elem {
     pub fn write_text(&self, w: &mut impl fmt::Write, grammar: &Grammar) -> fmt::Result {
         match self {
-            Elem::Token { token, ws } => {
+            Elem::Token {
+                token_id: token,
+                ws,
+            } => {
                 w.write_str(grammar.token_text(*token))?;
                 w.write_str(ws)
             }

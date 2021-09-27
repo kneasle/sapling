@@ -1,11 +1,12 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use index_vec::IndexSlice;
 use itertools::Itertools;
 use regex::Regex;
+use regex_syntax::hir;
 
 use super::SpecGrammar;
-use crate::{grammar, Grammar, TypeId, TypeVec};
+use crate::{char_set, grammar, Grammar, TypeId, TypeVec};
 
 pub type ConvertResult<T> = Result<T, ConvertError>;
 
@@ -27,7 +28,7 @@ pub(crate) fn convert(grammar: SpecGrammar) -> ConvertResult<Grammar> {
 
     Ok(Grammar::new(
         type_map.get_root(&root_type)?,
-        convert_whitespace(whitespace),
+        convert_whitespace(whitespace)?,
         types,
         token_map.into_vec(),
     ))
@@ -36,10 +37,19 @@ pub(crate) fn convert(grammar: SpecGrammar) -> ConvertResult<Grammar> {
 /// The possibly ways that parsing a [`Grammar`] can fail.
 #[derive(Debug)]
 pub enum ConvertError {
+    /// An error occurred whilst generating a [`Regex`] provided by the user
     Regex {
         type_name: String,
         regex: String,
         inner: regex::Error,
+    },
+    /// An error occurred whilst compiling a set of chars (as a regex)
+    CharSet {
+        /// The `CharSet` string provided by the user
+        source_str: String,
+        /// The [`Regex`] string which was generated from `source`
+        regex_str: String,
+        inner: regex_syntax::Error,
     },
     UnknownChildType {
         name: String,
@@ -79,11 +89,30 @@ fn convert_types(
             println!("]");
         }
     }
+    // Determine which concrete types can actually be parsed (i.e. aren't simply containers)
+    let parseable_type_ids = types
+        .iter_enumerated()
+        .filter(|(_id, (_name, ty))| match ty {
+            super::Type::Pattern { pattern, .. } => pattern.is_some(),
+            super::Type::Stringy { .. } => true,
+        })
+        .map(|(id, _)| id)
+        .collect::<HashSet<_>>();
+
     // Construct `grammar::Type`s for each `spec::Type`
     let types: TypeVec<grammar::Type> = types
         .into_iter()
         .zip(descendants)
-        .map(|((name, t), descendants)| convert_type(t, name, descendants, token_map, &type_map))
+        .map(|((name, t), descendants)| {
+            convert_type(
+                t,
+                name,
+                descendants,
+                &parseable_type_ids,
+                token_map,
+                &type_map,
+            )
+        })
         .collect::<Result<_, _>>()?;
     Ok((types, type_map))
 }
@@ -91,7 +120,8 @@ fn convert_types(
 fn convert_type(
     t: super::Type,
     name: String,
-    descendants: Vec<TypeId>,
+    all_descendants: Vec<TypeId>,
+    parseable_type_ids: &HashSet<TypeId>,
     token_map: &mut TokenMap,
     type_map: &TypeMap,
 ) -> ConvertResult<grammar::Type> {
@@ -129,27 +159,24 @@ fn convert_type(
             let validity_regex = validity_regex
                 // Compile two copies of the regex
                 .map(|regex_str| {
-                    // Generate anchored regex strings.
-                    let str_anchor_start = format!("^(?x: {} )", regex_str);
-                    let str_anchor_both = format!("^(?x: {} )$", regex_str);
+                    macro_rules! compile_regex {
+                        ($string: expr) => {
+                            Regex::new(&$string).map_err(|inner| ConvertError::Regex {
+                                type_name: name.to_owned(),
+                                regex: $string,
+                                inner,
+                            })?;
+                        };
+                    }
 
-                    // Compile regexes
-                    let anchored_start =
-                        Regex::new(&str_anchor_start).map_err(|inner| ConvertError::Regex {
-                            type_name: name.to_owned(),
-                            regex: str_anchor_start,
-                            inner,
-                        })?;
-                    let anchored_both =
-                        Regex::new(&str_anchor_both).map_err(|inner| ConvertError::Regex {
-                            type_name: name.to_owned(),
-                            regex: str_anchor_both,
-                            inner,
-                        })?;
+                    let str_unanchored = format!("(?x: {} )", regex_str);
+                    let str_anchor_start = format!("^{}", str_unanchored);
+                    let str_anchor_both = format!("^{}$", str_unanchored);
 
                     Ok(grammar::Regexes {
-                        anchored_start,
-                        anchored_both,
+                        unanchored: compile_regex!(str_unanchored),
+                        anchored_start: compile_regex!(str_anchor_start),
+                        anchored_both: compile_regex!(str_anchor_both),
                     })
                 })
                 // Convert the `Option<Result<R, E>>` into a `Result<Option<R>, E>`
@@ -157,7 +184,7 @@ fn convert_type(
             let inner = grammar::Stringy {
                 delim_start,
                 delim_end,
-                regex: validity_regex,
+                regexes: validity_regex,
                 default_content,
                 escape_rules,
             };
@@ -171,7 +198,12 @@ fn convert_type(
     Ok(grammar::Type {
         name,
         keys,
-        descendants,
+        all_descendants: all_descendants.iter().copied().collect(),
+        parseable_descendants: all_descendants
+            .iter()
+            .copied()
+            .filter(|id| parseable_type_ids.contains(id))
+            .collect_vec(),
         inner,
     })
 }
@@ -289,12 +321,32 @@ fn compile_pattern_element(
     })
 }
 
-fn convert_whitespace(whitespace: super::Whitespace) -> grammar::Whitespace {
-    match whitespace {
-        super::Whitespace::Chars(string) => {
-            grammar::Whitespace::from_chars(string.chars().collect())
-        }
-    }
+fn convert_whitespace(ws_chars: super::CharSet) -> ConvertResult<grammar::Whitespace> {
+    convert_char_set(ws_chars).map(grammar::Whitespace::from)
+}
+
+fn convert_char_set(set: super::CharSet) -> ConvertResult<char_set::CharSet> {
+    // Convert the source `CharSet` into the string for a regex which matches single `char`s from
+    // the same set.
+    let source_str = set.0;
+    let regex_str = format!("[{}]", source_str);
+    // Parse that regex
+    let regex_hir = regex_syntax::Parser::new()
+        .parse(&regex_str)
+        .map_err(|inner| ConvertError::CharSet {
+            source_str,
+            regex_str,
+            inner,
+        })?;
+    // Extract the char ranges from the regex
+    let unicode_ranges = match regex_hir.kind() {
+        hir::HirKind::Class(hir::Class::Unicode(unicode_class)) => unicode_class.ranges(),
+        _ => unreachable!("Regex shouldn't parse as anything other than a char class"),
+    };
+    Ok(unicode_ranges
+        .iter()
+        .map(|range| range.start()..=range.end())
+        .collect())
 }
 
 mod utils {

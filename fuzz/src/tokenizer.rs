@@ -4,12 +4,9 @@ use itertools::Itertools;
 use rand::Rng;
 use rand_distr::Geometric;
 use sapling::Lang;
-use sapling_grammar::{tokenizer, TokenId, TypeId};
+use sapling_grammar::{char_set, tokenizer, TokenId, TypeId};
 
-use crate::{
-    fuzzer::{self, Arbitrary},
-    utils,
-};
+use crate::{utils, Arbitrary};
 
 /// A string of tokens, interspersed with whitespace
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -52,6 +49,7 @@ impl<'lang> Arbitrary<'lang> for TokenString {
             stream_len_distr: Geometric::new(1.0 / config.average_length_tokens).unwrap(),
             num_static_token_types: lang.grammar().num_tokens(),
             lang,
+            ws_sampler: lang.grammar().whitespace().sampler(),
         }
     }
 
@@ -61,20 +59,15 @@ impl<'lang> Arbitrary<'lang> for TokenString {
         _config: &Self::Config,
     ) -> Self::SampleTable {
         SampleTable {
-            ws_samples: utils::gen_ws_samples(
-                3000,
-                &data.lang.grammar().whitespace().all_chars(),
-                rng,
-                data.ws_len_distr,
-            ),
+            ws_samples: utils::gen_ws_samples(3000, &data.ws_sampler, rng, data.ws_len_distr),
         }
     }
 
     fn gen(
         data: &Self::StaticData,
         table: &Self::SampleTable,
-        rng: &mut impl Rng,
         _config: &Self::Config,
+        rng: &mut impl Rng,
     ) -> Self {
         let leading_ws = utils::sample_ws(&table.ws_samples, rng).to_owned();
         let stream_length = rng.sample(data.stream_len_distr);
@@ -139,6 +132,7 @@ pub struct StaticData<'lang> {
     ws_len_distr: Geometric,
     stream_len_distr: Geometric,
     lang: &'lang Lang,
+    ws_sampler: char_set::Sampler<'lang>,
     /// How many different types of static tokens the language has
     num_static_token_types: usize,
 }
@@ -149,10 +143,10 @@ pub struct SampleTable {
     ws_samples: Vec<String>,
 }
 
-pub fn fuzz_tokenizer(lang: &Lang, iteration_limit: Option<usize>, average_length_tokens: f64) {
+pub fn fuzz(lang: &Lang, iteration_limit: Option<usize>, average_length_tokens: f64) {
     let config = Config {
         average_length_tokens,
         ..Config::default()
     };
-    fuzzer::fuzz::<TokenString>(lang, iteration_limit, &config);
+    crate::fuzz::<TokenString>(lang, iteration_limit, &config);
 }

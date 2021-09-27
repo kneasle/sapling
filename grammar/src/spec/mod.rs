@@ -35,7 +35,7 @@ type Pattern = Vec<PatternElement>;
 pub struct SpecGrammar {
     #[serde(rename = "root")]
     root_type: TypeName,
-    whitespace: Whitespace,
+    whitespace: self::CharSet,
     types: HashMap<TypeName, Type>,
 }
 
@@ -114,8 +114,7 @@ pub(crate) enum PatternElement {
     },
 }
 
+/// A set of `char`s, expressed as the contents of `[`, `]` in a regex (e.g. `a-zA-Z` will
+/// correspond to the regex `[a-zA-Z]`).
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields, untagged)]
-pub enum Whitespace {
-    Chars(String),
-}
+pub struct CharSet(String);

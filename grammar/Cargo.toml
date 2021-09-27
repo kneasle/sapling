@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
+bimap = { version = "0.6", features = ["serde"] }
 index_vec = "0.1"
 itertools = "0.10"
+rand = "0.8" # Remove this if we move `CharSet` to its own crate
 regex = "1.5"
-rand = "0.8"
+regex-syntax = "0.6"
 serde = { version = "1.0", features = ["derive"] }

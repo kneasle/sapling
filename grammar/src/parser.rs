@@ -85,7 +85,7 @@ fn parse_type_bound<'a, 's, N: Ast>(
     let ty = grammar.get_type(type_bound);
 
     // Try to parse each descendant type
-    for &descendant_id in &ty.descendants {
+    for &descendant_id in &ty.parseable_descendants {
         // TODO: Handle left-recursion
         //
         // We parse each descendant type on a copy of `tokens` so that, in the case of failure, the

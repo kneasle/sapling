@@ -182,7 +182,7 @@ fn eat_stringy<'s>(
     match (
         stringy.delim_start.as_str(),
         stringy.delim_end.as_str(),
-        &stringy.regex,
+        &stringy.regexes,
         &stringy.escape_rules,
     ) {
         // Cases with regexes but no delimiters/escapes can just be computed by running the

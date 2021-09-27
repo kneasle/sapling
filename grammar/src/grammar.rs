@@ -1,8 +1,9 @@
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     fmt::{Debug, Formatter},
 };
 
+use bimap::BiMap;
 use index_vec::{IndexSlice, IndexVec};
 use itertools::Itertools;
 use regex::Regex;
@@ -25,7 +26,6 @@ pub struct Grammar {
     /// Mapping from token texts to IDs, stored **in decreasing order** of the text length.  This
     /// makes sure that the tokenizer always consumes the largest possible token (e.g. `"&&"`
     /// should be tokenized into just `&&`, rather than two `&`s).
-    // TODO: Combine this with `tokens`?
     static_tokens_decreasing: Vec<(String, TokenId)>,
 }
 
@@ -82,6 +82,10 @@ impl Grammar {
         &self.types[id].name
     }
 
+    pub fn types(&self) -> &IndexSlice<TypeId, [Type]> {
+        &self.types
+    }
+
     ////////////
     // TOKENS //
     ////////////
@@ -120,10 +124,29 @@ pub struct Type {
     /// JSON fields (which are only created implicitly to contain other nodes).
     pub(crate) keys: Vec<String>,
     /// The complete set of types to which this type can be implicitly converted in order of
-    /// parsing precedence, **including**
-    /// itself.  For [`Stringy`] types, this will only contain `self`.
-    pub(crate) descendants: Vec<TypeId>,
+    /// parsing precedence, **including** itself.  For [`Stringy`] types, this will only contain
+    /// `self`.
+    pub(crate) all_descendants: HashSet<TypeId>,
+    /// See [`Self::parseable_descendants`] for docs
+    pub(crate) parseable_descendants: Vec<TypeId>,
     pub(crate) inner: TypeInner,
+}
+
+impl Type {
+    /// The descendant types of this type which are either a [`TypeInner::Pattern`] or a
+    /// [`TypeInner::Stringy`], listed in parsing precedence, **including** itself.  For
+    /// [`Stringy`] types, this will only contain `self`.
+    pub fn parseable_descendants(&self) -> &[TypeId] {
+        self.parseable_descendants.as_slice()
+    }
+
+    pub fn inner(&self) -> &TypeInner {
+        &self.inner
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -154,7 +177,7 @@ pub struct Stringy {
 
     /// A [`Regex`] which all node **contents** must match.  This always starts and ends with `^`
     /// and `$` to force the engine to match the whole string.
-    pub(crate) regex: Option<Regexes>,
+    pub(crate) regexes: Option<Regexes>,
     /// Default **contents** of new nodes.  This must match `validity_regex`.
     pub(crate) default_content: String,
 
@@ -162,9 +185,29 @@ pub struct Stringy {
     // TODO: Specify syntax highlighting group
 }
 
+impl Stringy {
+    /// Return the [`Regex`] which the contents of `self` must match
+    pub fn unanchored_content_regex(&self) -> Option<&Regex> {
+        self.regexes.as_ref().map(|regexes| &regexes.unanchored)
+    }
+
+    /// Creates a canonical `display_str` for some contents.
+    pub fn create_display_string(&self, contents: &str) -> String {
+        let mut display_str = String::with_capacity(contents.len() + 20);
+        display_str.push_str(&self.delim_start);
+        for c in contents.chars() {
+            // TODO: handle escaping
+            display_str.push(c);
+        }
+        display_str.push_str(&self.delim_end);
+        display_str
+    }
+}
+
 /// The [`Regex`]es required to specify the valid strings of a [`Stringy`] node
 #[derive(Debug, Clone)]
 pub struct Regexes {
+    pub(crate) unanchored: Regex,
     pub(crate) anchored_start: Regex,
     pub(crate) anchored_both: Regex,
 }
@@ -187,7 +230,7 @@ pub struct EscapeRules {
     /// `f` -> '\u{c}'
     /// `r` -> '\r'
     /// ```
-    pub(crate) rules: HashMap<String, String>,
+    pub(crate) rules: BiMap<String, String>,
     /// The prefix which takes 4 hex symbols and de-escapes them to that unicode code-point.  For
     /// example, in JSON strings this is `u` (i.e. `\uABCD` would turn into the unicode code point
     /// `0xABCD`).
@@ -253,10 +296,6 @@ pub struct Whitespace {
 }
 
 impl Whitespace {
-    pub(crate) fn from_chars(chars: CharSet) -> Self {
-        Self { chars }
-    }
-
     /// Returns `true` if `c` should be considered whitespace
     pub fn is(&self, c: char) -> bool {
         self.chars.contains(c)
@@ -264,6 +303,12 @@ impl Whitespace {
 
     pub fn sampler(&self) -> char_set::Sampler {
         self.chars.sampler()
+    }
+}
+
+impl From<CharSet> for Whitespace {
+    fn from(chars: CharSet) -> Self {
+        Self { chars }
     }
 }
 

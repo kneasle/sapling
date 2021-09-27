@@ -2,4 +2,4 @@
 members = ["sapling", "tui", "grammar", "fuzz"]
 # `tui` and `fuzz` are both binaries, but `cargo run` should run `tui` by default.
 # `cargo run -p fuzz` will run the fuzzer
-default-members = ["tui"]
+default-members = ["sapling", "grammar", "tui"]

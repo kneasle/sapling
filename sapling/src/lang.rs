@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    rc::Rc,
+};
 
 use sapling_grammar::{parser, tokenizer::Tokenizer, ConvertError, Grammar, SpecGrammar, TypeId};
 use serde::Deserialize;
@@ -45,7 +48,7 @@ impl Lang {
             .parse(type_id, s)
             .map(|(leading_ws, root)| Tree {
                 leading_ws: leading_ws.to_owned(),
-                root,
+                root: Rc::new(root),
             })
     }
 
