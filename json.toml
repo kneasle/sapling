@@ -50,5 +50,7 @@ default = ""
 
 escape.start_sequence = '\'
 # `\b` is backspace, `\f` is form feed
-escape.rules = { '"'='"', '\'='\', '/'='/', 'b'="\b", 'f'="\f", 'r'="\r", 'n'="\n", 't'="\t" }
+escape.rules = { '"'='"', '\'='\', '/'='/', "\b"='b', "\f"='f', "\r"='r', "\n"='n', "\t"='t' }
 escape.unicode_hex_4 = 'u' # `\uWXYZ` -> `<unicode codepoint 0xWXYZ>`
+escape.dont_escape = '[[:print:]]--["\\]' # Always escape quote and backslash, but don't escape any
+                                          # other printable char

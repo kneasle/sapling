@@ -1,13 +1,12 @@
 use std::{
     collections::HashSet,
-    fmt::{Debug, Formatter},
+    fmt::{Debug, Formatter, Write},
 };
 
 use bimap::BiMap;
 use index_vec::{IndexSlice, IndexVec};
 use itertools::Itertools;
 use regex::Regex;
-use serde::Deserialize;
 
 use crate::{
     char_set::{self, CharSet},
@@ -195,12 +194,19 @@ impl Stringy {
     pub fn create_display_string(&self, contents: &str) -> String {
         let mut display_str = String::with_capacity(contents.len() + 20);
         display_str.push_str(&self.delim_start);
-        for c in contents.chars() {
-            // TODO: handle escaping
-            display_str.push(c);
+        for ch in contents.chars() {
+            self.write_escaped_char(ch, &mut display_str);
         }
         display_str.push_str(&self.delim_end);
         display_str
+    }
+
+    /// Writes the escaped version of `c` to a [`String`]
+    pub fn write_escaped_char(&self, ch: char, out: &mut String) {
+        match &self.escape_rules {
+            Some(r) => r.write_escaped_char(ch, out),
+            None => out.push(ch),
+        }
     }
 }
 
@@ -212,29 +218,55 @@ pub struct Regexes {
     pub(crate) anchored_both: Regex,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
+/// Rules for how `char`s should be escaped
+#[derive(Debug, Clone)]
 pub struct EscapeRules {
     /// A non-empty string that all escape sequences must start with.  For example, in JSON strings
     /// this is `\`
     pub(crate) start_sequence: String,
-    /// Maps escape sequences (to go after `start_sequence`) to the de-escaped [`String`].  For
-    /// example, for JSON strings this is:
+    /// Maps chars to their escape sequence (i.e. the string which goes after
+    /// `self.start_sequence`).  For example, for JSON strings this is:
     /// ```text
-    /// `\` -> '\\' (i.e. `\\` de-escapes to `\`)
-    /// `"` -> '"'  (i.e. `\"` de-escapes to `"`)
-    /// `/` -> '/'
-    /// `n` -> '\n'
-    /// `t` -> '\t'
-    /// `b` -> '\u{8}'
-    /// `f` -> '\u{c}'
-    /// `r` -> '\r'
+    /// '\\'    <-> "\\" (i.e. `\\` de-escapes to `\`)
+    /// '"'     <-> "\""  (i.e. `\"` de-escapes to `"`)
+    /// '/'     <-> "/"
+    /// '\n'    <-> "n"
+    /// '\t'    <-> "t"
+    /// '\u{8}' <-> "b"
+    /// '\u{c}' <-> "f"
+    /// '\r'    <-> "r"
     /// ```
-    pub(crate) rules: BiMap<String, String>,
+    pub(crate) rules: BiMap<char, String>,
     /// The prefix which takes 4 hex symbols and de-escapes them to that unicode code-point.  For
     /// example, in JSON strings this is `u` (i.e. `\uABCD` would turn into the unicode code point
     /// `0xABCD`).
     pub(crate) unicode_hex_4: Option<String>,
+    /// A set of `char`s which should not be escaped, even if a rule for them exists.
+    pub(crate) dont_escape: CharSet,
+}
+
+impl EscapeRules {
+    fn write_escaped_char(&self, ch: char, out: &mut String) {
+        let codepoint = ch as u32;
+
+        if self.dont_escape.contains(ch) {
+            // Char escaping overriden by `self.dont_escape`
+            out.push(ch);
+        } else if let Some(escape_seq) = self.rules.get_by_left(&ch) {
+            // Char can be escaped using a specific escape sequence
+            out.push_str(&self.start_sequence);
+            out.push_str(escape_seq);
+        } else if self.unicode_hex_4.is_some() && codepoint <= 0xFFFF {
+            // Use a 4-digit hex encoding if it's defined and the char is at most 4 hex digits long
+            let unicode_hex_4_prefix = self.unicode_hex_4.as_ref().unwrap();
+            out.push_str(&self.start_sequence);
+            out.push_str(unicode_hex_4_prefix);
+            write!(out, "{:04X}", ch as u32).unwrap();
+        } else {
+            // If no way of escaping the char can be found, then leave it as-is
+            out.push(ch);
+        }
+    }
 }
 
 //////////////

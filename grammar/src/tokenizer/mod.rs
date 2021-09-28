@@ -235,9 +235,9 @@ fn eat_stringy<'s>(
                 // Check if we have an escape string
                 if ch == esc_start_char {
                     // Consume explicit escapes if needed
-                    for (escaped, content) in &esc_rules.rules {
+                    for (content, escaped) in &esc_rules.rules {
                         if iter.eat(escaped) {
-                            contents.push_str(content);
+                            contents.push(*content);
                             continue 'outer;
                         }
                     }

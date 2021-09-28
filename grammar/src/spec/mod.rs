@@ -12,9 +12,10 @@ pub(crate) mod convert;
 
 use std::collections::HashMap;
 
+use bimap::BiMap;
 use serde::Deserialize;
 
-use crate::{grammar, Grammar};
+use crate::Grammar;
 
 use self::convert::ConvertResult;
 
@@ -83,7 +84,7 @@ pub(crate) enum Type {
         validity_regex: Option<String>,
 
         #[serde(rename = "escape")]
-        escape_rules: Option<grammar::EscapeRules>,
+        escape_rules: Option<self::EscapeRules>,
     },
 }
 
@@ -112,6 +113,23 @@ pub(crate) enum PatternElement {
         pattern: Pattern,
         delimiter: TokenText,
     },
+}
+
+/// See [`grammar::EscapeRules`] for docs.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EscapeRules {
+    /// A non-empty string that all escape sequences must start with.  For example, in JSON strings
+    /// this is `\`
+    pub(crate) start_sequence: String,
+    /// See [`grammar::EscapeRules::rules`] for docs.
+    pub(crate) rules: BiMap<char, String>,
+    /// The prefix which takes 4 hex symbols and de-escapes them to that unicode code-point.  For
+    /// example, in JSON strings this is `u` (i.e. `\uABCD` would turn into the unicode code point
+    /// `0xABCD`).
+    pub(crate) unicode_hex_4: Option<String>,
+    /// A set of `char`s which should not be escaped, even if a rule for them exists.
+    pub(crate) dont_escape: self::CharSet,
 }
 
 /// A set of `char`s, expressed as the contents of `[`, `]` in a regex (e.g. `a-zA-Z` will

@@ -102,7 +102,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             average_ws_length: 5.0,
-            average_tree_size: 10.0,
+            average_tree_size: 2.0,
             max_stringy_regex_repeats: 15,
             tree_depth_limit: 15,
             tree_node_limit: 1_000,
@@ -222,18 +222,20 @@ fn gen_elem(
         }
         PatternElement::Seq { pattern, delimiter } => {
             out.push(ast::Elem::SeqStart);
-            // TODO: Handle depth limiting better than this
-            if depth < data.tree_depth_limit && state.nodes_generated < data.tree_node_limit {
-                let mut is_first_node = true;
-                while state.rng.gen_range(0.0..1.0) > data.one_minus_new_segment_prob {
-                    // Add delimiter between nodes
-                    if !is_first_node {
-                        out.push(ast::Elem::SeqDelim(*delimiter, table.gen_ws(state.rng)));
-                        is_first_node = false;
-                    }
-                    // Add segment
-                    gen_pattern(pattern, out, state, depth);
+            let mut is_first_node = true;
+            while state.rng.gen_range(0.0..1.0) > data.one_minus_new_segment_prob {
+                // TODO: Handle depth limiting better than this
+                if depth > data.tree_depth_limit || state.nodes_generated > data.tree_node_limit {
+                    break;
                 }
+
+                // Add delimiter between nodes
+                if !is_first_node {
+                    out.push(ast::Elem::SeqDelim(*delimiter, table.gen_ws(state.rng)));
+                }
+                // Add segment
+                gen_pattern(pattern, out, state, depth);
+                is_first_node = false;
             }
             out.push(ast::Elem::SeqEnd);
         }

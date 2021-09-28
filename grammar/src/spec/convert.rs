@@ -156,35 +156,19 @@ fn convert_type(
         } => {
             assert!(stringy); // stringy should always be set to `true`
 
-            let validity_regex = validity_regex
+            let regexes = validity_regex
                 // Compile two copies of the regex
-                .map(|regex_str| {
-                    macro_rules! compile_regex {
-                        ($string: expr) => {
-                            Regex::new(&$string).map_err(|inner| ConvertError::Regex {
-                                type_name: name.to_owned(),
-                                regex: $string,
-                                inner,
-                            })?;
-                        };
-                    }
-
-                    let str_unanchored = format!("(?x: {} )", regex_str);
-                    let str_anchor_start = format!("^{}", str_unanchored);
-                    let str_anchor_both = format!("^{}$", str_unanchored);
-
-                    Ok(grammar::Regexes {
-                        unanchored: compile_regex!(str_unanchored),
-                        anchored_start: compile_regex!(str_anchor_start),
-                        anchored_both: compile_regex!(str_anchor_both),
-                    })
-                })
-                // Convert the `Option<Result<R, E>>` into a `Result<Option<R>, E>`
+                .map(|regex_str| convert_validity_regex(&regex_str, &name))
+                // Use `?` on the `Result` inside the `Option`.  I.e. convert a
+                // `Option<Result<T, E>>` to `Option<T>`, returning `Err(E)` if needed
+                .transpose()?;
+            let escape_rules = escape_rules
+                .map(|rules| convert_escape_rules(rules))
                 .transpose()?;
             let inner = grammar::Stringy {
                 delim_start,
                 delim_end,
-                regexes: validity_regex,
+                regexes,
                 default_content,
                 escape_rules,
             };
@@ -205,6 +189,21 @@ fn convert_type(
             .filter(|id| parseable_type_ids.contains(id))
             .collect_vec(),
         inner,
+    })
+}
+
+fn convert_escape_rules(rules: super::EscapeRules) -> ConvertResult<grammar::EscapeRules> {
+    let super::EscapeRules {
+        start_sequence,
+        rules,
+        unicode_hex_4,
+        dont_escape,
+    } = rules;
+    Ok(grammar::EscapeRules {
+        start_sequence,
+        rules,
+        unicode_hex_4,
+        dont_escape: convert_char_set(dont_escape)?,
     })
 }
 
@@ -287,9 +286,9 @@ fn enumerate_type_descendants(
     Ok(())
 }
 
-/////////////////////////
-// PATTERNS/WHITESPACE //
-/////////////////////////
+//////////////
+// PATTERNS //
+//////////////
 
 fn compile_pattern(
     elems: super::Pattern,
@@ -318,6 +317,32 @@ fn compile_pattern_element(
             delimiter: token_map.get_id(delimiter),
         },
         Type { name } => PE::Type(type_map.get(&name, parent_type_name)?),
+    })
+}
+
+///////////////////////////////
+// REGEX/WHITESPACE/CHAR SET //
+///////////////////////////////
+
+fn convert_validity_regex(regex_str: &str, type_name: &str) -> ConvertResult<grammar::Regexes> {
+    macro_rules! compile_regex {
+        ($string: expr) => {
+            Regex::new(&$string).map_err(|inner| ConvertError::Regex {
+                type_name: type_name.to_owned(),
+                regex: $string,
+                inner,
+            })?;
+        };
+    }
+
+    let str_unanchored = format!("(?x: {} )", regex_str);
+    let str_anchor_start = format!("^{}", str_unanchored);
+    let str_anchor_both = format!("^{}$", str_unanchored);
+
+    Ok(grammar::Regexes {
+        unanchored: compile_regex!(str_unanchored),
+        anchored_start: compile_regex!(str_anchor_start),
+        anchored_both: compile_regex!(str_anchor_both),
     })
 }
 

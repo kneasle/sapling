@@ -2,7 +2,7 @@ use std::{convert::identity, iter::FromIterator, ops::RangeInclusive};
 
 use rand::Rng;
 
-const FIRST_NON_ASCII_CHAR: char = '\u{128}';
+const FIRST_NON_ASCII_CHAR: char = '\u{80}';
 
 /// An set of [`char`], optimised for sets where adjacent [`char`]s are very likely to either both
 /// be included or both excluded.
