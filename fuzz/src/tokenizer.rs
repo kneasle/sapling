@@ -6,17 +6,25 @@ use rand_distr::Geometric;
 use sapling::Lang;
 use sapling_grammar::{char_set, tokenizer, TokenId, TypeId};
 
-use crate::{utils, Arbitrary};
+use crate::{runner, utils, Arbitrary};
+
+pub fn fuzz(lang: &Lang, iteration_limit: Option<usize>, average_length_tokens: f64) {
+    let config = Config {
+        average_length_tokens,
+        ..Config::default()
+    };
+    runner::fuzz::<TokenString>(lang, iteration_limit, config);
+}
 
 /// A string of tokens, interspersed with whitespace
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct TokenString {
+struct TokenString {
     leading_ws: String,
     tokens: Vec<(ParsedToken, String)>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum ParsedToken {
+enum ParsedToken {
     Static(TokenId),
     Stringy {
         ty_id: TypeId,
@@ -110,7 +118,7 @@ impl<'lang> Arbitrary<'lang> for TokenString {
 
 /// Configuration parameters for generating token strings
 #[derive(Debug, Clone)]
-pub struct Config {
+struct Config {
     /// The average number of tokens in each generated string
     average_length_tokens: f64,
     /// The average length of the whitespace string
@@ -128,7 +136,7 @@ impl Default for Config {
 
 /// Static data for generating token strings of a given language
 #[derive(Debug, Clone)]
-pub struct StaticData<'lang> {
+struct StaticData<'lang> {
     ws_len_distr: Geometric,
     stream_len_distr: Geometric,
     lang: &'lang Lang,
@@ -139,14 +147,6 @@ pub struct StaticData<'lang> {
 
 /// Table in which random samples can be cached to speed up the parsing table
 #[derive(Debug, Clone)]
-pub struct SampleTable {
+struct SampleTable {
     ws_samples: Vec<String>,
-}
-
-pub fn fuzz(lang: &Lang, iteration_limit: Option<usize>, average_length_tokens: f64) {
-    let config = Config {
-        average_length_tokens,
-        ..Config::default()
-    };
-    crate::fuzz::<TokenString>(lang, iteration_limit, &config);
 }

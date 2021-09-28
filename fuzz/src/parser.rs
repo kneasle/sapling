@@ -10,7 +10,7 @@ use sapling_grammar::{char_set, Grammar, PatternElement, Stringy, TypeId, TypeIn
 use crate::utils;
 
 pub fn fuzz(lang: &Lang, iteration_limit: Option<usize>) {
-    crate::fuzz::<ast::Tree>(lang, iteration_limit, &Config::default());
+    crate::runner::fuzz::<ast::Tree>(lang, iteration_limit, Config::default());
 }
 
 impl<'lang> crate::Arbitrary<'lang> for ast::Tree {
@@ -102,7 +102,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             average_ws_length: 5.0,
-            average_tree_size: 2.0,
+            average_tree_size: 3.0,
             max_stringy_regex_repeats: 15,
             tree_depth_limit: 15,
             tree_node_limit: 1_000,
