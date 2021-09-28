@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use sapling_grammar::{parser, tokenizer::Tokenizer, ConvertError, Grammar, SpecGrammar, TypeId};
+use sapling_grammar::{parser, tokenizer::Tokenizer, Grammar, SpecGrammar, TypeId};
 use serde::Deserialize;
 
 use crate::ast::Tree;
@@ -80,5 +80,5 @@ struct LangFile {
 pub enum LoadError {
     Io(PathBuf, std::io::Error),
     Parse(toml::de::Error),
-    Convert(ConvertError),
+    Convert(sapling_grammar::spec::convert::Error),
 }

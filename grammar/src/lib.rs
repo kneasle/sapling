@@ -25,8 +25,8 @@
 pub mod char_set;
 mod grammar;
 pub mod parser;
-mod spec; // AST-like specification of the TOML format consumed by Sapling
+pub mod spec; // AST-like specification of the TOML format consumed by Sapling
 pub mod tokenizer;
 
 pub use grammar::*;
-pub use spec::{convert::ConvertError, SpecGrammar};
+pub use spec::SpecGrammar;

@@ -8,7 +8,7 @@
 //!
 //! All these stages can generate errors, which are all bubbled up to the caller
 
-pub(crate) mod convert;
+pub mod convert;
 
 use std::collections::HashMap;
 
@@ -16,8 +16,6 @@ use bimap::BiMap;
 use serde::Deserialize;
 
 use crate::Grammar;
-
-use self::convert::ConvertResult;
 
 type TypeName = String;
 type TokenText = String;
@@ -40,8 +38,7 @@ pub struct SpecGrammar {
 }
 
 impl SpecGrammar {
-    #[inline]
-    pub fn into_grammar(self) -> ConvertResult<Grammar> {
+    pub fn into_grammar(self) -> convert::Result<Grammar> {
         convert::convert(self)
     }
 }

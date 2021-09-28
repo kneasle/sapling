@@ -8,14 +8,14 @@ use regex_syntax::hir;
 use super::SpecGrammar;
 use crate::{char_set, grammar, Grammar, TypeId, TypeVec};
 
-pub type ConvertResult<T> = Result<T, ConvertError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 use self::utils::{TokenMap, TypeMap};
 
 /// Convert a [`SpecGrammar`] (likely parsed from a TOML file) into a full [`Grammar`], or fail
 /// with a [`ConvertError`].  This is a largely straightforward process, since the 'shapes' of
 /// [`SpecGrammar`] and [`Grammar`] are (intentionally) similar.
-pub(crate) fn convert(grammar: SpecGrammar) -> ConvertResult<Grammar> {
+pub(crate) fn convert(grammar: SpecGrammar) -> self::Result<Grammar> {
     let SpecGrammar {
         root_type,
         whitespace,
@@ -36,7 +36,7 @@ pub(crate) fn convert(grammar: SpecGrammar) -> ConvertResult<Grammar> {
 
 /// The possibly ways that parsing a [`Grammar`] can fail.
 #[derive(Debug)]
-pub enum ConvertError {
+pub enum Error {
     /// An error occurred whilst generating a [`Regex`] provided by the user
     Regex {
         type_name: String,
@@ -67,7 +67,7 @@ pub enum ConvertError {
 fn convert_types(
     types: HashMap<super::TypeName, super::Type>,
     token_map: &mut TokenMap,
-) -> ConvertResult<(TypeVec<grammar::Type>, TypeMap)> {
+) -> self::Result<(TypeVec<grammar::Type>, TypeMap)> {
     // Before generating types, assign all names to type IDs (because types may refer to child
     // types which appear after themselves in the HashMap iterator).  If we see a `TypeName` which
     // is not in the `TypeMap`, then we know it must be invalid and we can generate an error.
@@ -113,7 +113,7 @@ fn convert_types(
                 &type_map,
             )
         })
-        .collect::<Result<_, _>>()?;
+        .collect::<self::Result<_>>()?;
     Ok((types, type_map))
 }
 
@@ -124,7 +124,7 @@ fn convert_type(
     parseable_type_ids: &HashSet<TypeId>,
     token_map: &mut TokenMap,
     type_map: &TypeMap,
-) -> ConvertResult<grammar::Type> {
+) -> self::Result<grammar::Type> {
     let (key, mut keys, inner) = match t {
         super::Type::Pattern {
             key,
@@ -191,7 +191,7 @@ fn convert_type(
     })
 }
 
-fn convert_escape_rules(rules: super::EscapeRules) -> ConvertResult<grammar::EscapeRules> {
+fn convert_escape_rules(rules: super::EscapeRules) -> self::Result<grammar::EscapeRules> {
     let super::EscapeRules {
         start_sequence,
         rules,
@@ -215,7 +215,7 @@ fn convert_escape_rules(rules: super::EscapeRules) -> ConvertResult<grammar::Esc
 fn compute_type_descendants(
     types: &IndexSlice<TypeId, [(super::TypeName, super::Type)]>,
     type_map: &TypeMap,
-) -> ConvertResult<TypeVec<Vec<TypeId>>> {
+) -> self::Result<TypeVec<Vec<TypeId>>> {
     // For each TypeId, determine the `TypeId`s of its children
     let child_type_ids: TypeVec<Vec<TypeId>> = types
         .iter()
@@ -223,10 +223,10 @@ fn compute_type_descendants(
             super::Type::Pattern { children, .. } => children
                 .iter()
                 .map(|child_name| type_map.get(child_name, parent_name))
-                .collect::<ConvertResult<Vec<TypeId>>>(),
+                .collect::<self::Result<Vec<TypeId>>>(),
             super::Type::Stringy { .. } => Ok(Vec::new()), // Stringy nodes have no children
         })
-        .collect::<Result<_, _>>()?;
+        .collect::<self::Result<_>>()?;
     // For each node flatten its descendant tree, terminating if any cycles are found.
     //
     // PERF: This does a lot of duplicated work expanding nodes, which could be sped up by
@@ -261,7 +261,7 @@ fn enumerate_type_descendants(
     child_type_ids: &IndexSlice<TypeId, [Vec<TypeId>]>,
     type_stack: &mut Vec<TypeId>,
     out: &mut Vec<TypeId>,
-) -> ConvertResult<()> {
+) -> self::Result<()> {
     // Check for cycles
     if let Some(idx) = type_stack.iter().position(|&i| i == id) {
         // `type_stack[idx..] + id` forms the cycle (i.e. a cycle which starts and ends with `id`
@@ -270,7 +270,7 @@ fn enumerate_type_descendants(
             .chain(std::iter::once(&id))
             .map(|&id| types[id].0.to_owned())
             .collect_vec();
-        return Err(ConvertError::TypeCycle(cycle));
+        return Err(Error::TypeCycle(cycle));
     }
     // Mark this type as a descendant (if it hasn't been listed already)
     if !out.contains(&id) {
@@ -294,11 +294,11 @@ fn compile_pattern(
     parent_type_name: &str,
     token_map: &mut TokenMap,
     type_map: &TypeMap,
-) -> ConvertResult<grammar::Pattern> {
+) -> self::Result<grammar::Pattern> {
     elems
         .into_iter()
         .map(|e| compile_pattern_element(e, parent_type_name, token_map, type_map))
-        .collect::<Result<_, _>>()
+        .collect::<self::Result<_>>()
 }
 
 fn compile_pattern_element(
@@ -306,7 +306,7 @@ fn compile_pattern_element(
     parent_type_name: &str,
     token_map: &mut TokenMap,
     type_map: &TypeMap,
-) -> ConvertResult<grammar::PatternElement> {
+) -> self::Result<grammar::PatternElement> {
     use super::PatternElement::*;
     use grammar::PatternElement as PE;
     Ok(match elem {
@@ -323,10 +323,10 @@ fn compile_pattern_element(
 // REGEX/WHITESPACE/CHAR SET //
 ///////////////////////////////
 
-fn convert_validity_regex(regex_str: &str, type_name: &str) -> ConvertResult<grammar::Regexes> {
+fn convert_validity_regex(regex_str: &str, type_name: &str) -> self::Result<grammar::Regexes> {
     macro_rules! compile_regex {
         ($string: expr) => {
-            Regex::new(&$string).map_err(|inner| ConvertError::Regex {
+            Regex::new(&$string).map_err(|inner| Error::Regex {
                 type_name: type_name.to_owned(),
                 regex: $string,
                 inner,
@@ -345,11 +345,11 @@ fn convert_validity_regex(regex_str: &str, type_name: &str) -> ConvertResult<gra
     })
 }
 
-fn convert_whitespace(ws_chars: super::CharSet) -> ConvertResult<grammar::Whitespace> {
+fn convert_whitespace(ws_chars: super::CharSet) -> self::Result<grammar::Whitespace> {
     convert_char_set(ws_chars).map(grammar::Whitespace::from)
 }
 
-fn convert_char_set(set: super::CharSet) -> ConvertResult<char_set::CharSet> {
+fn convert_char_set(set: super::CharSet) -> self::Result<char_set::CharSet> {
     // Convert the source `CharSet` into the string for a regex which matches single `char`s from
     // the same set.
     let source_str = set.0;
@@ -357,7 +357,7 @@ fn convert_char_set(set: super::CharSet) -> ConvertResult<char_set::CharSet> {
     // Parse that regex
     let regex_hir = regex_syntax::Parser::new()
         .parse(&regex_str)
-        .map_err(|inner| ConvertError::CharSet {
+        .map_err(|inner| Error::CharSet {
             source_str,
             regex_str,
             inner,
@@ -380,7 +380,7 @@ mod utils {
 
     use crate::{spec, Token, TokenId, TypeId, TypeVec};
 
-    use super::{ConvertError, ConvertResult};
+    use super::Error;
 
     /// Maps [`TypeName`]s to [`TypeId`]s, providing `get` methods which generate error messages
     #[derive(Debug, Clone)]
@@ -404,21 +404,21 @@ mod utils {
             (types, Self { inner: inner_map })
         }
 
-        pub(super) fn get(&self, name: &str, parent_type_name: &str) -> ConvertResult<TypeId> {
+        pub(super) fn get(&self, name: &str, parent_type_name: &str) -> super::Result<TypeId> {
             self.inner
                 .get(name)
                 .copied()
-                .ok_or_else(|| ConvertError::UnknownChildType {
+                .ok_or_else(|| Error::UnknownChildType {
                     name: name.to_owned(),
                     parent_name: parent_type_name.to_owned(),
                 })
         }
 
-        pub(super) fn get_root(&self, name: &str) -> ConvertResult<TypeId> {
+        pub(super) fn get_root(&self, name: &str) -> super::Result<TypeId> {
             self.inner
                 .get(name)
                 .copied()
-                .ok_or_else(|| ConvertError::UnknownRootType(name.to_owned()))
+                .ok_or_else(|| Error::UnknownRootType(name.to_owned()))
         }
     }
 
