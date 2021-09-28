@@ -29,7 +29,7 @@ pub struct Grammar {
 }
 
 impl Grammar {
-    pub fn new(
+    pub(crate) fn new(
         root_type: TypeId,
         whitespace: Whitespace,
         types: TypeVec<Type>,
@@ -160,7 +160,8 @@ pub enum TypeInner {
     /// Note that this is not limited to string literals: for example, identifiers and other
     /// literals also use this node type.  Accordingly, the definition `Stringy` type is extremely
     /// flexible to accommodate these different use cases.
-    Stringy(Stringy),
+    Stringy(Box<Stringy>), // Note: We use `Box` to stop the large size of `Stringy` from making
+                           // `TypeInner` really big
 }
 
 /// A [`Type`] where the contents of each node is an arbitrary string (which can be edited

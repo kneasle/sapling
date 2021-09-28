@@ -154,7 +154,7 @@ fn convert_type(
 
             escape_rules,
         } => {
-            assert!(stringy); // stringy should always be set to `true`
+            assert!(stringy); // stringy should always be set to `true`.  TODO: Handle this more nicely
 
             let regexes = validity_regex
                 // Compile two copies of the regex
@@ -162,9 +162,8 @@ fn convert_type(
                 // Use `?` on the `Result` inside the `Option`.  I.e. convert a
                 // `Option<Result<T, E>>` to `Option<T>`, returning `Err(E)` if needed
                 .transpose()?;
-            let escape_rules = escape_rules
-                .map(|rules| convert_escape_rules(rules))
-                .transpose()?;
+            let escape_rules = escape_rules.map(convert_escape_rules).transpose()?;
+
             let inner = grammar::Stringy {
                 delim_start,
                 delim_end,
@@ -172,7 +171,7 @@ fn convert_type(
                 default_content,
                 escape_rules,
             };
-            (key, keys, grammar::TypeInner::Stringy(inner))
+            (key, keys, grammar::TypeInner::Stringy(Box::new(inner)))
         }
     };
 

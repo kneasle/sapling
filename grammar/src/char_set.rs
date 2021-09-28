@@ -96,7 +96,6 @@ impl CharSet {
                     self.len += 1;
                     return false;
                 }
-                drop(r);
                 // `(range before r).end() < ch < r.start() - 1`.  Try to extend `(range before r)`
                 // to include `ch`
                 if let Some(range_idx_before_r) = range_idx.checked_sub(1) {
@@ -168,6 +167,11 @@ impl CharSet {
     /// memory load.
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    /// `true` if `self` contains no `char`s.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 }
 

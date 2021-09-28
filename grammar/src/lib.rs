@@ -20,6 +20,8 @@
 //! worth doing some profiling before committing large amounts of time into optimising the parsing
 //! engine.
 
+#![allow(rustdoc::private_intra_doc_links)] // This crate is only meant to be used in Sapling
+
 pub mod char_set;
 mod grammar;
 pub mod parser;

@@ -18,7 +18,7 @@ pub struct Tokenizer<'s, 'g> {
 }
 
 impl<'s, 'g> Tokenizer<'s, 'g> {
-    /// Creates a new [`TokenIter`] which tokenizes a given [`str`]ing slice according to a
+    /// Creates a new `Tokenizer` which tokenizes a given [`str`]ing slice according to a
     /// [`Grammar`].
     // TODO: Make this pub(crate)?
     pub fn new(grammar: &'g Grammar, string: &'s str) -> (&'s str, Self) {
@@ -30,7 +30,7 @@ impl<'s, 'g> Tokenizer<'s, 'g> {
             .types
             .iter_enumerated()
             .filter_map(|(id, ty)| match &ty.inner {
-                TypeInner::Stringy(s) => Some((id, s)),
+                TypeInner::Stringy(s) => Some((id, s.as_ref())),
                 _ => None,
             })
             .collect_vec();
@@ -91,7 +91,7 @@ impl<'s, 't> Iterator for Tokenizer<'s, 't> {
     type Item = Result<(ParsedToken<'s>, &'s str), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // A `TokenIter` always starts having just finished consuming whitespace so, if the string
+        // A `Tokenizer` always starts having just finished consuming whitespace so, if the string
         // is valid token string, the remainder of `chars` must start with a token.
 
         if self.iter.is_done() {

@@ -3,8 +3,8 @@
 //!
 //! When loading a language's grammar, Sapling will perform the following sequence of actions:
 //! 1. Load the `*.toml` file containing that language's grammar
-//! 2. Read that TOML file into a [`Spec`]
-//! 3. Compile that [`Spec`] into a full [`Grammar`], which Sapling can use directly
+//! 2. Read that TOML file into a [`SpecGrammar`]
+//! 3. Compile that [`SpecGrammar`] into a full [`Grammar`], which Sapling can use directly
 //!
 //! All these stages can generate errors, which are all bubbled up to the caller
 
@@ -21,12 +21,11 @@ use self::convert::ConvertResult;
 
 type TypeName = String;
 type TokenText = String;
-type Pattern = Vec<PatternElement>;
 
 /// A simplified version of [`Grammar`] which can be [`Deserialize`]d from any JSON-like data
 /// structure (usually TOML).  In fact, it can **only** be generated through [`serde`], and the
-/// only exported method is [`to_grammar`](SpecGrammar::to_grammar), which checks the source data
-/// and returns a [`Grammar`] specifying the same language as the source `SpecGrammar`.
+/// only exported method is [`into_grammar`](SpecGrammar::into_grammar), which checks the source
+/// data and returns a [`Grammar`] specifying the same language as the source `SpecGrammar`.
 ///
 /// This type is implemented very declaratively, with minimal use of [`serde`] features.  To this
 /// end, it is designed to be consulted as a reference specification for the TOML files consumed by
@@ -49,7 +48,10 @@ impl SpecGrammar {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields, untagged)]
-pub(crate) enum Type {
+// It's OK that the `Stringy` variant is quite large (~300 bytes), because this is a temporary
+// datatype that's only created once.
+#[allow(clippy::large_enum_variant)]
+enum Type {
     Pattern {
         key: Option<String>,
         #[serde(default = "Vec::new")]
@@ -88,9 +90,12 @@ pub(crate) enum Type {
     },
 }
 
+/// A `Pattern` is the right-hand side of a grammar rule
+type Pattern = Vec<PatternElement>;
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields, untagged)]
-pub(crate) enum PatternElement {
+enum PatternElement {
     /// A single, unchanging piece of non-whitespace text
     Token(TokenText),
     /// A position where a sub-node will be placed
@@ -118,7 +123,7 @@ pub(crate) enum PatternElement {
 /// See [`grammar::EscapeRules`] for docs.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct EscapeRules {
+struct EscapeRules {
     /// A non-empty string that all escape sequences must start with.  For example, in JSON strings
     /// this is `\`
     pub(crate) start_sequence: String,
@@ -135,4 +140,4 @@ pub struct EscapeRules {
 /// A set of `char`s, expressed as the contents of `[`, `]` in a regex (e.g. `a-zA-Z` will
 /// correspond to the regex `[a-zA-Z]`).
 #[derive(Debug, Clone, Deserialize)]
-pub struct CharSet(String);
+struct CharSet(String);

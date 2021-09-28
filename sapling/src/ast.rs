@@ -109,7 +109,7 @@ pub enum Elem {
         ws: String,
     },
     /// This element contains a [`Node`] which stores a sub-tree.  This can be replaced with any
-    /// [`Node`] who's [`Type`] is a descendent of `type_bound`.
+    /// [`Node`] who's [`Type`](sapling_grammar::Type) is a descendent of `type_bound`.
     Node {
         type_bound: TypeId,
         node: Rc<Node>,
