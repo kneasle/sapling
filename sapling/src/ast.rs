@@ -18,6 +18,14 @@ impl Tree {
     pub fn new(leading_ws: String, root: Rc<Node>) -> Self {
         Self { leading_ws, root }
     }
+
+    pub fn root(&self) -> &Rc<Node> {
+        &self.root
+    }
+
+    pub fn leading_ws(&self) -> &str {
+        self.leading_ws.as_str()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,6 +104,14 @@ pub struct TreeNode {
 impl TreeNode {
     pub fn new(type_id: TypeId, pattern: Pattern) -> Self {
         Self { type_id, pattern }
+    }
+
+    /// Returns the direct children of this node, in document order
+    pub fn children(&self) -> impl Iterator<Item = &Rc<Node>> {
+        self.pattern.iter().filter_map(|e| match e {
+            Elem::Node { node, .. } => Some(node),
+            _ => None,
+        })
     }
 }
 

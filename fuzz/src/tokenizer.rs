@@ -1,5 +1,7 @@
 //! Code to fuzz Sapling's tokenizer
 
+use std::{borrow::Cow, ops::Deref};
+
 use itertools::Itertools;
 use rand::Rng;
 use rand_distr::Geometric;
@@ -50,6 +52,7 @@ impl<'lang> Arbitrary<'lang> for TokenString {
     type Config = Config;
     type StaticData = StaticData<'lang>;
     type SampleTable = SampleTable;
+    type Shrink = Shrink;
 
     fn gen_static_data(lang: &'lang Lang, config: &Self::Config) -> Self::StaticData {
         StaticData {
@@ -149,4 +152,33 @@ struct StaticData<'lang> {
 #[derive(Debug, Clone)]
 struct SampleTable {
     ws_samples: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+struct Shrink(TokenString);
+
+impl From<TokenString> for Shrink {
+    fn from(s: TokenString) -> Self {
+        Self(s)
+    }
+}
+
+impl From<Shrink> for TokenString {
+    fn from(s: Shrink) -> Self {
+        s.0
+    }
+}
+
+impl Deref for Shrink {
+    type Target = TokenString;
+
+    fn deref(&self) -> &TokenString {
+        &self.0
+    }
+}
+
+impl crate::Shrink for Shrink {
+    fn smaller_cases<'s>(&'s self) -> Box<dyn Iterator<Item = Cow<'s, Self>> + 's> {
+        Box::new(std::iter::empty())
+    }
 }

@@ -1,10 +1,13 @@
 //! Fuzzer for Sapling's full parsing pipeline (i.e. converting strings into syntax trees)
 
-use std::{collections::HashMap, rc::Rc};
+use std::{borrow::Cow, collections::HashMap, ops::Deref, rc::Rc};
 
 use rand::{prelude::SliceRandom, Rng};
 use rand_distr::Geometric;
-use sapling::{ast, Lang};
+use sapling::{
+    ast::{self, Node},
+    Lang,
+};
 use sapling_grammar::{char_set, Grammar, PatternElement, Stringy, TypeId, TypeInner};
 
 use crate::utils;
@@ -17,6 +20,7 @@ impl<'lang> crate::Arbitrary<'lang> for ast::Tree {
     type Config = Config;
     type StaticData = StaticData<'lang>;
     type SampleTable = SampleTable;
+    type Shrink = Shrink;
 
     fn gen_static_data(lang: &'lang Lang, config: &Config) -> Self::StaticData {
         let stringy_regex_generators = lang
@@ -102,7 +106,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             average_ws_length: 5.0,
-            average_tree_size: 3.0,
+            average_tree_size: 4.0,
             max_stringy_regex_repeats: 15,
             tree_depth_limit: 15,
             tree_node_limit: 1_000,
@@ -140,6 +144,54 @@ pub struct SampleTable {
 impl SampleTable {
     fn gen_ws(&self, rng: &mut impl Rng) -> String {
         utils::sample_ws(&self.ws_samples, rng).to_owned()
+    }
+}
+
+///////////////
+// SHRINKING //
+///////////////
+
+#[derive(Debug, Clone)]
+pub struct Shrink {
+    tree: ast::Tree,
+}
+
+impl From<ast::Tree> for Shrink {
+    fn from(tree: ast::Tree) -> Self {
+        Self { tree }
+    }
+}
+
+impl From<Shrink> for ast::Tree {
+    fn from(s: Shrink) -> Self {
+        s.tree
+    }
+}
+
+impl Deref for Shrink {
+    type Target = ast::Tree;
+
+    fn deref(&self) -> &ast::Tree {
+        &self.tree
+    }
+}
+
+impl crate::Shrink for Shrink {
+    fn smaller_cases<'s>(&'s self) -> Box<dyn Iterator<Item = Cow<'s, Self>> + 's> {
+        let ws = self.tree.leading_ws().to_owned();
+        match self.tree.root().as_ref() {
+            // Stringy nodes can't be shrunk
+            Node::Stringy { .. } => Box::new(std::iter::empty()),
+            // Shrink tree nodes into their children.  This is actually pretty terrible, because
+            // the children of a root node are often not valid as full trees (e.g. fields in JSON
+            // are children of objects, but can't be full trees).  TODO: Reduce the tree by
+            // deleting/bubbling subtrees
+            Node::Tree(node) => Box::new(node.children().map(move |e| {
+                Cow::Owned(Shrink {
+                    tree: ast::Tree::new(ws.clone(), e.clone()),
+                })
+            })),
+        }
     }
 }
 
