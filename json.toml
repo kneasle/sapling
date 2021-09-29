@@ -31,7 +31,7 @@ field.pattern = [{ type = "string" }, ":", { type = "value" }] # <string>: <valu
 key = "n"
 stringy = true # Sapling currently doesn't understand that numbers have special meaning
 validity_regex = '''
-    -?                      # negation (optional)
+    -?                         # negation (optional)
     (?: 0 | [1-9][0-9]* )      # integer  (single `0`, or >=1 digits which doesn't start with 0)
     (?: \. [0-9]+ )?           # fraction (optional; `.` followed by >=1 digits)
     (?: [Ee] [-+]? [0-9]+ )?   # exponent (optional; `E` or `e`, then possibly `-` or `+`, then >=1 digits)
@@ -53,4 +53,4 @@ escape.start_sequence = '\'
 escape.rules = { '"'='"', '\'='\', '/'='/', "\b"='b', "\f"='f', "\r"='r', "\n"='n', "\t"='t' }
 escape.unicode_hex_4 = 'u' # `\uWXYZ` -> `<unicode codepoint 0xWXYZ>`
 escape.dont_escape = '[[:print:]]--["\\]' # Always escape quote and backslash, but don't escape any
-                                          # other printable char
+                                          # other printable char into a 4-digit hex code

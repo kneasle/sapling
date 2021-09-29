@@ -14,10 +14,10 @@
 //!
 //! Speed/quality improvements to this crate are very welcome - optimisations are very much
 //! encouraged and rewrites of any scale is good, as long as the external behaviour of the parser
-//! is still correct.  Well-justified use of `unsafe` is also fine, but generally Sapling cares
-//! more about safety and correctness then absolutely top-notch performance.  Also, I suspect that
-//! a reasonably well optimised parser is unlikely to be a major bottleneck of Sapling, so it's
-//! worth doing some profiling before committing large amounts of time into optimising the parsing
+//! is correct.  Well-justified use of `unsafe` is also fine, but generally Sapling cares more
+//! about safety and correctness then absolutely top-notch performance.  Also, I suspect that a
+//! reasonably well optimised parser is unlikely to be a major bottleneck of Sapling, so it's worth
+//! doing some profiling before committing large amounts of time into optimising the parsing
 //! engine.
 
 #![allow(rustdoc::private_intra_doc_links)] // This crate is only meant to be used in Sapling

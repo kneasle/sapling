@@ -34,66 +34,6 @@ pub enum Node {
     Stringy { inner: StringyNode, ws: String },
 }
 
-impl parser::Ast for Node {
-    type Builder = NodeBuilder;
-
-    fn new_stringy(type_id: TypeId, contents: String, display_str: String, ws: &str) -> Self {
-        Node::Stringy {
-            inner: StringyNode {
-                type_: type_id,
-                contents,
-                display_str,
-            },
-            ws: ws.to_owned(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct NodeBuilder {
-    type_id: TypeId,
-    pattern: Pattern,
-}
-
-impl parser::Builder for NodeBuilder {
-    type Node = Node;
-
-    fn new(type_id: TypeId) -> Self {
-        NodeBuilder {
-            type_id,
-            pattern: Vec::new(),
-        }
-    }
-
-    fn add_node(&mut self, type_bound: TypeId, node: Rc<Self::Node>) {
-        self.pattern.push(Elem::Node { type_bound, node });
-    }
-
-    fn add_token(&mut self, token: TokenId, ws: &str) {
-        self.pattern.push(Elem::Token {
-            token_id: token,
-            ws: ws.to_owned(),
-        });
-    }
-
-    fn seq_start(&mut self) {
-        self.pattern.push(Elem::SeqStart);
-    }
-
-    fn seq_delim(&mut self, token: TokenId, ws: &str) {
-        self.pattern.push(Elem::SeqDelim(token, ws.to_owned()));
-    }
-
-    fn seq_end(&mut self) {
-        self.pattern.push(Elem::SeqEnd);
-    }
-
-    fn into_node(self) -> Self::Node {
-        let NodeBuilder { type_id, pattern } = self;
-        Node::Tree(TreeNode { type_id, pattern })
-    }
-}
-
 /// An syntax tree node which contains a sequence of tokens and sub-nodes
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeNode {
@@ -213,5 +153,70 @@ impl Elem {
                 w.write_str(ws)
             }
         }
+    }
+}
+
+/* Interface code to allow [`Tree`]s to be constructed by [`sapling_grammar`]'s parsing engine */
+
+impl parser::Ast for Node {
+    type Builder = NodeBuilder;
+
+    fn new_stringy(type_id: TypeId, contents: String, display_str: String, ws: &str) -> Self {
+        Node::Stringy {
+            inner: StringyNode {
+                type_: type_id,
+                contents,
+                display_str,
+            },
+            ws: ws.to_owned(),
+        }
+    }
+}
+
+/// A [`Builder`](parser::Builder) for [`Node`]s.  The [`Builder`](parser::Builder) trait allows
+/// the [`sapling_grammar`] crate to construct [`Tree`]s _without_ knowing any implementation
+/// details of how syntax trees are actually stored.
+#[derive(Debug, Clone)]
+pub struct NodeBuilder {
+    type_id: TypeId,
+    pattern: Pattern,
+}
+
+impl parser::Builder for NodeBuilder {
+    type Node = Node;
+
+    fn new(type_id: TypeId) -> Self {
+        NodeBuilder {
+            type_id,
+            pattern: Vec::new(),
+        }
+    }
+
+    fn add_node(&mut self, type_bound: TypeId, node: Rc<Self::Node>) {
+        self.pattern.push(Elem::Node { type_bound, node });
+    }
+
+    fn add_token(&mut self, token: TokenId, ws: &str) {
+        self.pattern.push(Elem::Token {
+            token_id: token,
+            ws: ws.to_owned(),
+        });
+    }
+
+    fn seq_start(&mut self) {
+        self.pattern.push(Elem::SeqStart);
+    }
+
+    fn seq_delim(&mut self, token: TokenId, ws: &str) {
+        self.pattern.push(Elem::SeqDelim(token, ws.to_owned()));
+    }
+
+    fn seq_end(&mut self) {
+        self.pattern.push(Elem::SeqEnd);
+    }
+
+    fn into_node(self) -> Self::Node {
+        let NodeBuilder { type_id, pattern } = self;
+        Node::Tree(TreeNode { type_id, pattern })
     }
 }

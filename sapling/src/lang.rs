@@ -39,6 +39,7 @@ impl Lang {
         &self.grammar
     }
 
+    // TODO: Remove this
     pub fn tokenize<'s, 't>(&'t self, s: &'s str) -> (&'s str, Tokenizer<'s, 't>) {
         Tokenizer::new(self.grammar(), s)
     }
@@ -76,6 +77,7 @@ struct LangFile {
     grammar: SpecGrammar,
 }
 
+/// The errors generated when loading a [`Lang`] from a TOML file.
 #[derive(Debug)]
 pub enum LoadError {
     Io(PathBuf, std::io::Error),
