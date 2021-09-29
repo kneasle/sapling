@@ -1,0 +1,11 @@
+[package]
+name = "sapling-tui"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+itertools = "0.10"
+sapling.path = "../sapling"
+sapling_grammar.path = "../grammar"
+rand = "0.8"
+rand_distr = "0.4"
