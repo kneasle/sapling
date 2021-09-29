@@ -22,9 +22,7 @@ jobs:
       run: cargo test --verbose
     - name: Run clippy
       run: cargo clippy
-    - name: Run rustfmt
-      run: rustfmt src/**/*.rs --check
+    - name: Check formatting
+      run: cargo fmt -- --check
     - name: Check docs
-      run: |
-          rustup update nightly
-          cargo +nightly doc --no-deps --document-private-items
+      run: cargo doc --no-deps --document-private-items
