@@ -9,7 +9,7 @@ typed-arena = "2.0.1"
 hmap = "0.1.0"
 log = "0.4.14"
 pretty_env_logger = "0.4.0"
-serde_json = { version = "1.0.73", features = ["preserve_order"] }
+serde_json = { version = "1.0.74", features = ["preserve_order"] }
 crossterm = "0.22.1"
 tui = { version = "0.16.0", default-features = false, features = ["crossterm"] }
 tui-logger = "0.6.6"
