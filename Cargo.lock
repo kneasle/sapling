@@ -384,7 +384,7 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "serde_json",
- "tui",
+ "tui 0.16.0",
  "tui-logger",
  "typed-arena",
 ]
@@ -498,10 +498,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "tui-logger"
-version = "0.7.0"
+name = "tui"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6da221cbd8b72750b7a918c40f84009c963fcc244500abfe54f5fced92f4306"
+checksum = "23ed0a32c88b039b73f1b6c5acbd0554bfa5b6be94467375fd947c4de3a02271"
+dependencies = [
+ "bitflags",
+ "cassowary",
+ "unicode-segmentation",
+ "unicode-width",
+]
+
+[[package]]
+name = "tui-logger"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66278ef876c1336aca32cc590598563026dc3caf4cb73a20d47a3d499b913bbb"
 dependencies = [
  "chrono",
  "fxhash",
@@ -509,7 +521,7 @@ dependencies = [
  "log",
  "parking_lot 0.12.0",
  "slog",
- "tui",
+ "tui 0.17.0",
 ]
 
 [[package]]
