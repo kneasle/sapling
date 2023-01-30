@@ -10,6 +10,6 @@ hmap = "0.1.0"
 log = "0.4.17"
 pretty_env_logger = "0.4.0"
 serde_json = { version = "1.0.86", features = ["preserve_order"] }
-crossterm = "0.24.0"
+crossterm = "0.26.0"
 tui = { version = "0.17.0", default-features = false, features = ["crossterm"] }
 tui-logger = "0.7.1"
