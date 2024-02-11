@@ -5,7 +5,7 @@ authors = ["Ben White-Horne <kneasle@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-typed-arena = "2.0.1"
+typed-arena = "2.0.2"
 hmap = "0.1.0"
 log = "0.4.17"
 pretty_env_logger = "0.4.0"
