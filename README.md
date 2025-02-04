@@ -112,6 +112,9 @@ git clone https://github.com/kneasle/sapling.git
 cargo run 2> log
 ```
 
+If you have Nix you can also run `nix build` and `./result/bin/sapling 2> log`, or if you don't mind
+seeing stderr output even quicker with `nix run`. 
+
 ### Demo
 
 ![Demo GIF](https://user-images.githubusercontent.com/60934058/112751246-d8e23f00-8fc4-11eb-9a15-8a3ef32d54a4.gif)
